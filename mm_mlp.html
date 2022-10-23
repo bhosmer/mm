@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <title></title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
+  <link type="text/css" rel="stylesheet" href="main.css" />
+</head>
+
+<body>
+  <div id="info">mm2 hey 3</div>
+  <div id="container"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs/dist/tf.min.js"> </script>
+
+  <!-- Import maps polyfill -->
+  <!-- Remove this when import maps will be widely supported -->
+  <script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script>
+
+  <script type="importmap">
+			{
+				"imports": {
+					"three": "https://threejs.org/build/three.module.js"
+				}
+			}
+  </script>
+
+  <script type="module">
+
+    // TODO
+    // get this out of here
+    // shaders embedded in js rather than html? if so move to vis where they're used
+    // mm group object 
+    // gather up all this top level shit
+
+    import * as THREE from 'three'
+    import * as vis from './vis_mlp.js'
+
+    import { OrbitControls } from 'https://threejs.org/examples/jsm/controls/OrbitControls.js'
+    import { EffectComposer } from 'https://threejs.org/examples/jsm/postprocessing/EffectComposer.js';
+    import { RenderPass } from 'https://threejs.org/examples/jsm/postprocessing/RenderPass.js';
+    import { UnrealBloomPass } from 'https://threejs.org/examples/jsm/postprocessing/UnrealBloomPass.js';
+    import Stats from 'https://threejs.org/examples/jsm/libs/stats.module.js';
+
+    let scene
+    let camera
+    let renderer
+    let composer
+    let stats
+
+
+    const params = {
+      exposure: 1,
+      bloomStrength: 1.2,
+      bloomThreshold: 0,
+      bloomRadius: 0
+    };
+
+    function init() {
+
+      let container = document.getElementById('container')
+
+      renderer = new THREE.WebGLRenderer()
+      renderer.setPixelRatio(window.devicePixelRatio)
+      renderer.setSize(window.innerWidth, window.innerHeight)
+      container.appendChild(renderer.domElement)
+
+      scene = vis.createScene()
+      // scene.background = new THREE.Color(0x101010);
+      // scene.fog = new THREE.FogExp2(0xffffff, 0.9)
+      const light = new THREE.AmbientLight(0x0000ff);
+      scene.add(light);
+
+      // TODO position should depend on stuff in scene
+      camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 5, 10000);
+      camera.position.x = -64 // -1000 // -640
+      camera.position.y = 64 // 1000 // 640
+      camera.position.z = 64 // 1000 // 640
+
+      composer = new EffectComposer(renderer)
+
+      const renderPass = new RenderPass(scene, camera)
+      composer.addPass(renderPass)
+
+      var _ = new OrbitControls(camera, renderer.domElement)
+
+      stats = new Stats();
+      container.appendChild(stats.dom)
+
+      window.addEventListener('resize', onWindowResize, false)
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight
+      camera.updateProjectionMatrix()
+      composer.setSize(window.innerWidth, window.innerHeight)
+      renderer.setSize(window.innerWidth, window.innerHeight)
+    }
+
+    function animate(now) {
+      render(now)
+      stats.update()
+      requestAnimationFrame(animate)
+    }
+
+    function render(now) {
+      vis.bump(now)
+      composer.render(scene, camera)
+    }
+
+    // // main
+
+    init()
+    animate()
+
+  </script>
+</body>
+
+</html>
