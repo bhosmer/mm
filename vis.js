@@ -227,11 +227,22 @@ class Mat {
 
 }
 
+// https://stackoverflow.com/questions/25582882/javascript-math-random-normal-distribution-gaussian-bell-curve
+// Standard Normal variate using Box-Muller transform.
+function gaussianRandom(mean = 0, stdev = 1) {
+  let u = 1 - Math.random(); //Converting [0,1) to (0,1)
+  let v = Math.random();
+  let z = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+  // Transform to the desired mean and standard deviation:
+  return z * stdev + mean;
+}
+
 //
 // MatMul
 //
 export class MatMul {
 
+  // note: assumes input is in [0, 1]
   squeeze(x) {
     return this.init_base + this.init_range * x
   }
@@ -251,6 +262,8 @@ export class MatMul {
         return (i, j, h, w) => gate(() => this.squeeze((j * h + i) / (h * w)))
       case 'uniform':
         return (i, j, h, w) => gate(() => this.squeeze(Math.random()))
+      case 'gaussian':
+        return (i, j, h, w) => gate(() => this.squeeze(gaussianRandom(0.5, 0.5)))
       case 'tril':
         return (i, j, h, w) => gate(() => (j <= i ? 1 : 0))
       case 'triu':
@@ -649,7 +662,7 @@ export class MatMul {
       xname.geometry.translate(-2, -xh - center(this.H - 1, xh), xw + center(this.D - 1, xw))
       this.legends.push(xname)
 
-      const xhtext = this.getText("I = " + this.H, legend_color, legend_size)
+      const xhtext = this.getText("i = " + this.H, legend_color, legend_size)
       const { h: xhh, w: xhw } = bbhw(xhtext.geometry)
       xhtext.geometry.translate(center(this.H - 1, xhw), -2 * xhh, 1)
       xhtext.geometry.rotateX(-Math.PI / 2)
@@ -657,7 +670,7 @@ export class MatMul {
       xhtext.geometry.rotateZ(Math.PI / 2)
       this.legends.push(xhtext)
 
-      const xwtext = this.getText("J = " + this.D, legend_color, legend_size)
+      const xwtext = this.getText("j = " + this.D, legend_color, legend_size)
       const { h: xwh, w: xww } = bbhw(xwtext.geometry)
       xwtext.geometry.translate(center(this.D - 1, xww), -this.H - xwh, 1)
       xwtext.geometry.rotateY(-Math.PI / 2)
@@ -669,14 +682,14 @@ export class MatMul {
       yname.geometry.translate(center(this.W - 1, yw), 2, yh + center(this.D - 1, yh))
       this.legends.push(yname)
 
-      const yhtext = this.getText("J = " + this.D, legend_color, legend_size)
+      const yhtext = this.getText("j = " + this.D, legend_color, legend_size)
       const { h: yhh, w: yhw } = bbhw(yhtext.geometry)
       yhtext.geometry.translate((this.D - 1) / 2 - yhw / 2, this.W + yhh / 2, 1)
       yhtext.geometry.rotateX(-Math.PI / 2)
       yhtext.geometry.rotateY(-Math.PI / 2)
       this.legends.push(yhtext)
 
-      const ywtext = this.getText("K = " + this.W, legend_color, legend_size)
+      const ywtext = this.getText("k = " + this.W, legend_color, legend_size)
       const { h: ywh, w: yww } = bbhw(ywtext.geometry)
       ywtext.geometry.translate(center(this.W - 1, yww), ywh, 1)
       ywtext.geometry.rotateX(-Math.PI / 2)
@@ -687,13 +700,13 @@ export class MatMul {
       zname.geometry.translate(center(this.W - 1, zw), -zh - center(this.H - 1, zh), this.D + 1)
       this.legends.push(zname)
 
-      const zhtext = this.getText("I = " + this.H, legend_color, legend_size)
+      const zhtext = this.getText("i = " + this.H, legend_color, legend_size)
       const { h: zhh, w: zhw } = bbhw(zhtext.geometry)
       zhtext.geometry.translate(center(this.H - 1, zhw), this.W + zhh / 2, this.D)
       zhtext.geometry.rotateZ(-Math.PI / 2)
       this.legends.push(zhtext)
 
-      const zwtext = this.getText("K = " + this.W, legend_color, legend_size)
+      const zwtext = this.getText("k = " + this.W, legend_color, legend_size)
       const { h: zwh, w: zww } = bbhw(zwtext.geometry)
       zwtext.geometry.translate(center(this.W - 1, zww), -this.H - 1.5 * zwh, this.D)
       this.legends.push(zwtext)
