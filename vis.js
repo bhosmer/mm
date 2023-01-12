@@ -275,11 +275,14 @@ export class MatMul {
     }
   }
 
-  constructor(params, getText) {
+  constructor(params, getText, group = undefined) {
     this.getText = getText
     this.params = { ...params }
 
     this.group = new THREE.Group()
+    if (group) {
+      group.add(this.group)
+    }
 
     this.H = params.I
     this.D = params.J
@@ -296,11 +299,19 @@ export class MatMul {
   }
 
   initLeftData() {
+    if (this.params.left) {
+      this.left_data = this.params.left.data
+      return
+    }
     const left_init = this.getInitFunc(this.params['left init'], this.params['left sparsity']);
     this.left_data = new Array(this.H, this.D, left_init);
   }
 
   initRightData() {
+    if (this.params.right) {
+      this.right_data = this.params.right.data
+      return
+    }
     const right_init = this.getInitFunc(this.params['right init'], this.params['right sparsity']);
     this.right_data = new Array(this.D, this.W, right_init);
   }
@@ -331,37 +342,24 @@ export class MatMul {
     this.legends = []
     this.setLegends(this.params.legends)
 
-    this.initPosition();
+    this.setPosition();
   }
 
-  initPosition() {
-    // center cube on 0,0,0
-    this.group.position.x = -(this.W - 1) / 2;
-    this.group.position.y = (this.H - 1) / 2;
-    this.group.position.z = -(this.D - 1) / 2;
-  }
-
-  initResultVis() {
-    if (this.result) {
-      this.group.remove(this.result.points)
-    }
-    this.result = new Mat(this.H, this.W, this.result_data, this);
-    this.result.points.rotation.x = Math.PI;
-    this.result.points.position.z = this.D;
-    this.group.add(this.result.points);
-  }
-
-  initRightVis() {
-    if (this.right) {
-      this.group.remove(this.right.points)
-    }
-    this.right = new Mat(this.D, this.W, this.right_data, this);
-    this.right.points.rotation.x = Math.PI / 2;
-    this.right.points.position.y = 1;
-    this.group.add(this.right.points);
+  setPosition() {
+    // center cube on 0,0,0 if no pos given
+    // note: don't save into params
+    const pos = this.params.pos ? this.params.pos :
+      new THREE.Vector3(-(this.W - 1) / 2, (this.H - 1) / 2, -(this.D - 1) / 2)
+    this.group.position.x = pos.x
+    this.group.position.y = pos.y
+    this.group.position.z = pos.z
   }
 
   initLeftVis() {
+    if (this.params.left) {
+      this.left = this.params.left
+      return
+    }
     if (this.left) {
       this.group.remove(this.left.points)
     }
@@ -370,6 +368,42 @@ export class MatMul {
     this.left.points.rotation.z = Math.PI;
     this.left.points.position.x = -1;
     this.group.add(this.left.points);
+  }
+
+  initRightVis() {
+    if (this.params.right) {
+      this.right = this.params.right
+      return
+    }
+    if (this.right) {
+      this.group.remove(this.right.points)
+    }
+    this.right = new Mat(this.D, this.W, this.right_data, this);
+    this.right.points.rotation.x = Math.PI / 2;
+    if (this.params.right_rot) {
+      Object.keys(this.params.right_rot).map(k => this.right.points.rotation[k] += this.params.right_rot[k])
+    }
+    this.right.points.position.y = 1;
+    if (this.params.right_pos) {
+      Object.keys(this.params.right_pos).map(k => this.right.points.position[k] += this.params.right_pos[k])
+    }
+    this.group.add(this.right.points);
+  }
+
+  initResultVis() {
+    if (this.result) {
+      this.group.remove(this.result.points)
+    }
+    this.result = new Mat(this.H, this.W, this.result_data, this);
+    this.result.points.rotation.x = Math.PI;
+    if (this.params.result_rot) {
+      Object.keys(this.params.result_rot).map(k => this.result.points.rotation[k] += this.params.result_rot[k])
+    }
+    this.result.points.position.z = this.D;
+    if (this.params.result_pos) {
+      Object.keys(this.params.result_pos).map(k => this.result.points.position[k] += this.params.result_pos[k])
+    }
+    this.group.add(this.result.points);
   }
 
   setEpilog(epilog) {
@@ -656,11 +690,12 @@ export class MatMul {
       const name_color = 0xbbddff
       const name_size = (this.H + this.D + this.W) / 30
 
-      const xname = this.getText("X", name_color, name_size)
-      const { h: xh, w: xw } = bbhw(xname.geometry)
-      xname.geometry.rotateY(Math.PI / 2)
-      xname.geometry.translate(-2, -xh - center(this.H - 1, xh), xw + center(this.D - 1, xw))
-      this.legends.push(xname)
+      const xname = this.params.left_name ? this.params.left_name : "X"
+      const xtext = this.getText(xname, name_color, name_size)
+      const { h: xh, w: xw } = bbhw(xtext.geometry)
+      xtext.geometry.rotateY(Math.PI / 2)
+      xtext.geometry.translate(-2, -xh - center(this.H - 1, xh), xw + center(this.D - 1, xw))
+      this.legends.push(xtext)
 
       const xhtext = this.getText("i = " + this.H, legend_color, legend_size)
       const { h: xhh, w: xhw } = bbhw(xhtext.geometry)
@@ -676,11 +711,12 @@ export class MatMul {
       xwtext.geometry.rotateY(-Math.PI / 2)
       this.legends.push(xwtext)
 
-      const yname = this.getText("Y", name_color, name_size)
-      const { h: yh, w: yw } = bbhw(yname.geometry)
-      yname.geometry.rotateX(-Math.PI / 2)
-      yname.geometry.translate(center(this.W - 1, yw), 2, yh + center(this.D - 1, yh))
-      this.legends.push(yname)
+      const yname = this.params.right_name ? this.params.right_name : "Y"
+      const ytext = this.getText(yname, name_color, name_size)
+      const { h: yh, w: yw } = bbhw(ytext.geometry)
+      ytext.geometry.rotateX(-Math.PI / 2)
+      ytext.geometry.translate(center(this.W - 1, yw), 2, yh + center(this.D - 1, yh))
+      this.legends.push(ytext)
 
       const yhtext = this.getText("j = " + this.D, legend_color, legend_size)
       const { h: yhh, w: yhw } = bbhw(yhtext.geometry)
@@ -695,10 +731,11 @@ export class MatMul {
       ywtext.geometry.rotateX(-Math.PI / 2)
       this.legends.push(ywtext)
 
-      const zname = this.getText("XY", name_color, name_size)
-      const { h: zh, w: zw } = bbhw(zname.geometry)
-      zname.geometry.translate(center(this.W - 1, zw), -zh - center(this.H - 1, zh), this.D + 1)
-      this.legends.push(zname)
+      const zname = this.params.result_name ? this.params.result_name : "XY"
+      const ztext = this.getText(zname, name_color, name_size)
+      const { h: zh, w: zw } = bbhw(ztext.geometry)
+      ztext.geometry.translate(center(this.W - 1, zw), -zh - center(this.H - 1, zh), this.D + 1)
+      this.legends.push(ztext)
 
       const zhtext = this.getText("i = " + this.H, legend_color, legend_size)
       const { h: zhh, w: zhw } = bbhw(zhtext.geometry)
@@ -717,6 +754,58 @@ export class MatMul {
       this.legends = []
     }
   }
+}
+
+//
+// Attn
+//
+
+export class Attn {
+  constructor(params, getText, group = undefined) {
+    this.getText = getText
+    this.group = group ? group : new THREE.Group()
+
+    // TODO passed in
+    const mm1_params = { ...params }
+    const mm2_params = { ...params }
+
+    if (mm1_params.I != mm2_params.I) {
+      throw Error(`mm1_params.I ${mm1_params.I} mm2_params.I ${mm2_params.I}`)
+    }
+    if (mm1_params.K != mm2_params.J) {
+      throw Error(`mm1_params.K ${mm1_params.K} mm2_params.J ${mm2_params.J}`)
+    }
+
+    this.H = mm1_params.I
+    this.D = mm1_params.J + mm2_params.K
+    this.W = mm1_params.K
+
+    // TODO offset from parent pos
+    this.mm1_params = mm1_params
+    this.mm1_params.pos = new THREE.Vector3(-this.W / 2, this.H / 2, -this.D / 2)
+    this.mm1 = new MatMul(this.mm1_params, getText, this.group)
+
+    this.mm2_params = mm2_params
+    this.mm2_params.left = this.mm1.result
+    this.mm2_params.right_pos = new THREE.Vector3(0, -this.H - 1, mm2_params.K)
+    this.mm2_params.right_rot = new THREE.Vector3(0, 0, -Math.PI / 2)
+    this.mm2_params.result_pos = new THREE.Vector3(this.W, 0, 0)
+    this.mm2_params.result_rot = new THREE.Vector3(0, -Math.PI / 2, 0)
+    this.mm2_params.pos = new THREE.Vector3(-this.W / 2, this.H / 2, -this.D / 2 + mm1_params.J)
+    this.mm2 = new MatMul(this.mm2_params, getText, this.group)
+  }
+
+  bump() {
+    this.mm1.bump()
+    this.mm2.bump()
+  }
+
+  // TODO devolve to Mat
+  setGuides(enabled) {
+    this.mm1.setGuides(enabled)
+    this.mm2.setGuides(enabled)
+  }
+
 }
 
 //
