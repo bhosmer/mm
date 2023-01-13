@@ -36,13 +36,13 @@
     import { RenderPass } from 'https://threejs.org/examples/jsm/postprocessing/RenderPass.js'
 
     const init_dims = { i: 32, j: 32, k: 32 }
-    const init_funcs = ['rows', 'cols', 'row major', 'col major', 'uniform', 'gaussian', 'tril', 'triu', 'eye']
+    const init_funcs = ['rows', 'cols', 'row major', 'col major', 'uniform', 'gaussian', 'tril', 'triu', 'eye', 'diff']
 
     const params = {
       'I': init_dims.i,
       'J': init_dims.j,
       'K': init_dims.k,
-      'animation': 'dotprod',
+      'animation': 'none',
       'speed': 8,
       'pause': false,
       'left init': 'rows',
@@ -52,12 +52,12 @@
       'init min': -1,
       'init max': 1,
       'epilog': 'none',
-      'zero hue': 0.4,
+      'zero hue': 0.25,
       'zero size': 0.25,
       'zero light': 0.15,
       'max light': 0.65,
       'hue gap': 0.25,
-      'hue spread': 0.1,
+      'hue spread': 0.01,
       'guides': false,
       'legends': true,
       'axes': false,
@@ -186,18 +186,25 @@
       gui.add(params, 'I', 1, 128).onChange(function (val) {
         val = Math.floor(val)
         setParams({ I: val })
-        getObj().setI(val)
+        if (val != getObj().params.I) {
+          getObj().setI(val)
+        }
       })
 
       gui.add(params, 'J', 1, 128).onChange(function (val) {
-        setParams({ J: Math.floor(val) })
-        initObj()
+        val = Math.floor(val)
+        setParams({ J: val })
+        if (val != getObj().params.J) {
+          initObj()
+        }
       })
 
       gui.add(params, 'K', 1, 128).onChange(function (val) {
         val = Math.floor(val)
         setParams({ K: val })
-        getObj().setK(val)
+        if (val != getObj().params.K) {
+          getObj().setK(val)
+        }
       })
 
       gui.add(params, 'animation', ['itemwise', 'dotprod', 'mvprod', 'vmprod', 'none']).onChange(function (val) {

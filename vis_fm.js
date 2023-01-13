@@ -249,7 +249,7 @@ class Mat {
         const { h: hleg, w: wleg } = bbhw(legend.geometry)
         legend.geometry.rotateY(Math.PI)
         legend.geometry.rotateZ(Math.PI)
-        legend.geometry.translate(center(this.w - 1, wleg), hleg + center(this.h - 1, hleg), -(1 + hleg / 2))
+        legend.geometry.translate(center(this.w - 1, wleg), hleg + center(this.h - 1, hleg), -hleg / 2)
         this.group.add(legend)
         this.name_legend = legend
       }
@@ -310,13 +310,13 @@ export class MatMul {
       (f => f())
     switch (name) {
       case 'rows':
-        return (i, j, h, w) => gate(() => this.squeeze(h > 1 ? i / (h - 1) : 0))
+        return (i, j, h, w) => gate(() => this.squeeze(i / h))
       case 'cols':
-        return (i, j, h, w) => gate(() => this.squeeze(w > 1 ? j / (w - 1) : 0))
+        return (i, j, h, w) => gate(() => this.squeeze(j / w))
       case 'row major':
-        return (i, j, h, w) => gate(() => this.squeeze(h * w > 1 ? (i * w + j) / (h * w - 1) : 0))
+        return (i, j, h, w) => gate(() => this.squeeze((i * w + j) / (h * w)))
       case 'col major':
-        return (i, j, h, w) => gate(() => this.squeeze(h * w > 1 ? (j * h + i) / (h * w) : 0))
+        return (i, j, h, w) => gate(() => this.squeeze((j * h + i) / (h * w)))
       case 'uniform':
         return (i, j, h, w) => gate(() => this.squeeze(Math.random()))
       case 'gaussian':
@@ -327,8 +327,6 @@ export class MatMul {
         return (i, j, h, w) => gate(() => (j >= i ? 1 : 0))
       case 'eye':
         return (i, j, h, w) => gate(() => (i == j ? 1 : 0))
-      case 'diff':
-        return (i, j, h, w) => gate(() => (i == j ? 1 : i == j + 1 ? -1 : 0))
       default:
         throw Error(`unrecognized initializer: ${name}`)
     }
@@ -766,7 +764,7 @@ export class MatMul {
   }
 
   getNameColor() {
-    return this.params.name_color ? this.params.name_color : 0xccccff
+    return this.params.name_color ? this.params.name_color : 0xbbddff
   }
 
   getDimColor() {
@@ -774,7 +772,7 @@ export class MatMul {
   }
 
   getNameSize() {
-    return (this.H + this.D + this.W) / 32
+    return (this.H + this.D + this.W) / 30
   }
 
   getDimSize() {
@@ -856,7 +854,7 @@ export class MatMul {
 }
 
 //
-// Attn (Q @ K) @ V
+// Attn
 //
 
 export class Attn {
@@ -869,10 +867,10 @@ export class Attn {
     const mm2_params = { ...params }
 
     if (mm1_params.I != mm2_params.I) {
-      throw Error(`Attn: mm1_params.I ${mm1_params.I} mm2_params.I ${mm2_params.I}`)
+      throw Error(`mm1_params.I ${mm1_params.I} mm2_params.I ${mm2_params.I}`)
     }
     if (mm1_params.K != mm2_params.J) {
-      throw Error(`Attn: mm1_params.K ${mm1_params.K} mm2_params.J ${mm2_params.J}`)
+      throw Error(`mm1_params.K ${mm1_params.K} mm2_params.J ${mm2_params.J}`)
     }
 
     this.H = mm1_params.I
@@ -892,76 +890,9 @@ export class Attn {
     this.mm2_params.result_name = "out"
     this.mm2_params.pos = new THREE.Vector3(-this.W / 2, this.H / 2, -this.D / 2 + mm1_params.J)
     this.mm2_params.left = this.mm1.result
-    // this.mm2_params.right_pos = new THREE.Vector3(0, -this.H - 1, 1) // bot
-    this.mm2_params.right_pos = new THREE.Vector3(0, 0, 1)
+    this.mm2_params.right_pos = new THREE.Vector3(0, -this.H - 1, 1)
     this.mm2_params.right_rot = new THREE.Vector3(Math.PI, 0, -Math.PI / 2)
     this.mm2_params.result_pos = new THREE.Vector3(this.W, 0, -mm1_params.J + 1)
-    this.mm2_params.result_rot = new THREE.Vector3(0, Math.PI / 2, 0)
-    this.mm2 = new MatMul(this.mm2_params, getText, this.group)
-  }
-
-  bump() {
-    this.mm1.bump()
-    this.mm2.bump()
-  }
-
-  setGuides(enabled) {
-    this.mm1.setGuides(enabled)
-    this.mm2.setGuides(enabled)
-  }
-
-  setLegends(enabled) {
-    this.mm1.setLegends(enabled)
-    this.mm2.setLegends(enabled)
-  }
-}
-
-//
-// MLP W1 @ (W0 @ X)
-//
-
-export class MLP {
-  constructor(params, getText, group = undefined) {
-    this.getText = getText
-    this.group = group ? group : new THREE.Group()
-
-    // TODO passed in
-    const mm1_params = { ...params }
-    const mm2_params = { ...params }
-
-    if (mm1_params.I != mm2_params.K) {
-      throw Error(`MLP: mm1_params.I ${mm1_params.I} mm2_params.K ${mm2_params.K}`)
-    }
-    if (mm1_params.K != mm2_params.J) {
-      throw Error(`MLP: mm1_params.K ${mm1_params.K} mm2_params.J ${mm2_params.J}`)
-    }
-
-    // @@@@@@@@@@@@@@@@@@@@@
-
-    this.H = mm1_params.I
-    this.D = mm1_params.J + mm2_params.I
-    this.W = mm1_params.K
-
-    // TODO offset from parent pos
-    this.mm1_params = mm1_params
-    this.mm1_params.left_name = "W0"
-    this.mm1_params.right_name = "X"
-    this.mm1_params.result_name = "W0 @ X"
-    this.mm1_params.pos = new THREE.Vector3(-this.W / 2, this.H / 2, -this.D / 2)
-    this.mm1 = new MatMul(this.mm1_params, getText, this.group)
-
-    this.mm2_params = mm2_params
-    this.mm2_params.left_name = "W1"
-    this.mm2_params.result_name = "out"
-    this.mm2_params.pos = new THREE.Vector3(-this.W / 2, this.H / 2, -this.D / 2 + mm1_params.J)
-
-    this.mm2_params.right = this.mm1.result
-
-    this.mm2_params.left_pos = new THREE.Vector3(0, 0, 1)
-    this.mm2_params.left_rot = new THREE.Vector3(Math.PI, 0, -Math.PI / 2)
-
-    // this.mm2_params.result_pos = new THREE.Vector3(this.W, 0, -mm1_params.J + 1)
-    this.mm2_params.result_pos = new THREE.Vector3(0, -this.H - 1, 1) // bot
     this.mm2_params.result_rot = new THREE.Vector3(0, Math.PI / 2, 0)
     this.mm2 = new MatMul(this.mm2_params, getText, this.group)
   }
