@@ -17,7 +17,7 @@ const MATERIAL = new THREE.ShaderMaterial({
   void main() {
     vColor = pointColor;
     vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
-    gl_PointSize = pointSize * 100.0 / -mvPosition.z;
+    gl_PointSize = pointSize / -mvPosition.z;
     gl_Position = projectionMatrix * mvPosition;
   }
 `,
@@ -83,7 +83,7 @@ class Array {
 // Mat
 //
 class Mat {
-  ELEM_SIZE = 20
+  ELEM_SIZE = 2048
   ELEM_SAT = 1.0
   ELEM_LIGHT = 0.6
 
@@ -269,7 +269,8 @@ class Mat {
         legend.geometry.rotateX(Math.PI)
         const zrot = (left ? -1 : 1) * Math.PI / 2
         legend.geometry.rotateZ(zrot)
-        const xoff = left ? hleg * -1.5 : this.w + hleg * 0.5
+        const spacer = 0.25
+        const xoff = left ? -hleg * 1.5 - spacer : this.w - 1 + hleg + spacer
         const yoff = left ? wleg + center(this.h - 1, wleg) : center(this.h - 1, wleg)
         legend.geometry.translate(xoff, yoff, 0)
         this.group.add(legend)
@@ -282,6 +283,28 @@ class Mat {
       }
     }
   }
+
+  setWidthLegend(enabled, name, top, getText, color, size) {
+    if (enabled) {
+      if (!this.width_legend) {
+        const legend = getText(`${name} = ${this.w}`, color, size)
+        const { h: hleg, w: wleg } = bbhw(legend.geometry)
+        legend.geometry.rotateX(Math.PI)
+        const spacer = 0.25
+        const xoff = center(this.w - 1, wleg)
+        const yoff = top ? -hleg * 2 - spacer : this.h - 1 + hleg * 1.5 + spacer
+        legend.geometry.translate(xoff, yoff, 0)
+        this.group.add(legend)
+        this.width_legend = legend
+      }
+    } else {
+      if (this.width_legend) {
+        this.group.remove(this.width_legend)
+        this.width_legend = undefined
+      }
+    }
+  }
+
 }
 
 // https://stackoverflow.com/questions/25582882/javascript-math-random-normal-distribution-gaussian-bell-curve
@@ -395,12 +418,6 @@ export class MatMul {
     this.animation = 'none'
     this.setAnimation(this.params.animation)
 
-    // this.rowguides = []
-    // this.setGuides(this.params.guides)
-
-    this.legends = []
-    this.setLegends(this.params.legends)
-
     this.setPosition();
   }
 
@@ -427,9 +444,7 @@ export class MatMul {
     this.left.group.rotation.z = Math.PI;
     this.left.group.position.x = -1;
     this.left.setGuide(this.params.guides)
-    this.left.setNameLegend(this.params.legends, this.getLeftName(), this.getText, this.getNameColor(), this.getNameSize())
-    this.left.setHeightLegend(this.params.legends, this.getHeightName(), true, this.getText, this.getDimColor(), this.getDimSize())
-    // this.left.setWidthLegend(this.params.legends, this.getDepthName(), this.getText, this.getDimColor(), this.getDimSize())
+    this.setLeftLegends(this.params.legends)
     this.group.add(this.left.group)
   }
 
@@ -451,8 +466,7 @@ export class MatMul {
       Object.keys(this.params.right_pos).map(k => this.right.group.position[k] += this.params.right_pos[k])
     }
     this.right.setGuide(this.params.guides)
-    this.left.setNameLegend(this.params.legends, this.getRightName(), this.getText, this.getNameColor(), this.getNameSize())
-    this.left.setHeightLegend(this.params.legends, this.getDepthName(), true, this.getText, this.getDimColor(), this.getDimSize())
+    this.setRightLegends(this.params.legends)
     this.group.add(this.right.group)
   }
 
@@ -469,8 +483,8 @@ export class MatMul {
     if (this.params.result_pos) {
       Object.keys(this.params.result_pos).map(k => this.result.group.position[k] += this.params.result_pos[k])
     }
-    this.result.setNameLegend(this.params.legends, this.getResultName(), this.getText, this.getNameColor(), this.getNameSize())
     this.result.setGuide(this.params.guides)
+    this.setResultLegends(this.params.legends)
     this.group.add(this.result.group);
   }
 
@@ -781,78 +795,34 @@ export class MatMul {
     return (this.H + this.D + this.W) / 75
   }
 
-  // TODO devolve to Mat
+  // TODO this is clumsy, devolve to Mat
+
+  setLeftLegends(enabled) {
+    this.left.setNameLegend(enabled, this.getLeftName(), this.getText, this.getNameColor(), this.getNameSize())
+    this.left.setHeightLegend(enabled, this.getHeightName(), true, this.getText, this.getDimColor(), this.getDimSize())
+    this.left.setWidthLegend(enabled, this.getDepthName(), false, this.getText, this.getDimColor(), this.getDimSize())
+  }
+
+  setRightLegends(enabled) {
+    this.right.setNameLegend(enabled, this.getRightName(), this.getText, this.getNameColor(), this.getNameSize())
+    this.right.setHeightLegend(enabled, this.getDepthName(), false, this.getText, this.getDimColor(), this.getDimSize())
+    this.right.setWidthLegend(enabled, this.getWidthName(), true, this.getText, this.getDimColor(), this.getDimSize())
+  }
+
+  setResultLegends(enabled) {
+    this.result.setNameLegend(enabled, this.getResultName(), this.getText, this.getNameColor(), this.getNameSize())
+    this.result.setHeightLegend(enabled, this.getHeightName(), false, this.getText, this.getDimColor(), this.getDimSize())
+    this.result.setWidthLegend(enabled, this.getWidthName(), false, this.getText, this.getDimColor(), this.getDimSize())
+  }
+
+
   setLegends(enabled) {
     this.params.legends = enabled
-
-    const dim_color = this.getDimColor() // 0x00aaff
-    const dim_size = this.getDimSize() // (this.H + this.D + this.W) / 75
-    const name_color = this.getNameColor() // 0xbbddff
-    const name_size = this.getNameSize() // (this.H + this.D + this.W) / 30
-
-    if (!this.params.left) {
-      this.left.setNameLegend(enabled, this.getLeftName(), this.getText, name_color, name_size)
-      this.left.setHeightLegend(enabled, this.getHeightName(), true, this.getText, dim_color, dim_size)
-      // this.left.setWidthLegend(enabled, this.getDepthName(), this.getText, dim_color, dim_size)
-    }
-
-    if (!this.params.right) {
-      this.right.setNameLegend(enabled, this.getRightName(), this.getText, name_color, name_size)
-      this.right.setHeightLegend(enabled, this.getDepthName(), false, this.getText, dim_color, dim_size)
-    }
-
-    this.result.setNameLegend(enabled, this.getResultName(), this.getText, name_color, name_size)
-
-
-    if (enabled) {
-      if (!this.params.left) {
-        // const xhtext = this.getText("i = " + this.H, dim_color, dim_size)
-        // const { h: xhh, w: xhw } = bbhw(xhtext.geometry)
-        // xhtext.geometry.translate(center(this.H - 1, xhw), -2 * xhh, 1)
-        // xhtext.geometry.rotateX(-Math.PI / 2)
-        // xhtext.geometry.rotateY(-Math.PI)
-        // xhtext.geometry.rotateZ(Math.PI / 2)
-        // this.legends.push(xhtext)
-
-        const xwtext = this.getText("j = " + this.D, dim_color, dim_size)
-        const { h: xwh, w: xww } = bbhw(xwtext.geometry)
-        xwtext.geometry.translate(center(this.D - 1, xww), -this.H - xwh, 1)
-        xwtext.geometry.rotateY(-Math.PI / 2)
-        this.legends.push(xwtext)
-      }
-
-      if (!this.params.right) {
-        // const yhtext = this.getText("j = " + this.D, dim_color, dim_size)
-        // const { h: yhh, w: yhw } = bbhw(yhtext.geometry)
-        // yhtext.geometry.translate((this.D - 1) / 2 - yhw / 2, this.W + yhh / 2, 1)
-        // yhtext.geometry.rotateX(-Math.PI / 2)
-        // yhtext.geometry.rotateY(-Math.PI / 2)
-        // this.legends.push(yhtext)
-
-        const ywtext = this.getText("k = " + this.W, dim_color, dim_size)
-        const { h: ywh, w: yww } = bbhw(ywtext.geometry)
-        ywtext.geometry.translate(center(this.W - 1, yww), ywh, 1)
-        ywtext.geometry.rotateX(-Math.PI / 2)
-        this.legends.push(ywtext)
-      }
-
-      const zhtext = this.getText("i = " + this.H, dim_color, dim_size)
-      const { h: zhh, w: zhw } = bbhw(zhtext.geometry)
-      zhtext.geometry.translate(center(this.H - 1, zhw), this.W + zhh / 2, this.D)
-      zhtext.geometry.rotateZ(-Math.PI / 2)
-      this.legends.push(zhtext)
-
-      const zwtext = this.getText("k = " + this.W, dim_color, dim_size)
-      const { h: zwh, w: zww } = bbhw(zwtext.geometry)
-      zwtext.geometry.translate(center(this.W - 1, zww), -this.H - 1.5 * zwh, this.D)
-      this.legends.push(zwtext)
-
-      this.legends.map(leg => this.group.add(leg))
-    } else {
-      this.legends.map(leg => this.group.remove(leg))
-      this.legends = []
-    }
+    this.setLeftLegends(enabled)
+    this.setRightLegends(enabled)
+    this.setResultLegends(enabled)
   }
+
 }
 
 //
