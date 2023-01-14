@@ -76,7 +76,7 @@ export function castToType(x, t, name) {
 //
 
 export function bbhw(g) {
-  return { h: g.boundingBox.max.y - g.boundingBox.min.y, w: g.boundingBox.max.y - g.boundingBox.min.y }
+  return { h: g.boundingBox.max.y - g.boundingBox.min.y, w: g.boundingBox.max.x - g.boundingBox.min.x }
 }
 
 export function center(x, y) {

@@ -854,6 +854,7 @@ export class MatMul {
 export class Attn {
   constructor(params, getText) {
     this.getText = getText
+    this.params = { ...params }
     this.group = new THREE.Group()
 
     // TODO passed in
@@ -871,31 +872,72 @@ export class Attn {
     this.D = mm1_params.J + mm2_params.K
     this.W = mm1_params.K
 
-    // TODO offset from parent pos
     this.mm1_params = mm1_params
+    this.initmm1()
+    this.mm2_params = mm2_params
+    this.initmm2()
+
+    this.setPosition()
+  }
+
+  setPosition() {
+    // center cube on 0,0,0 if no pos given
+    // note: don't save into params
+    const pos = this.params.pos ? this.params.pos :
+      new THREE.Vector3(-this.W / 2, this.H / 2, -this.D / 2)
+    this.group.position.x = pos.x
+    this.group.position.y = pos.y
+    this.group.position.z = pos.z
+  }
+
+  initmm1() {
+    if (this.mm1) {
+      this.group.remove(this.mm1.group)
+    }
     this.mm1_params.left_name = "Q"
     this.mm1_params.right_name = "K^T"
     this.mm1_params.result_name = "attn"
-    this.mm1_params.pos = new THREE.Vector3(-this.W / 2, this.H / 2, -this.D / 2)
-    this.mm1 = new MatMul(this.mm1_params, getText, this.group)
+    this.mm1_params.pos = new THREE.Vector3(0, 0, 0)
+    this.mm1 = new MatMul(this.mm1_params, this.getText, this.group)
     this.group.add(this.mm1.group)
+  }
 
-    this.mm2_params = mm2_params
+  initmm2() {
+    if (this.mm2) {
+      this.group.remove(this.mm2.group)
+    }
+    this.mm2_params.left = this.mm1.result
     this.mm2_params.right_name = "V"
     this.mm2_params.result_name = "out"
-    this.mm2_params.pos = new THREE.Vector3(-this.W / 2, this.H / 2, -this.D / 2 + mm1_params.J)
-    this.mm2_params.left = this.mm1.result
-    this.mm2_params.right_pos = new THREE.Vector3(0, 0, 1)
+    this.mm2_params.pos = new THREE.Vector3(0, 0, this.mm1.D + 1)
     this.mm2_params.right_rot = new THREE.Vector3(Math.PI, 0, -Math.PI / 2)
-    this.mm2_params.result_pos = new THREE.Vector3(this.W, 0, -mm1_params.J + 1)
+    this.mm2_params.result_pos = new THREE.Vector3(this.W, 0, -this.mm1_params.K)
     this.mm2_params.result_rot = new THREE.Vector3(0, Math.PI / 2, 0)
-    this.mm2 = new MatMul(this.mm2_params, getText, this.group)
+    this.mm2 = new MatMul(this.mm2_params, this.getText, this.group)
     this.group.add(this.mm2.group)
   }
 
   bump() {
     this.mm1.bump()
     this.mm2.bump()
+  }
+
+  setI(i) {
+    this.H = this.params.I = i
+    this.mm1_params.I = i
+    this.mm1.setI(i)
+    this.mm2_params.I = i
+    this.mm2.setI(i)
+    this.setPosition()
+  }
+
+  setK(k) {
+    this.W = this.params.K = k
+    this.mm1_params.K = k
+    this.mm1.setK(k)
+    this.mm2_params.J = k
+    this.initmm2()
+    this.setPosition()
   }
 
   setGuides(enabled) {
