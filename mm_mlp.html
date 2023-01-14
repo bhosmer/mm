@@ -32,11 +32,12 @@
     import { FontLoader } from 'https://threejs.org/examples/jsm/loaders/FontLoader.js';
     import { GUI } from 'https://threejs.org/examples/jsm/libs/lil-gui.module.min.js';
     import { OrbitControls } from 'https://threejs.org/examples/jsm/controls/OrbitControls.js'
+    import { ArcballControls } from 'https://threejs.org/examples/jsm/controls/ArcballControls.js';
     import { EffectComposer } from 'https://threejs.org/examples/jsm/postprocessing/EffectComposer.js'
     import { RenderPass } from 'https://threejs.org/examples/jsm/postprocessing/RenderPass.js'
 
     const init_dims = { i: 32, j: 32, k: 32 }
-    const init_funcs = ['rows', 'cols', 'row major', 'col major', 'uniform', 'tril', 'triu', 'eye']
+    const init_funcs = ['rows', 'cols', 'row major', 'col major', 'uniform', 'gaussian', 'tril', 'triu', 'eye', 'diff', 'ones', 'zeros']
 
     const params = {
       'I': init_dims.i,
@@ -52,12 +53,12 @@
       'init min': -1,
       'init max': 1,
       'epilog': 'none',
-      'zero hue': 0.4,
+      'zero hue': 0.25,
       'zero size': 0.25,
       'zero light': 0.15,
       'max light': 0.65,
       'hue gap': 0.25,
-      'hue spread': 0.1,
+      'hue spread': 0.01,
       'guides': false,
       'legends': true,
       'axes': false,
@@ -157,6 +158,11 @@
         setParams({ xcam: camera.position.x, ycam: camera.position.y, zcam: camera.position.z })
       }, false)
 
+      // let arcball = new ArcballControls(camera, renderer.domElement, scene);
+      // arcball.addEventListener('change', function () {
+      //   setParams({ xcam: camera.position.x, ycam: camera.position.y, zcam: camera.position.z })
+      // }, false)
+
       function onWindowResize() {
         camera.aspect = window.innerWidth / window.innerHeight
         camera.updateProjectionMatrix()
@@ -186,112 +192,132 @@
       gui.add(params, 'I', 1, 128).onChange(function (val) {
         val = Math.floor(val)
         setParams({ I: val })
-        getObj().setI(val)
+        if (val != getObj().params.I) {
+          getObj().setI(val)
+        }
       })
 
       gui.add(params, 'J', 1, 128).onChange(function (val) {
-        setParams({ J: Math.floor(val) })
-        initObj()
+        val = Math.floor(val)
+        setParams({ J: val })
+        if (val != getObj().params.J) {
+          initObj()
+        }
       })
 
       gui.add(params, 'K', 1, 128).onChange(function (val) {
         val = Math.floor(val)
         setParams({ K: val })
-        getObj().setK(val)
+        if (val != getObj().params.K) {
+          getObj().setK(val)
+        }
       })
 
-      gui.add(params, 'animation', ['itemwise', 'dotprod', 'mvprod', 'vmprod', 'none']).onChange(function (val) {
-        setParams({ animation: val })
-        getObj().initVis(params)
-      })
+      const gui_data = gui.addFolder('data')
 
-      gui.add(params, 'speed', 1, 10).onChange(function (val) {
-        setParams({ speed: Math.floor(val) })
-      })
-
-      gui.add(params, 'pause').onChange(function (val) {
-        setParams({ pause: val })
-      })
-
-      gui.add(params, 'left init', init_funcs).onChange(function (val) {
+      gui_data.add(params, 'left init', init_funcs).onChange(function (val) {
         setParams({ 'left init': val })
         initObj()
       })
 
-      gui.add(params, 'left sparsity', 0.0, 1.0).onChange(function (val) {
-        setParams({ 'left sparsity': val })
-        getObj().initLeft(params)
-      })
-
-      gui.add(params, 'right init', init_funcs).onChange(function (val) {
+      gui_data.add(params, 'right init', init_funcs).onChange(function (val) {
         setParams({ 'right init': val })
         initObj()
       })
 
-      gui.add(params, 'right sparsity', 0.0, 1.0).onChange(function (val) {
+      gui_data.add(params, 'left sparsity', 0.0, 1.0).onChange(function (val) {
+        setParams({ 'left sparsity': val })
+        getObj().initLeft(params)
+      })
+
+      gui_data.add(params, 'right sparsity', 0.0, 1.0).onChange(function (val) {
         setParams({ 'right sparsity': val })
         getObj().initRight(params)
       })
 
-      gui.add(params, 'init min', -1.0, 1.0).onChange(function (val) {
+      gui_data.add(params, 'init min', -1.0, 1.0).onChange(function (val) {
         setParams({ 'init min': val })
         initObj()
       })
 
-      gui.add(params, 'init max', 0.0, 1.0).onChange(function (val) {
+      gui_data.add(params, 'init max', 0.0, 1.0).onChange(function (val) {
         setParams({ 'init max': val })
         initObj()
       })
 
-      gui.add(params, 'epilog', ['x/J', 'x/sqrt(J)', 'tanh(x)', 'relu(x)', 'none']).onChange(function (val) {
+      gui_data.add(params, 'epilog', ['x/J', 'x/sqrt(J)', 'tanh(x)', 'relu(x)', 'none']).onChange(function (val) {
         setParams({ 'epilog': val })
         getObj().setEpilog(val)
       })
 
-      gui.add(params, 'zero hue', 0.0, 1.0).onChange(function (val) {
-        setParams({ 'zero hue': val })
+      gui_data.open()
+
+      const gui_vis = gui.addFolder('vis')
+
+      gui_vis.add(params, 'animation', ['itemwise', 'dotprod', 'mvprod', 'vmprod', 'none']).onChange(function (val) {
+        setParams({ animation: val })
         getObj().initVis(params)
       })
 
-      gui.add(params, 'zero size', 0.0, 1.0).onChange(function (val) {
-        setParams({ 'zero size': val })
-        getObj().initVis(params)
+      gui_vis.add(params, 'speed', 1, 10).onChange(function (val) {
+        setParams({ speed: Math.floor(val) })
       })
 
-      gui.add(params, 'zero light', 0.0, 1.0).onChange(function (val) {
-        setParams({ 'zero light': val })
-        getObj().initVis(params)
+      gui_vis.add(params, 'pause').onChange(function (val) {
+        setParams({ pause: val })
       })
 
-      gui.add(params, 'max light', 0.0, 1.0).onChange(function (val) {
-        setParams({ 'max light': val })
-        getObj().initVis(params)
-      })
-
-      gui.add(params, 'hue gap', 0.0, 1.0).onChange(function (val) {
-        setParams({ 'hue gap': val })
-        getObj().initVis(params)
-      })
-
-      gui.add(params, 'hue spread', 0.0, 1.0).onChange(function (val) {
-        setParams({ 'hue spread': val })
-        getObj().initVis(params)
-      })
-
-      gui.add(params, 'guides', params.rowguides).onChange(function (val) {
+      gui_vis.add(params, 'guides', params.rowguides).onChange(function (val) {
         setParams({ 'guides': val })
         getObj().setGuides(val)
       })
 
-      gui.add(params, 'legends').onChange(function (val) {
+      gui_vis.add(params, 'legends').onChange(function (val) {
         setParams({ legends: val })
         getObj().setLegends(val)
       })
 
-      gui.add(params, 'axes').onChange(function (val) {
+      gui_vis.add(params, 'axes').onChange(function (val) {
         setParams({ axes: val })
         initAxes(val)
       })
+
+      gui_vis.open()
+
+      const gui_colors = gui.addFolder('colors')
+
+      gui_colors.add(params, 'zero hue', 0.0, 1.0).onChange(function (val) {
+        setParams({ 'zero hue': val })
+        getObj().initVis(params)
+      })
+
+      gui_colors.add(params, 'zero size', 0.0, 1.0).onChange(function (val) {
+        setParams({ 'zero size': val })
+        getObj().initVis(params)
+      })
+
+      gui_colors.add(params, 'zero light', 0.0, 1.0).onChange(function (val) {
+        setParams({ 'zero light': val })
+        getObj().initVis(params)
+      })
+
+      gui_colors.add(params, 'max light', 0.0, 1.0).onChange(function (val) {
+        setParams({ 'max light': val })
+        getObj().initVis(params)
+      })
+
+      gui_colors.add(params, 'hue gap', 0.0, 1.0).onChange(function (val) {
+        setParams({ 'hue gap': val })
+        getObj().initVis(params)
+      })
+
+      gui_colors.add(params, 'hue spread', 0.0, 1.0).onChange(function (val) {
+        setParams({ 'hue spread': val })
+        getObj().initVis(params)
+      })
+
+      gui_colors.open()
+
     }
 
 

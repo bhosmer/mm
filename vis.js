@@ -1,6 +1,10 @@
 import * as THREE from 'three'
 import * as util from './util.js'
 
+//
+//
+//
+
 const TEXTURE = new THREE.TextureLoader().load('../examples/textures/sprites/ball.png');
 
 const MATERIAL = new THREE.ShaderMaterial({
@@ -34,6 +38,10 @@ const MATERIAL = new THREE.ShaderMaterial({
   }`,
 })
 
+//
+//
+//
+
 // https://stackoverflow.com/questions/25582882/javascript-math-random-normal-distribution-gaussian-bell-curve
 // Standard Normal variate using Box-Muller transform.
 function gaussianRandom(mean = 0, stdev = 1) {
@@ -43,6 +51,11 @@ function gaussianRandom(mean = 0, stdev = 1) {
   // Transform to the desired mean and standard deviation:
   return z * stdev + mean;
 }
+
+// def softmax(x):
+//     """Compute softmax values for each sets of scores in x."""
+//     e_x = np.exp(x) #
+//     return np.exp(x)/sum(np.exp(x))
 
 // note: assumes x is in [0, 1]
 function squeeze(base, range, x) {
