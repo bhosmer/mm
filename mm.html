@@ -32,11 +32,12 @@
     import { FontLoader } from 'https://threejs.org/examples/jsm/loaders/FontLoader.js';
     import { GUI } from 'https://threejs.org/examples/jsm/libs/lil-gui.module.min.js';
     import { OrbitControls } from 'https://threejs.org/examples/jsm/controls/OrbitControls.js'
+    import { ArcballControls } from 'https://threejs.org/examples/jsm/controls/ArcballControls.js';
     import { EffectComposer } from 'https://threejs.org/examples/jsm/postprocessing/EffectComposer.js'
     import { RenderPass } from 'https://threejs.org/examples/jsm/postprocessing/RenderPass.js'
 
     const init_dims = { i: 32, j: 32, k: 32 }
-    const init_funcs = ['rows', 'cols', 'row major', 'col major', 'uniform', 'gaussian', 'tril', 'triu', 'eye', 'diff']
+    const init_funcs = ['rows', 'cols', 'row major', 'col major', 'uniform', 'gaussian', 'tril', 'triu', 'eye', 'diff', 'ones', 'zeros']
 
     const params = {
       'I': init_dims.i,
@@ -156,6 +157,11 @@
       orbit.addEventListener('change', function () {
         setParams({ xcam: camera.position.x, ycam: camera.position.y, zcam: camera.position.z })
       }, false)
+
+      // let arcball = new ArcballControls(camera, renderer.domElement, scene);
+      // arcball.addEventListener('change', function () {
+      //   setParams({ xcam: camera.position.x, ycam: camera.position.y, zcam: camera.position.z })
+      // }, false)
 
       function onWindowResize() {
         camera.aspect = window.innerWidth / window.innerHeight

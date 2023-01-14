@@ -246,10 +246,10 @@ class Mat {
     if (enabled) {
       if (!this.name_legend) {
         const legend = getText(name, color, size)
-        const { h: hleg, w: wleg } = bbhw(legend.geometry)
+        const { h: hleg, w: wleg } = util.bbhw(legend.geometry)
         legend.geometry.rotateY(Math.PI)
         legend.geometry.rotateZ(Math.PI)
-        legend.geometry.translate(center(this.w - 1, wleg), hleg + center(this.h - 1, hleg), -(1 + hleg / 2))
+        legend.geometry.translate(util.center(this.w - 1, wleg), hleg + util.center(this.h - 1, hleg), -(1 + hleg / 2))
         this.group.add(legend)
         this.name_legend = legend
       }
@@ -265,13 +265,13 @@ class Mat {
     if (enabled) {
       if (!this.height_legend) {
         const legend = getText(`${name} = ${this.h}`, color, size)
-        const { h: hleg, w: wleg } = bbhw(legend.geometry)
+        const { h: hleg, w: wleg } = util.bbhw(legend.geometry)
         legend.geometry.rotateX(Math.PI)
         const zrot = (left ? -1 : 1) * Math.PI / 2
         legend.geometry.rotateZ(zrot)
         const spacer = 0.25
         const xoff = left ? -hleg * 1.5 - spacer : this.w - 1 + hleg + spacer
-        const yoff = left ? wleg + center(this.h - 1, wleg) : center(this.h - 1, wleg)
+        const yoff = left ? wleg + util.center(this.h - 1, wleg) : util.center(this.h - 1, wleg)
         legend.geometry.translate(xoff, yoff, 0)
         this.group.add(legend)
         this.height_legend = legend
@@ -288,10 +288,10 @@ class Mat {
     if (enabled) {
       if (!this.width_legend) {
         const legend = getText(`${name} = ${this.w}`, color, size)
-        const { h: hleg, w: wleg } = bbhw(legend.geometry)
+        const { h: hleg, w: wleg } = util.bbhw(legend.geometry)
         legend.geometry.rotateX(Math.PI)
         const spacer = 0.25
-        const xoff = center(this.w - 1, wleg)
+        const xoff = util.center(this.w - 1, wleg)
         const yoff = top ? -hleg * 2 - spacer : this.h - 1 + hleg * 1.5 + spacer
         legend.geometry.translate(xoff, yoff, 0)
         this.group.add(legend)
@@ -352,6 +352,10 @@ export class MatMul {
         return (i, j, h, w) => gate(() => (i == j ? 1 : 0))
       case 'diff':
         return (i, j, h, w) => gate(() => (i == j ? 1 : i == j + 1 ? -1 : 0))
+      case 'ones':
+        return (i, j, h, w) => gate(() => 1)
+      case 'zeros':
+        return (i, j, h, w) => gate(() => 0)
       default:
         throw Error(`unrecognized initializer: ${name}`)
     }
@@ -951,29 +955,3 @@ export class MLP {
     this.mm2.setLegends(enabled)
   }
 }
-
-//
-// misc
-//
-
-function bbhw(geo) {
-  return { h: bbh(geo), w: bbw(geo) }
-}
-
-function bbw(geo) {
-  return geo.boundingBox.max.x - geo.boundingBox.min.x
-}
-
-function bbh(geo) {
-  return geo.boundingBox.max.y - geo.boundingBox.min.y
-}
-
-function center(x, y) {
-  return (x - y) / 2
-}
-
-function locate(y, x) {
-  ['x', 'y', 'z'].map(d => y.rotation[d] = x.rotation[d]);
-  ['x', 'y', 'z'].map(d => y.position[d] = x.position[d])
-}
-

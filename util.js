@@ -69,3 +69,22 @@ export function castToType(x, t, name) {
       throw Error(`don't know how to cast to ${t}, x ${x} ${name ? name : ''}`)
   }
 }
+
+
+//
+// bounding box stuff for text positioning
+//
+
+export function bbhw(g) {
+  return { h: g.boundingBox.max.y - g.boundingBox.min.y, w: g.boundingBox.max.y - g.boundingBox.min.y }
+}
+
+export function center(x, y) {
+  return (x - y) / 2
+}
+
+export function locate(y, x) {
+  ['x', 'y', 'z'].map(d => y.rotation[d] = x.rotation[d]);
+  ['x', 'y', 'z'].map(d => y.position[d] = x.position[d])
+}
+
