@@ -34,6 +34,55 @@ const MATERIAL = new THREE.ShaderMaterial({
   }`,
 })
 
+// https://stackoverflow.com/questions/25582882/javascript-math-random-normal-distribution-gaussian-bell-curve
+// Standard Normal variate using Box-Muller transform.
+function gaussianRandom(mean = 0, stdev = 1) {
+  let u = 1 - Math.random(); //Converting [0,1) to (0,1)
+  let v = Math.random();
+  let z = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+  // Transform to the desired mean and standard deviation:
+  return z * stdev + mean;
+}
+
+// note: assumes x is in [0, 1]
+function squeeze(base, range, x) {
+  return base + range * x
+}
+
+function getInitFunc(name, sparsity, base, range) {
+  const gate = sparsity > 0 ?
+    (f => Math.random() > sparsity ? f() : 0) :
+    (f => f())
+  switch (name) {
+    case 'rows':
+      return (i, j, h, w) => gate(() => squeeze(base, range, h > 1 ? i / (h - 1) : 0))
+    case 'cols':
+      return (i, j, h, w) => gate(() => squeeze(base, range, w > 1 ? j / (w - 1) : 0))
+    case 'row major':
+      return (i, j, h, w) => gate(() => squeeze(base, range, h * w > 1 ? (i * w + j) / (h * w - 1) : 0))
+    case 'col major':
+      return (i, j, h, w) => gate(() => squeeze(base, range, h * w > 1 ? (j * h + i) / (h * w) : 0))
+    case 'uniform':
+      return (i, j, h, w) => gate(() => squeeze(base, range, Math.random()))
+    case 'gaussian':
+      return (i, j, h, w) => gate(() => squeeze(base, range, gaussianRandom(0.5, 0.5)))
+    case 'tril':
+      return (i, j, h, w) => gate(() => (j <= i ? 1 : 0))
+    case 'triu':
+      return (i, j, h, w) => gate(() => (j >= i ? 1 : 0))
+    case 'eye':
+      return (i, j, h, w) => gate(() => (i == j ? 1 : 0))
+    case 'diff':
+      return (i, j, h, w) => gate(() => (i == j ? 1 : i == j + 1 ? -1 : 0))
+    case 'ones':
+      return (i, j, h, w) => gate(() => 1)
+    case 'zeros':
+      return (i, j, h, w) => gate(() => 0)
+    default:
+      throw Error(`unrecognized initializer: ${name}`)
+  }
+}
+
 //
 // Array
 //
@@ -307,60 +356,10 @@ class Mat {
 
 }
 
-// https://stackoverflow.com/questions/25582882/javascript-math-random-normal-distribution-gaussian-bell-curve
-// Standard Normal variate using Box-Muller transform.
-function gaussianRandom(mean = 0, stdev = 1) {
-  let u = 1 - Math.random(); //Converting [0,1) to (0,1)
-  let v = Math.random();
-  let z = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
-  // Transform to the desired mean and standard deviation:
-  return z * stdev + mean;
-}
-
 //
 // MatMul
 //
 export class MatMul {
-
-  // note: assumes input is in [0, 1]
-  squeeze(x) {
-    return this.init_base + this.init_range * x
-  }
-
-  getInitFunc(name, sparsity) {
-    const gate = sparsity > 0 ?
-      (f => Math.random() > sparsity ? f() : 0) :
-      (f => f())
-    switch (name) {
-      case 'rows':
-        return (i, j, h, w) => gate(() => this.squeeze(h > 1 ? i / (h - 1) : 0))
-      case 'cols':
-        return (i, j, h, w) => gate(() => this.squeeze(w > 1 ? j / (w - 1) : 0))
-      case 'row major':
-        return (i, j, h, w) => gate(() => this.squeeze(h * w > 1 ? (i * w + j) / (h * w - 1) : 0))
-      case 'col major':
-        return (i, j, h, w) => gate(() => this.squeeze(h * w > 1 ? (j * h + i) / (h * w) : 0))
-      case 'uniform':
-        return (i, j, h, w) => gate(() => this.squeeze(Math.random()))
-      case 'gaussian':
-        return (i, j, h, w) => gate(() => this.squeeze(gaussianRandom(0.5, 0.5)))
-      case 'tril':
-        return (i, j, h, w) => gate(() => (j <= i ? 1 : 0))
-      case 'triu':
-        return (i, j, h, w) => gate(() => (j >= i ? 1 : 0))
-      case 'eye':
-        return (i, j, h, w) => gate(() => (i == j ? 1 : 0))
-      case 'diff':
-        return (i, j, h, w) => gate(() => (i == j ? 1 : i == j + 1 ? -1 : 0))
-      case 'ones':
-        return (i, j, h, w) => gate(() => 1)
-      case 'zeros':
-        return (i, j, h, w) => gate(() => 0)
-      default:
-        throw Error(`unrecognized initializer: ${name}`)
-    }
-  }
-
   constructor(params, getText) {
     this.getText = getText
     this.params = { ...params }
@@ -385,7 +384,9 @@ export class MatMul {
       this.left_data = this.params.left.data
       return
     }
-    const left_init = this.getInitFunc(this.params['left init'], this.params['left sparsity']);
+    const init = this.params['left init']
+    const sparsity = this.params['left sparsity']
+    const left_init = getInitFunc(init, sparsity, this.init_base, this.init_range);
     this.left_data = new Array(this.H, this.D, left_init);
   }
 
@@ -394,7 +395,9 @@ export class MatMul {
       this.right_data = this.params.right.data
       return
     }
-    const right_init = this.getInitFunc(this.params['right init'], this.params['right sparsity']);
+    const init = this.params['right init']
+    const sparsity = this.params['right sparsity']
+    const right_init = getInitFunc(init, sparsity, this.init_base, this.init_range);
     this.right_data = new Array(this.D, this.W, right_init);
   }
 
