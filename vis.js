@@ -357,14 +357,10 @@ export class MatMul {
     }
   }
 
-  constructor(params, getText, group = undefined) {
+  constructor(params, getText) {
     this.getText = getText
     this.params = { ...params }
-
     this.group = new THREE.Group()
-    if (group) {
-      group.add(this.group)
-    }
 
     this.H = params.I
     this.D = params.J
@@ -442,7 +438,13 @@ export class MatMul {
     this.left = new Mat(this.H, this.D, this.left_data, this);
     this.left.group.rotation.y = Math.PI / 2;
     this.left.group.rotation.z = Math.PI;
+    if (this.params.left_rot) {
+      Object.keys(this.params.left_rot).map(k => this.left.group.rotation[k] += this.params.left_rot[k])
+    }
     this.left.group.position.x = -1;
+    if (this.params.left_pos) {
+      Object.keys(this.params.left_pos).map(k => this.left.group.position[k] += this.params.left_pos[k])
+    }
     this.left.setGuide(this.params.guides)
     this.setLeftLegends(this.params.legends)
     this.group.add(this.left.group)
@@ -830,9 +832,9 @@ export class MatMul {
 //
 
 export class Attn {
-  constructor(params, getText, group = undefined) {
+  constructor(params, getText) {
     this.getText = getText
-    this.group = group ? group : new THREE.Group()
+    this.group = new THREE.Group()
 
     // TODO passed in
     const mm1_params = { ...params }
@@ -856,18 +858,19 @@ export class Attn {
     this.mm1_params.result_name = "attn"
     this.mm1_params.pos = new THREE.Vector3(-this.W / 2, this.H / 2, -this.D / 2)
     this.mm1 = new MatMul(this.mm1_params, getText, this.group)
+    this.group.add(this.mm1.group)
 
     this.mm2_params = mm2_params
     this.mm2_params.right_name = "V"
     this.mm2_params.result_name = "out"
     this.mm2_params.pos = new THREE.Vector3(-this.W / 2, this.H / 2, -this.D / 2 + mm1_params.J)
     this.mm2_params.left = this.mm1.result
-    // this.mm2_params.right_pos = new THREE.Vector3(0, -this.H - 1, 1) // bot
     this.mm2_params.right_pos = new THREE.Vector3(0, 0, 1)
     this.mm2_params.right_rot = new THREE.Vector3(Math.PI, 0, -Math.PI / 2)
     this.mm2_params.result_pos = new THREE.Vector3(this.W, 0, -mm1_params.J + 1)
     this.mm2_params.result_rot = new THREE.Vector3(0, Math.PI / 2, 0)
     this.mm2 = new MatMul(this.mm2_params, getText, this.group)
+    this.group.add(this.mm2.group)
   }
 
   bump() {
@@ -891,9 +894,9 @@ export class Attn {
 //
 
 export class MLP {
-  constructor(params, getText, group = undefined) {
+  constructor(params, getText) {
     this.getText = getText
-    this.group = group ? group : new THREE.Group()
+    this.group = new THREE.Group()
 
     // TODO passed in
     const mm1_params = { ...params }
@@ -906,8 +909,6 @@ export class MLP {
       throw Error(`MLP: mm1_params.K ${mm1_params.K} mm2_params.J ${mm2_params.J}`)
     }
 
-    // @@@@@@@@@@@@@@@@@@@@@
-
     this.H = mm1_params.I
     this.D = mm1_params.J + mm2_params.I
     this.W = mm1_params.K
@@ -919,21 +920,20 @@ export class MLP {
     this.mm1_params.result_name = "W0 @ X"
     this.mm1_params.pos = new THREE.Vector3(-this.W / 2, this.H / 2, -this.D / 2)
     this.mm1 = new MatMul(this.mm1_params, getText, this.group)
+    this.group.add(this.mm1.group)
 
     this.mm2_params = mm2_params
     this.mm2_params.left_name = "W1"
     this.mm2_params.result_name = "out"
     this.mm2_params.pos = new THREE.Vector3(-this.W / 2, this.H / 2, -this.D / 2 + mm1_params.J)
-
-    this.mm2_params.right = this.mm1.result
-
     this.mm2_params.left_pos = new THREE.Vector3(0, 0, 1)
-    this.mm2_params.left_rot = new THREE.Vector3(Math.PI, 0, -Math.PI / 2)
-
-    // this.mm2_params.result_pos = new THREE.Vector3(this.W, 0, -mm1_params.J + 1)
-    this.mm2_params.result_pos = new THREE.Vector3(0, -this.H - 1, 1) // bot
-    this.mm2_params.result_rot = new THREE.Vector3(0, Math.PI / 2, 0)
+    this.mm2_params.left_rot = new THREE.Vector3(Math.PI, Math.PI, -Math.PI / 2)
+    this.mm2_params.right = this.mm1.result
+    this.mm2_params.result_pos = new THREE.Vector3(0, -this.H, -mm2_params.I + 1) // bot
+    this.mm2_params.result_rot = new THREE.Vector3(-Math.PI / 2, 0, 0)
     this.mm2 = new MatMul(this.mm2_params, getText, this.group)
+    this.group.add(this.mm2.group)
+
   }
 
   bump() {
