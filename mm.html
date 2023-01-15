@@ -217,12 +217,12 @@
 
       gui_data.add(params, 'left init', init_funcs).onChange(function (val) {
         setParams({ 'left init': val })
-        initObj()
+        getObj().initLeft(params)
       })
 
       gui_data.add(params, 'right init', init_funcs).onChange(function (val) {
         setParams({ 'right init': val })
-        initObj()
+        getObj().initRight(params)
       })
 
       gui_data.add(params, 'left sparsity', 0.0, 1.0).onChange(function (val) {
@@ -237,12 +237,16 @@
 
       gui_data.add(params, 'init min', -1.0, 1.0).onChange(function (val) {
         setParams({ 'init min': val })
-        initObj()
+        if (val != getObj().params['init min']) {
+          initObj()
+        }
       })
 
       gui_data.add(params, 'init max', 0.0, 1.0).onChange(function (val) {
         setParams({ 'init max': val })
-        initObj()
+        if (val != getObj().params['init max']) {
+          initObj()
+        }
       })
 
       gui_data.add(params, 'epilog', ['x/J', 'x/sqrt(J)', 'tanh(x)', 'relu(x)', 'none']).onChange(function (val) {

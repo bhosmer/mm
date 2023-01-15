@@ -5,7 +5,7 @@ import * as util from './util.js'
 //
 //
 
-const TEXTURE = new THREE.TextureLoader().load('../examples/textures/sprites/ball.png');
+const TEXTURE = new THREE.TextureLoader().load('../examples/textures/sprites/ball.png')
 
 const MATERIAL = new THREE.ShaderMaterial({
   uniforms: {
@@ -45,11 +45,11 @@ const MATERIAL = new THREE.ShaderMaterial({
 // https://stackoverflow.com/questions/25582882/javascript-math-random-normal-distribution-gaussian-bell-curve
 // Standard Normal variate using Box-Muller transform.
 function gaussianRandom(mean = 0, stdev = 1) {
-  let u = 1 - Math.random(); //Converting [0,1) to (0,1)
-  let v = Math.random();
-  let z = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+  let u = 1 - Math.random() //Converting [0,1) to (0,1)
+  let v = Math.random()
+  let z = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v)
   // Transform to the desired mean and standard deviation:
-  return z * stdev + mean;
+  return z * stdev + mean
 }
 
 // def softmax(x):
@@ -201,7 +201,7 @@ class Mat {
         this.setElemHSL(colors, this.data.addr(i, j), this.getData(i, j))
       }
     }
-    const g = new THREE.BufferGeometry().setFromPoints(points);
+    const g = new THREE.BufferGeometry().setFromPoints(points)
     g.setAttribute('pointSize', new THREE.Float32BufferAttribute(sizes, 1))
     g.setAttribute('pointColor', new THREE.Float32BufferAttribute(colors, 3))
     this.points = new THREE.Points(g, MATERIAL)
@@ -304,69 +304,66 @@ class Mat {
     }
   }
 
-  setNameLegend(enabled, name, getText, color, size) {
+  setLegends(enabled, props, getText) {
     if (enabled) {
-      if (!this.name_legend) {
-        const legend = getText(name, color, size)
-        const { h: hleg, w: wleg } = util.bbhw(legend.geometry)
-        legend.geometry.rotateY(Math.PI)
-        legend.geometry.rotateZ(Math.PI)
-        legend.geometry.translate(util.center(this.w - 1, wleg), hleg + util.center(this.h - 1, hleg), -(1 + hleg / 2))
-        this.group.add(legend)
-        this.name_legend = legend
+      if (!this.legends) {
+        this.legends = new THREE.Group()
+        if (props.name) {
+          const name = getText(props.name, props.name_color, props.name_size)
+          const { h, w } = util.bbhw(name.geometry)
+          name.geometry.rotateZ(Math.PI)
+          if (props.backward) {
+            name.geometry.translate(w + util.center(this.w - 1, w), h + util.center(this.h - 1, h), 1 + h / 2)
+          } else {
+            name.geometry.rotateY(Math.PI)
+            name.geometry.translate(util.center(this.w - 1, w), h + util.center(this.h - 1, h), -(1 + h / 2))
+          }
+          this.legends.add(name)
+        }
+        if (props.height) {
+          const height = getText(`${props.height} = ${this.h}`, props.dim_color, props.dim_size)
+          const { h, w } = util.bbhw(height.geometry)
+          if (props.backward) {
+            const zrot = (props.hleft ? 1 : -1) * Math.PI / 2
+            height.geometry.rotateZ(zrot)
+          } else {
+            height.geometry.rotateX(Math.PI)
+            const zrot = (props.hleft ? -1 : 1) * Math.PI / 2
+            height.geometry.rotateZ(zrot)
+          }
+          const spacer = 0.5
+          const xoff = props.backward ?
+            (props.hleft ? -h * 1 - spacer : this.w + h) :
+            (props.hleft ? -h * 1 - spacer : this.w - 1 + h + spacer)
+          const yoff = props.backward ?
+            (props.hleft ? util.center(this.h - 1, w) : w + util.center(this.h - 1, w)) :
+            (props.hleft ? w + util.center(this.h - 1, w) : util.center(this.h - 1, w))
+          height.geometry.translate(xoff, yoff, 0)
+          this.legends.add(height)
+        }
+        if (props.width) {
+          const width = getText(`${props.width} = ${this.w}`, props.dim_color, props.dim_size)
+          const { h, w } = util.bbhw(width.geometry)
+          if (props.backward) {
+            width.geometry.rotateZ(Math.PI)
+          } else {
+            width.geometry.rotateX(Math.PI)
+          }
+          const spacer = 0.5
+          const xoff = (props.backward ? w : 0) + util.center(this.w - 1, w)
+          const yoff = props.wtop ? -h * 1 - spacer : this.h - 1 + h * 1.5 + spacer
+          width.geometry.translate(xoff, yoff, 0)
+          this.legends.add(width)
+        }
+        this.group.add(this.legends)
       }
     } else {
-      if (this.name_legend) {
-        this.group.remove(this.name_legend)
-        this.name_legend = undefined
+      if (this.legends) {
+        this.group.remove(this.legends)
+        this.legends = undefined
       }
     }
   }
-
-  setHeightLegend(enabled, name, left, getText, color, size) {
-    if (enabled) {
-      if (!this.height_legend) {
-        const legend = getText(`${name} = ${this.h}`, color, size)
-        const { h: hleg, w: wleg } = util.bbhw(legend.geometry)
-        legend.geometry.rotateX(Math.PI)
-        const zrot = (left ? -1 : 1) * Math.PI / 2
-        legend.geometry.rotateZ(zrot)
-        const spacer = 0.25
-        const xoff = left ? -hleg * 1.5 - spacer : this.w - 1 + hleg + spacer
-        const yoff = left ? wleg + util.center(this.h - 1, wleg) : util.center(this.h - 1, wleg)
-        legend.geometry.translate(xoff, yoff, 0)
-        this.group.add(legend)
-        this.height_legend = legend
-      }
-    } else {
-      if (this.height_legend) {
-        this.group.remove(this.height_legend)
-        this.height_legend = undefined
-      }
-    }
-  }
-
-  setWidthLegend(enabled, name, top, getText, color, size) {
-    if (enabled) {
-      if (!this.width_legend) {
-        const legend = getText(`${name} = ${this.w}`, color, size)
-        const { h: hleg, w: wleg } = util.bbhw(legend.geometry)
-        legend.geometry.rotateX(Math.PI)
-        const spacer = 0.25
-        const xoff = util.center(this.w - 1, wleg)
-        const yoff = top ? -hleg * 2 - spacer : this.h - 1 + hleg * 1.5 + spacer
-        legend.geometry.translate(xoff, yoff, 0)
-        this.group.add(legend)
-        this.width_legend = legend
-      }
-    } else {
-      if (this.width_legend) {
-        this.group.remove(this.width_legend)
-        this.width_legend = undefined
-      }
-    }
-  }
-
 }
 
 //
@@ -385,11 +382,14 @@ export class MatMul {
     this.init_base = params['init min']
     this.init_range = Math.max(0, params['init max'] - params['init min'])
 
-    this.initLeftData();
-    this.initRightData();
-    this.initResultData();
+    this.initData()
+    this.initVis()
+  }
 
-    this.initVis(params)
+  initData() {
+    this.initLeftData()
+    this.initRightData()
+    this.initResultData()
   }
 
   initLeftData() {
@@ -399,8 +399,8 @@ export class MatMul {
     }
     const init = this.params['left init']
     const sparsity = this.params['left sparsity']
-    const left_init = getInitFunc(init, sparsity, this.init_base, this.init_range);
-    this.left_data = new Array(this.H, this.D, left_init);
+    const left_init = getInitFunc(init, sparsity, this.init_base, this.init_range)
+    this.left_data = new Array(this.H, this.D, left_init)
   }
 
   initRightData() {
@@ -410,16 +410,16 @@ export class MatMul {
     }
     const init = this.params['right init']
     const sparsity = this.params['right sparsity']
-    const right_init = getInitFunc(init, sparsity, this.init_base, this.init_range);
-    this.right_data = new Array(this.D, this.W, right_init);
+    const right_init = getInitFunc(init, sparsity, this.init_base, this.init_range)
+    this.right_data = new Array(this.D, this.W, right_init)
   }
 
   initResultData() {
-    const result_init = (y, x, h, w) => this._result_val(this.left_data, this.right_data, y, x);
-    this.result_data = new Array(this.H, this.W, result_init);
+    const result_init = (y, x, h, w) => this._result_val(this.left_data, this.right_data, y, x)
+    this.result_data = new Array(this.H, this.W, result_init)
   }
 
-  initVis(params) {
+  initVis(params = undefined) {
     if (params) {
       this.params = { ...params }
     }
@@ -427,14 +427,14 @@ export class MatMul {
 
     this._setAbsmax(this.left_data, this.right_data, this.result_data)
 
-    this.initLeftVis();
-    this.initRightVis();
-    this.initResultVis();
+    this.initLeftVis()
+    this.initRightVis()
+    this.initResultVis()
 
     this.animation = 'none'
     this.setAnimation(this.params.animation)
 
-    this.setPosition();
+    this.setPosition()
   }
 
   setPosition() {
@@ -455,13 +455,13 @@ export class MatMul {
     if (this.left) {
       this.group.remove(this.left.group)
     }
-    this.left = new Mat(this.H, this.D, this.left_data, this);
-    this.left.group.rotation.y = Math.PI / 2;
-    this.left.group.rotation.z = Math.PI;
+    this.left = new Mat(this.H, this.D, this.left_data, this)
+    this.left.group.rotation.y = Math.PI / 2
+    this.left.group.rotation.z = Math.PI
     if (this.params.left_rot) {
       Object.keys(this.params.left_rot).map(k => this.left.group.rotation[k] += this.params.left_rot[k])
     }
-    this.left.group.position.x = -1;
+    this.left.group.position.x = -1
     if (this.params.left_pos) {
       Object.keys(this.params.left_pos).map(k => this.left.group.position[k] += this.params.left_pos[k])
     }
@@ -478,12 +478,12 @@ export class MatMul {
     if (this.right) {
       this.group.remove(this.right.group)
     }
-    this.right = new Mat(this.D, this.W, this.right_data, this);
-    this.right.group.rotation.x = Math.PI / 2;
+    this.right = new Mat(this.D, this.W, this.right_data, this)
+    this.right.group.rotation.x = Math.PI / 2
     if (this.params.right_rot) {
       Object.keys(this.params.right_rot).map(k => this.right.group.rotation[k] += this.params.right_rot[k])
     }
-    this.right.group.position.y = 1;
+    this.right.group.position.y = 1
     if (this.params.right_pos) {
       Object.keys(this.params.right_pos).map(k => this.right.group.position[k] += this.params.right_pos[k])
     }
@@ -496,18 +496,18 @@ export class MatMul {
     if (this.result) {
       this.group.remove(this.result.group)
     }
-    this.result = new Mat(this.H, this.W, this.result_data, this);
-    this.result.group.rotation.x = Math.PI;
+    this.result = new Mat(this.H, this.W, this.result_data, this)
+    this.result.group.rotation.x = Math.PI
     if (this.params.result_rot) {
       Object.keys(this.params.result_rot).map(k => this.result.group.rotation[k] += this.params.result_rot[k])
     }
-    this.result.group.position.z = this.D;
+    this.result.group.position.z = this.D
     if (this.params.result_pos) {
       Object.keys(this.params.result_pos).map(k => this.result.group.position[k] += this.params.result_pos[k])
     }
     this.result.setGuide(this.params.guides)
     this.setResultLegends(this.params.legends)
-    this.group.add(this.result.group);
+    this.group.add(this.result.group)
   }
 
   setEpilog(epilog) {
@@ -525,25 +525,25 @@ export class MatMul {
     if (params) {
       this.params = { ...params }
     }
-    this.initLeftData();
-    this.initResultData();
-    this._setAbsmax(this.left_data, this.right_data, this.result_data);
-    this.initVis(this.params);
+    this.initLeftData()
+    this.initResultData()
+    this._setAbsmax(this.left_data, this.right_data, this.result_data)
+    this.initVis()
   }
 
   setK(k) {
     this.W = this.params.K = k
-    this.initRight();
+    this.initRight()
   }
 
   initRight(params = undefined) {
     if (params) {
       this.params = { ...params }
     }
-    this.initRightData();
-    this.initResultData();
-    this._setAbsmax(this.left_data, this.right_data, this.result_data);
-    this.initVis(this.params);
+    this.initRightData()
+    this.initResultData()
+    this._setAbsmax(this.left_data, this.right_data, this.result_data)
+    this.initVis()
   }
 
   setAnimation(animation) {
@@ -764,10 +764,8 @@ export class MatMul {
     this.itemwise.setData(0, 0, this.dotprod_val(i, k, j))
   }
 
-  // TODO devolve to Mat
   setGuides(enabled) {
     this.params.guides = enabled
-
     if (!this.params.left) {
       this.left.setGuide(enabled)
     }
@@ -777,66 +775,38 @@ export class MatMul {
     this.result.setGuide(enabled)
   }
 
-  getLeftName() {
-    return this.params.left_name ? this.params.left_name : "X"
+  getLegendProps() {
+    const custom = this.params.legend_props ? this.params.legend_props : {}
+    const sa_geo = Math.sqrt(this.H * this.D) + Math.sqrt(this.D * this.W) + Math.sqrt(this.H * this.W)
+    const defaults = {
+      name_color: 0xccccff,
+      name_size: sa_geo / 32,
+      dim_color: 0x00aaff,
+      dim_size: sa_geo / 96,
+    }
+    return { ...defaults, ...custom }
   }
-
-  getRightName() {
-    return this.params.right_name ? this.params.right_name : "Y"
-  }
-
-  getResultName() {
-    return this.params.result_name ? this.params.result_name : "XY"
-  }
-
-  getHeightName() {
-    return this.params.height_name ? this.params.height_name : "i"
-  }
-
-  getDepthName() {
-    return this.params.depth_name ? this.params.depth_name : "j"
-  }
-
-  getWidthName() {
-    return this.params.width_name ? this.params.width_name : "k"
-  }
-
-  getNameColor() {
-    return this.params.name_color ? this.params.name_color : 0xccccff
-  }
-
-  getDimColor() {
-    return this.params.dim_color ? this.params.dim_color : 0x00aaff
-  }
-
-  getNameSize() {
-    return (this.H + this.D + this.W) / 32
-  }
-
-  getDimSize() {
-    return (this.H + this.D + this.W) / 75
-  }
-
-  // TODO this is clumsy, devolve to Mat
 
   setLeftLegends(enabled) {
-    this.left.setNameLegend(enabled, this.getLeftName(), this.getText, this.getNameColor(), this.getNameSize())
-    this.left.setHeightLegend(enabled, this.getHeightName(), true, this.getText, this.getDimColor(), this.getDimSize())
-    this.left.setWidthLegend(enabled, this.getDepthName(), false, this.getText, this.getDimColor(), this.getDimSize())
+    const custom = this.params.left_legend ? this.params.left_legend : {}
+    const defaults = { name: "X", height: "i", width: "j", hleft: true, wtop: false }
+    const props = { ...this.getLegendProps(), ...defaults, ...custom }
+    this.left.setLegends(enabled, props, this.getText)
   }
 
   setRightLegends(enabled) {
-    this.right.setNameLegend(enabled, this.getRightName(), this.getText, this.getNameColor(), this.getNameSize())
-    this.right.setHeightLegend(enabled, this.getDepthName(), false, this.getText, this.getDimColor(), this.getDimSize())
-    this.right.setWidthLegend(enabled, this.getWidthName(), true, this.getText, this.getDimColor(), this.getDimSize())
+    const custom = this.params.right_legend ? this.params.right_legend : {}
+    const defaults = { name: "Y", height: "j", width: "k", hleft: false, wtop: true }
+    const props = { ...this.getLegendProps(), ...defaults, ...custom }
+    this.right.setLegends(enabled, props, this.getText)
   }
 
   setResultLegends(enabled) {
-    this.result.setNameLegend(enabled, this.getResultName(), this.getText, this.getNameColor(), this.getNameSize())
-    this.result.setHeightLegend(enabled, this.getHeightName(), false, this.getText, this.getDimColor(), this.getDimSize())
-    this.result.setWidthLegend(enabled, this.getWidthName(), false, this.getText, this.getDimColor(), this.getDimSize())
+    const custom = this.params.result_legend ? this.params.result_legend : {}
+    const defaults = { name: "XY", height: "i", width: "k", hleft: false, wtop: false }
+    const props = { ...this.getLegendProps(), ...defaults, ...custom }
+    this.result.setLegends(enabled, props, this.getText)
   }
-
 
   setLegends(enabled) {
     this.params.legends = enabled
@@ -844,11 +814,10 @@ export class MatMul {
     this.setRightLegends(enabled)
     this.setResultLegends(enabled)
   }
-
 }
 
 //
-// Attn (Q @ K) @ V
+// Attn (Q @ K^T) @ V
 //
 
 export class Attn {
@@ -857,25 +826,26 @@ export class Attn {
     this.params = { ...params }
     this.group = new THREE.Group()
 
-    // TODO passed in
-    const mm1_params = { ...params }
-    const mm2_params = { ...params }
+    this.H = params.n_q
+    this.D = params.d_qk + this.params.d_v
+    this.W = params.n_kv
 
-    if (mm1_params.I != mm2_params.I) {
-      throw Error(`Attn: mm1_params.I ${mm1_params.I} mm2_params.I ${mm2_params.I}`)
+    this.initVis()
+  }
+
+  initVis(params = undefined) {
+    if (params) {
+      this.params = { ...params }
     }
-    if (mm1_params.K != mm2_params.J) {
-      throw Error(`Attn: mm1_params.K ${mm1_params.K} mm2_params.J ${mm2_params.J}`)
-    }
+    this.group.clear()
 
-    this.H = mm1_params.I
-    this.D = mm1_params.J + mm2_params.K
-    this.W = mm1_params.K
+    // this._setAbsmax(this.left_data, this.right_data, this.result_data)
 
-    this.mm1_params = mm1_params
     this.initmm1()
-    this.mm2_params = mm2_params
     this.initmm2()
+
+    // this.animation = 'none'
+    // this.setAnimation(this.params.animation)
 
     this.setPosition()
   }
@@ -894,11 +864,23 @@ export class Attn {
     if (this.mm1) {
       this.group.remove(this.mm1.group)
     }
-    this.mm1_params.left_name = "Q"
-    this.mm1_params.right_name = "K^T"
-    this.mm1_params.result_name = "attn"
-    this.mm1_params.pos = new THREE.Vector3(0, 0, 0)
-    this.mm1 = new MatMul(this.mm1_params, this.getText, this.group)
+    const mm1_params = {
+      ...this.params, ...{
+        I: this.params.n_q,
+        J: this.params.d_qk,
+        K: this.params.n_kv,
+        'left init': this.params['q init'],
+        'left sparsity': this.params['q sparsity'],
+        left_legend: { name: "Q", height: "n_q", width: "d_qk" },
+        'right init': this.params['k^t init'],
+        'right sparsity': this.params['k^t sparsity'],
+        right_legend: { name: "K^T", height: "d_qk", width: "n_kv" },
+        result_legend: { name: "attn", height: "", width: "" },
+        epilog: this.params['attn epilog'],
+        pos: new THREE.Vector3(0, 0, 0),
+      }
+    }
+    this.mm1 = new MatMul(mm1_params, this.getText)
     this.group.add(this.mm1.group)
   }
 
@@ -906,38 +888,63 @@ export class Attn {
     if (this.mm2) {
       this.group.remove(this.mm2.group)
     }
-    this.mm2_params.left = this.mm1.result
-    this.mm2_params.right_name = "V"
-    this.mm2_params.result_name = "out"
-    this.mm2_params.pos = new THREE.Vector3(0, 0, this.mm1.D + 1)
-    this.mm2_params.right_rot = new THREE.Vector3(Math.PI, 0, -Math.PI / 2)
-    this.mm2_params.result_pos = new THREE.Vector3(this.W, 0, -this.mm1_params.K)
-    this.mm2_params.result_rot = new THREE.Vector3(0, Math.PI / 2, 0)
-    this.mm2 = new MatMul(this.mm2_params, this.getText, this.group)
+    const mm2_params = {
+      ...this.params, ...{
+        I: this.params.n_q,
+        J: this.params.n_kv,
+        K: this.params.d_v,
+        left: this.mm1.result,
+        'right init': this.params['v init'],
+        'right sparsity': this.params['v sparsity'],
+        right_legend: { name: "V", height: "n_kv", width: "d_v", backward: true },
+        result_legend: { name: "out", height: "n_q", width: "d_v", wtop: true },
+        epilog: this.params['result epilog'],
+        pos: new THREE.Vector3(0, 0, this.mm1.D + 1),
+        right_rot: new THREE.Vector3(Math.PI, 0, -Math.PI / 2),
+        right_pos: new THREE.Vector3(0, -this.H - 1, 0),
+        result_pos: new THREE.Vector3(this.W, 0, -this.mm1.W),
+        result_rot: new THREE.Vector3(0, Math.PI / 2, 0),
+      }
+    }
+    this.mm2 = new MatMul(mm2_params, this.getText)
     this.group.add(this.mm2.group)
   }
 
-  bump() {
-    this.mm1.bump()
-    this.mm2.bump()
+  initQ(params = undefined) {
+    if (params) {
+      this.params = { ...params }
+    }
+    this.initmm1()
+    this.initVis()
   }
 
-  setI(i) {
-    this.H = this.params.I = i
-    this.mm1_params.I = i
-    this.mm1.setI(i)
-    this.mm2_params.I = i
-    this.mm2.setI(i)
+  setNQ(n_q) {
+    this.H = this.params.n_q = n_q
+    this.mm1.setI(n_q)
+    this.mm2.params.left = this.mm1.result
+    this.mm2.params.right_pos = new THREE.Vector3(0, -this.H - 1, 0)
+    this.mm2.setI(n_q)
     this.setPosition()
   }
 
-  setK(k) {
-    this.W = this.params.K = k
-    this.mm1_params.K = k
-    this.mm1.setK(k)
-    this.mm2_params.J = k
+  setNKV(n_kv) {
+    this.W = this.params.n_kv = n_kv
+    this.mm1.setK(n_kv)
+    this.mm2.params.left = this.mm1.result
     this.initmm2()
     this.setPosition()
+  }
+
+  setAttnEpilog(epilog) {
+    this.params['attn epilog'] = epilog
+    this.mm1.initResultData()
+    this.initVis()
+  }
+
+  setResultEpilog(epilog) {
+    this.params['result epilog'] = epilog
+    this.mm2.initResultData()
+    this.initVis()
   }
 
   setGuides(enabled) {
@@ -948,6 +955,11 @@ export class Attn {
   setLegends(enabled) {
     this.mm1.setLegends(enabled)
     this.mm2.setLegends(enabled)
+  }
+
+  bump() {
+    this.mm1.bump()
+    this.mm2.bump()
   }
 }
 
@@ -977,23 +989,24 @@ export class MLP {
 
     // TODO offset from parent pos
     this.mm1_params = mm1_params
-    this.mm1_params.left_name = "W0"
-    this.mm1_params.right_name = "X"
-    this.mm1_params.result_name = "W0 @ X"
+    this.mm1_params.left_legend = { name: "w0" }
+    this.mm1_params.right_legend = { name: "x0" }
+    this.mm1_params.result_legend = { name: "x1", height: "", width: "" }
     this.mm1_params.pos = new THREE.Vector3(-this.W / 2, this.H / 2, -this.D / 2)
-    this.mm1 = new MatMul(this.mm1_params, getText, this.group)
+    this.mm1 = new MatMul(this.mm1_params, getText)
     this.group.add(this.mm1.group)
 
     this.mm2_params = mm2_params
-    this.mm2_params.left_name = "W1"
-    this.mm2_params.result_name = "out"
+    this.mm2_params.left_legend = { name: "w1", backward: true }
+    this.mm2_params.result_legend = { name: "x2", height: "" }
     this.mm2_params.pos = new THREE.Vector3(-this.W / 2, this.H / 2, -this.D / 2 + mm1_params.J)
-    this.mm2_params.left_pos = new THREE.Vector3(0, 0, 1)
+    // this.mm2_params.left_pos = new THREE.Vector3(0, 0, 1)
+    this.mm2_params.left_pos = new THREE.Vector3(this.W + 1, 0, 1)
     this.mm2_params.left_rot = new THREE.Vector3(Math.PI, Math.PI, -Math.PI / 2)
     this.mm2_params.right = this.mm1.result
     this.mm2_params.result_pos = new THREE.Vector3(0, -this.H, -mm2_params.I + 1) // bot
     this.mm2_params.result_rot = new THREE.Vector3(-Math.PI / 2, 0, 0)
-    this.mm2 = new MatMul(this.mm2_params, getText, this.group)
+    this.mm2 = new MatMul(this.mm2_params, getText)
     this.group.add(this.mm2.group)
 
   }

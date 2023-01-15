@@ -36,23 +36,27 @@
     import { EffectComposer } from 'https://threejs.org/examples/jsm/postprocessing/EffectComposer.js'
     import { RenderPass } from 'https://threejs.org/examples/jsm/postprocessing/RenderPass.js'
 
-    const init_dims = { i: 32, j: 32, k: 32 }
+    const init_dims = { n_q: 128, d_qk: 32, d_v: 32, n_kv: 128 }
     const init_funcs = ['rows', 'cols', 'row major', 'col major', 'uniform', 'gaussian', 'tril', 'triu', 'eye', 'diff', 'ones', 'zeros']
 
     const params = {
-      'I': init_dims.i,
-      'J': init_dims.j,
-      'K': init_dims.k,
+      'n_q': init_dims.n_q,
+      'd_qk': init_dims.d_qk,
+      'd_v': init_dims.d_v,
+      'n_kv': init_dims.n_kv,
       'animation': 'none',
       'speed': 8,
       'pause': false,
-      'left init': 'rows',
-      'left sparsity': 0,
-      'right init': 'cols',
-      'right sparsity': 0,
+      'q init': 'rows',
+      'k^t init': 'cols',
+      'v init': 'rows',
+      'q sparsity': 0,
+      'k^t sparsity': 0,
+      'v sparsity': 0,
       'init min': -1,
       'init max': 1,
-      'epilog': 'none',
+      'attn epilog': 'none', // TODO softmax(1)
+      'result epilog': 'none',
       'zero hue': 0.25,
       'zero size': 0.25,
       'zero light': 0.15,
@@ -63,9 +67,9 @@
       'legends': true,
       'axes': false,
       // set from orbit control
-      'xcam': -init_dims.i * 2,
-      'ycam': init_dims.j * 2,
-      'zcam': init_dims.k * 2,
+      'xcam': -init_dims.n_q * 2,
+      'ycam': init_dims.d_qk + init_dims.d_v,
+      'zcam': init_dims.n_kv * 2,
     };
 
     let addressBarUpdatePending = false
@@ -145,6 +149,7 @@
       const renderer = new THREE.WebGLRenderer({ antialias: true });
       renderer.setPixelRatio(window.devicePixelRatio)
       renderer.setSize(window.innerWidth, window.innerHeight)
+      renderer.sortObject = false
       document.getElementById('container').appendChild(renderer.domElement)
 
       const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 5, 10000);
@@ -189,50 +194,68 @@
     function initGui(getObj, initObj, initAxes) {
       const gui = new GUI();
 
-      gui.add(params, 'I', 1, 128).onChange(function (val) {
+      gui.add(params, 'n_q', 1, 512).onChange(function (val) {
         val = Math.floor(val)
-        setParams({ I: val })
-        if (val != getObj().params.I) {
-          getObj().setI(val)
+        setParams({ n_q: val })
+        if (val != getObj().params.n_q) {
+          getObj().setNQ(val)
         }
       })
 
-      gui.add(params, 'J', 1, 128).onChange(function (val) {
+      gui.add(params, 'n_kv', 1, 512).onChange(function (val) {
         val = Math.floor(val)
-        setParams({ J: val })
-        if (val != getObj().params.J) {
+        setParams({ n_kv: val })
+        if (val != getObj().params.n_kv) {
+          getObj().setNKV(val)
+        }
+      })
+
+      gui.add(params, 'd_qk', 1, 512).onChange(function (val) {
+        val = Math.floor(val)
+        setParams({ d_qk: val })
+        if (val != getObj().params.d_qk) {
           initObj()
         }
       })
 
-      gui.add(params, 'K', 1, 128).onChange(function (val) {
+      gui.add(params, 'd_v', 1, 512).onChange(function (val) {
         val = Math.floor(val)
-        setParams({ K: val })
-        if (val != getObj().params.K) {
-          getObj().setK(val)
+        setParams({ d_v: val })
+        if (val != getObj().params.d_v) {
+          initObj()
         }
       })
 
       const gui_data = gui.addFolder('data')
 
-      gui_data.add(params, 'left init', init_funcs).onChange(function (val) {
-        setParams({ 'left init': val })
-        initObj()
+      gui_data.add(params, 'q init', init_funcs).onChange(function (val) {
+        setParams({ 'q init': val })
+        getObj().initQ(params)
       })
 
-      gui_data.add(params, 'right init', init_funcs).onChange(function (val) {
-        setParams({ 'right init': val })
-        initObj()
+      gui_data.add(params, 'k^t init', init_funcs).onChange(function (val) {
+        setParams({ 'k^t init': val })
+        getObj().initK(params)
       })
 
-      gui_data.add(params, 'left sparsity', 0.0, 1.0).onChange(function (val) {
-        setParams({ 'left sparsity': val })
-        getObj().initLeft(params)
+      gui_data.add(params, 'v init', init_funcs).onChange(function (val) {
+        setParams({ 'v init': val })
+        getObj().initV(params)
       })
 
-      gui_data.add(params, 'right sparsity', 0.0, 1.0).onChange(function (val) {
-        setParams({ 'right sparsity': val })
-        getObj().initRight(params)
+      gui_data.add(params, 'q sparsity', 0.0, 1.0).onChange(function (val) {
+        setParams({ 'q sparsity': val })
+        getObj().initQ(params)
+      })
+
+      gui_data.add(params, 'k^t sparsity', 0.0, 1.0).onChange(function (val) {
+        setParams({ 'k^t sparsity': val })
+        getObj().initK(params)
+      })
+
+      gui_data.add(params, 'v sparsity', 0.0, 1.0).onChange(function (val) {
+        setParams({ 'v sparsity': val })
+        getObj().initV(params)
       })
 
       gui_data.add(params, 'init min', -1.0, 1.0).onChange(function (val) {
@@ -245,9 +268,14 @@
         initObj()
       })
 
-      gui_data.add(params, 'epilog', ['x/J', 'x/sqrt(J)', 'tanh(x)', 'relu(x)', 'none']).onChange(function (val) {
-        setParams({ 'epilog': val })
-        getObj().setEpilog(val)
+      gui_data.add(params, 'attn epilog', ['x/J', 'x/sqrt(J)', 'tanh(x)', 'relu(x)', 'none']).onChange(function (val) {
+        setParams({ 'attn epilog': val })
+        getObj().setAttnEpilog(val)
+      })
+
+      gui_data.add(params, 'result epilog', ['x/J', 'x/sqrt(J)', 'tanh(x)', 'relu(x)', 'none']).onChange(function (val) {
+        setParams({ 'result epilog': val })
+        getObj().setResultEpilog(val)
       })
 
       gui_data.open()
