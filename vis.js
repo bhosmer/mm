@@ -144,7 +144,7 @@ class Array {
 //
 // Mat
 //
-class Mat {
+export class Mat {
   ELEM_SIZE = 2048
   ELEM_SAT = 1.0
   ELEM_LIGHT = 0.6
@@ -180,14 +180,73 @@ class Mat {
     return new Mat(h, w, new Array(h, w, init), container)
   }
 
-  constructor(h, w, data, container) {
-    this.container = container
-    this.zero_hue = container.params['zero hue']
-    this.zero_size = container.params['zero size']
-    this.zero_light = container.params['zero light']
-    this.max_light = container.params['max light']
-    this.hue_gap = container.params['hue gap']
-    this.hue_spread = container.params['hue spread']
+  // --------
+
+  // TODO 
+  // param plumbing
+  // parameterized orientation 
+
+  static fromParams(h, w, params, getText) {
+    const data = Mat.dataFromParams(h, w, params)
+    // params.normal = new THREE.Vector(0, 0, 1)
+
+    const m = new Mat(h, w, data, undefined, params)
+
+    m.setGuide(params.guides)
+
+    // this.setLeftLegends(params.legends)
+    const custom = params.legend ? params.legend : {}
+    const defaults = { name: "X", height: "i", width: "j", hleft: true, wtop: false, backward: true }
+    const props = { ...m.getLegendProps(h, w, params), ...defaults, ...custom }
+    m.setLegends(params.legends, props, getText)
+
+    return m
+  }
+
+  static dataFromParams(h, w, params) {
+    const init_base = params['init min']
+    const init_range = Math.max(0, params['init max'] - params['init min'])
+    const init_name = params['left init']
+    const sparsity = params['left sparsity']
+    const init = getInitFunc(init_name, sparsity, init_base, init_range)
+    return new Array(h, w, init)
+  }
+
+  getLegendProps(h, w, params) {
+    const custom = params.legend_props ? params.legend_props : {}
+    const gm = Math.sqrt(h * w)
+    const defaults = {
+      name_color: 0xccccff,
+      name_size: gm / 16,
+      dim_color: 0x00aaff,
+      dim_size: gm / 32,
+    }
+    return { ...defaults, ...custom }
+  }
+
+  // --------
+
+  constructor(h, w, data, container, params) {
+    if (container) {
+      this.container = container
+      if (params) {
+        throw Error('passed both container and params to Mat')
+      }
+    } else {
+      this.container = this
+      this.global_absmax = data.absmax
+      this.setAbsmax = () => this.global_absmax = data.absmax
+      if (!params) {
+        throw Error('passed neither container nor params to Mat')
+      }
+      this.params = params
+    }
+    this.zero_hue = this.container.params['zero hue']
+    this.zero_size = this.container.params['zero size']
+    this.zero_light = this.container.params['zero light']
+    this.max_light = this.container.params['max light']
+    this.hue_gap = this.container.params['hue gap']
+    this.hue_spread = this.container.params['hue spread']
     this.h = h
     this.w = w
     this.data = data
