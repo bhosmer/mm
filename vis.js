@@ -141,6 +141,25 @@ class Array {
   }
 }
 
+// move
+function orientFromParams(params) {
+  if (params.orient) {
+    return params.orient
+  }
+  const x = params['left/right'] == 'left' ? -1 : 1
+  const y = params['up/down'] == 'down' ? -1 : 1
+  const z = params['front/back'] == 'back' ? -1 : 1
+  return { x: x, y: y, z: z }
+}
+
+function rotFromOrient(orient) {
+  return {
+    x: orient.x == -1 ? Math.PI : 0,
+    y: orient.y == -1 ? Math.PI : 0,
+    z: orient.z == -1 ? Math.PI : 0,
+  }
+}
+
 //
 // Mat
 //
@@ -186,17 +205,18 @@ export class Mat {
   // param plumbing
   // parameterized orientation 
 
+  // orientation for front facing, right side up, left to right is {x: 1, y: -1, z: 1} 
+
   static fromParams(h, w, params, getText) {
     const data = Mat.dataFromParams(h, w, params)
-    // params.normal = new THREE.Vector(0, 0, 1)
 
     const m = new Mat(h, w, data, undefined, params)
 
-    m.setGuide(params.guides)
+    m.setGuides(params.guides)
 
     // this.setLeftLegends(params.legends)
     const custom = params.legend ? params.legend : {}
-    const defaults = { name: "X", height: "i", width: "j", hleft: true, wtop: false, backward: true }
+    const defaults = { name: "X", height: "i", width: "j", hleft: true, wtop: false }
     const props = { ...m.getLegendProps(h, w, params), ...defaults, ...custom }
     m.setLegends(params.legends, props, getText)
 
@@ -232,6 +252,7 @@ export class Mat {
       if (params) {
         throw Error('passed both container and params to Mat')
       }
+      this.orient = orientFromParams(this.container.params)
     } else {
       this.container = this
       this.global_absmax = data.absmax
@@ -239,8 +260,10 @@ export class Mat {
       if (!params) {
         throw Error('passed neither container nor params to Mat')
       }
-      this.params = params
+      this.params = { ...params }
+      this.orient = orientFromParams(this.params)
     }
+
     this.zero_hue = this.container.params['zero hue']
     this.zero_size = this.container.params['zero size']
     this.zero_light = this.container.params['zero light']
@@ -266,6 +289,8 @@ export class Mat {
     this.points = new THREE.Points(g, MATERIAL)
     this.group = new THREE.Group()
     this.group.add(this.points)
+
+    this.group.rotation.setFromVector3(rotFromOrient(this.orient))
   }
 
   numel() {
@@ -348,7 +373,7 @@ export class Mat {
     }
   }
 
-  setGuide(enabled) {
+  setGuides(enabled) {
     if (enabled) {
       if (!this.guide) {
         const guide = util.rowguide(this.h, 0.5, this.w)
@@ -524,7 +549,7 @@ export class MatMul {
     if (this.params.left_pos) {
       Object.keys(this.params.left_pos).map(k => this.left.group.position[k] += this.params.left_pos[k])
     }
-    this.left.setGuide(this.params.guides)
+    this.left.setGuides(this.params.guides)
     this.setLeftLegends(this.params.legends)
     this.group.add(this.left.group)
   }
@@ -546,7 +571,7 @@ export class MatMul {
     if (this.params.right_pos) {
       Object.keys(this.params.right_pos).map(k => this.right.group.position[k] += this.params.right_pos[k])
     }
-    this.right.setGuide(this.params.guides)
+    this.right.setGuides(this.params.guides)
     this.setRightLegends(this.params.legends)
     this.group.add(this.right.group)
   }
@@ -564,7 +589,7 @@ export class MatMul {
     if (this.params.result_pos) {
       Object.keys(this.params.result_pos).map(k => this.result.group.position[k] += this.params.result_pos[k])
     }
-    this.result.setGuide(this.params.guides)
+    this.result.setGuides(this.params.guides)
     this.setResultLegends(this.params.legends)
     this.group.add(this.result.group)
   }
@@ -826,12 +851,12 @@ export class MatMul {
   setGuides(enabled) {
     this.params.guides = enabled
     if (!this.params.left) {
-      this.left.setGuide(enabled)
+      this.left.setGuides(enabled)
     }
     if (!this.params.right) {
-      this.right.setGuide(enabled)
+      this.right.setGuides(enabled)
     }
-    this.result.setGuide(enabled)
+    this.result.setGuides(enabled)
   }
 
   getLegendProps() {
