@@ -40,32 +40,38 @@
     const init_funcs = ['rows', 'cols', 'row major', 'col major', 'uniform', 'gaussian', 'tril', 'triu', 'eye', 'diff', 'ones', 'zeros']
 
     const params = {
-      'I': init_dims.i,
-      'J': init_dims.j,
-      'K': init_dims.k,
-      'animation': 'none',
-      'speed': 8,
-      'pause': false,
+      nlayers: 5,
+      I_0: init_dims.i,
+      J_0: init_dims.j,
+      I_1: init_dims.i,
+      I_2: init_dims.i,
+      I_3: init_dims.i,
+      I_4: init_dims.i,
+      K: init_dims.k,
+      alternating: true,
+      animation: 'none',
+      speed: 8,
+      pause: false,
       'left init': 'rows',
       'left sparsity': 0,
       'right init': 'cols',
       'right sparsity': 0,
       'init min': -1,
       'init max': 1,
-      'epilog': 'none',
+      epilog: 'none',
       'zero hue': 0.25,
       'zero size': 0.25,
       'zero light': 0.15,
       'max light': 0.65,
       'hue gap': 0.25,
       'hue spread': 0.01,
-      'guides': false,
-      'legends': true,
-      'axes': false,
+      guides: true,
+      legends: true,
+      axes: true,
       // set from orbit control
-      'xcam': -init_dims.i * 2,
-      'ycam': init_dims.j * 2,
-      'zcam': init_dims.k * 2,
+      xcam: -init_dims.i * 2,
+      ycam: init_dims.j * 2,
+      zcam: init_dims.k * 2,
     };
 
     let addressBarUpdatePending = false
@@ -77,7 +83,8 @@
       if (!addressBarUpdatePending) {
         addressBarUpdatePending = true
         setTimeout(function () {
-          const url = `${window.location.pathname}?${new URLSearchParams(params)}`
+          const save = Object.fromEntries(Object.entries(params).filter(([k, v]) => typeof v != 'function'))
+          const url = `${window.location.pathname}?${new URLSearchParams(save)}`
           window.history.replaceState({}, '', url)
           addressBarUpdatePending = false
         }, 250);
@@ -186,32 +193,60 @@
       return animate
     }
 
+    // gui
+
     function initGui(getObj, initObj, initAxes) {
       const gui = new GUI();
 
-      gui.add(params, 'I', 1, 128).onChange(function (val) {
-        val = Math.floor(val)
-        setParams({ I: val })
-        if (val != getObj().params.I) {
-          getObj().setI(val)
-        }
-      })
+      const gui_layers = gui.addFolder('layers')
 
-      gui.add(params, 'J', 1, 128).onChange(function (val) {
-        val = Math.floor(val)
-        setParams({ J: val })
-        if (val != getObj().params.J) {
-          initObj()
-        }
-      })
+      for (let i = 0; i < params.nlayers; i++) {
+        gui_layers.add(params, `I_${i}`, 1, 256).onChange(function (val) {
+          val = Math.floor(val)
+          setParams({ [`I_${i}`]: val })
+          if (val != getObj().params[`I_${i}`]) {
+            initObj()
+          }
+        })
 
-      gui.add(params, 'K', 1, 128).onChange(function (val) {
+        if (i == 0) {
+          gui_layers.add(params, `J_${i}`, 1, 256).onChange(function (val) {
+            val = Math.floor(val)
+            setParams({ [`J_${i}`]: val })
+            if (val != getObj().params[`J_${i}`]) {
+              initObj()
+            }
+          })
+
+        }
+      }
+
+      gui_layers.add(params, 'K', 1, 128).onChange(function (val) {
         val = Math.floor(val)
         setParams({ K: val })
         if (val != getObj().params.K) {
           getObj().setK(val)
         }
       })
+
+      params['add layer'] = () => {
+        params[`I_${params.nlayers}`] = init_dims.i
+        params[`J_${params.nlayers}`] = params[`I_${params.nlayers - 1}`]
+        params.nlayers += 1
+        getObj().addLayer(params)
+      }
+
+      params['remove layer'] = () => {
+        if (params.nlayers > 1) {
+          delete params[`I_${params.nlayers - 1}`]
+          delete params[`J_${params.nlayers - 1}`]
+          params.nlayers -= 1
+          getObj().removeLayer(params)
+        }
+      }
+
+      gui_layers.add(params, 'add layer')
+      gui_layers.add(params, 'remove layer')
 
       const gui_data = gui.addFolder('data')
 
@@ -250,9 +285,12 @@
         getObj().setEpilog(val)
       })
 
-      gui_data.open()
-
       const gui_vis = gui.addFolder('vis')
+
+      gui_vis.add(params, 'alternating').onChange(function (val) {
+        setParams({ alternating: val })
+        initObj() // TODO initVis
+      })
 
       gui_vis.add(params, 'animation', ['itemwise', 'dotprod', 'mvprod', 'vmprod', 'none']).onChange(function (val) {
         setParams({ animation: val })
@@ -281,8 +319,6 @@
         setParams({ axes: val })
         initAxes(val)
       })
-
-      gui_vis.open()
 
       const gui_colors = gui.addFolder('colors')
 
@@ -315,9 +351,6 @@
         setParams({ 'hue spread': val })
         getObj().initVis(params)
       })
-
-      gui_colors.open()
-
     }
 
 

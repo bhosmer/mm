@@ -141,6 +141,17 @@ class Array {
   }
 }
 
+
+//
+// rules:
+//
+// mats always have (0, 0, 0) as their minimum point
+// cubes also
+// cubes are either concave or convex
+// convex: 
+//
+//
+
 // move
 function orientFromParams(params) {
   if (params.orient) {
@@ -529,6 +540,10 @@ export class MatMul {
     this.group.position.x = pos.x
     this.group.position.y = pos.y
     this.group.position.z = pos.z
+    const rot = this.params.rot ? this.params.rot : new THREE.Vector3(0, 0, 0)
+    this.group.rotation.x = rot.x
+    this.group.rotation.y = rot.y
+    this.group.rotation.z = rot.z
   }
 
   initLeftVis() {
@@ -980,14 +995,24 @@ export class Attn {
         left: this.mm1.result,
         'right init': this.params['v init'],
         'right sparsity': this.params['v sparsity'],
-        right_legend: { name: "V", height: "n_kv", width: "d_v", backward: true },
+
+        // right_legend: { name: "V", height: "n_kv", width: "d_v", backward: true },
+        right_legend: { name: "V", height: "n_kv", width: "d_v" },
+
         result_legend: { name: "out", height: "n_q", width: "d_v", wtop: true },
         epilog: this.params['result epilog'],
-        pos: new THREE.Vector3(0, 0, this.mm1.D + 1),
-        right_rot: new THREE.Vector3(Math.PI, 0, -Math.PI / 2),
+
+        right_rot: new THREE.Vector3(0, Math.PI, 0),
+
+        // alternating
         right_pos: new THREE.Vector3(0, -this.H - 1, 0),
-        result_pos: new THREE.Vector3(this.W, 0, -this.mm1.W),
-        result_rot: new THREE.Vector3(0, Math.PI / 2, 0),
+
+        result_rot: new THREE.Vector3(0, Math.PI, 0),
+
+        rot: new THREE.Vector3(0, Math.PI / 2, 0),
+        pos: new THREE.Vector3(0, 0, this.mm1.D + 1),
+
+
       }
     }
     this.mm2 = new MatMul(mm2_params, this.getText)
@@ -1054,50 +1079,80 @@ export class Attn {
 export class MLP {
   constructor(params, getText) {
     this.getText = getText
+    this.params = { ...params }
     this.group = new THREE.Group()
 
-    // TODO passed in
-    const mm1_params = { ...params }
-    const mm2_params = { ...params }
-
-    if (mm1_params.I != mm2_params.K) {
-      throw Error(`MLP: mm1_params.I ${mm1_params.I} mm2_params.K ${mm2_params.K}`)
+    this.mms = []
+    const nlayers = params.nlayers ? params.nlayers : 5
+    for (let i = 0; i < nlayers; i++) {
+      const I = params[`I_${i}`]
+      const J = i == 0 ? params.J_0 : params[`I_${i - 1}`]
+      const K = params.K
+      const mm_params = {
+        I: I,
+        J: J,
+        K: K,
+        ...this.params,
+        ...(i > 0 ? { right: this.mms[i - 1].result } : {}),
+        ...{
+          left_legend: {
+            ...{
+              name: `w${i}`,
+              width: (i == 0 ? "in" : `h${i}`) + " features",
+              height: (i == nlayers - 1 ? "out" : `h${i + 1}`) + " features"
+            },
+            ...(i % 2 == 1 ? { backward: true } : {})
+          },
+          right_legend: {
+            name: i == 0 ? "in" : `x${i}`,
+            width: i == 0 ? "batch size" : "",
+            height: (i == 0 ? "in" : `h${i} `) + " features"
+          },
+          result_legend: {
+            name: i == nlayers - 1 ? "out" : `h${i + 1} `,
+            height: i == nlayers - 1 ? "out features" : "",
+            width: i == nlayers - 1 ? "batch size" : ""
+          },
+          pos: i == 0 ?
+            new THREE.Vector3(0, 0, 0) :
+            (prev =>
+              new THREE.Vector3(
+                0,
+                prev.group.position.y + (i % 2 == 0 ? -prev.D - 1 : 0),
+                prev.group.position.z + (i % 2 == 1 ? prev.D + 1 : 0)
+              )
+            )(this.mms[i - 1])
+          ,
+        },
+        ...(i % 2 == 0 ? {} : {
+          // alternating
+          left_pos: new THREE.Vector3(params.alternating ? this.mms[0].W + 1 : 0, 0, 0),
+          left_rot: new THREE.Vector3(-Math.PI / 2, Math.PI, 0),
+          result_pos: new THREE.Vector3(0, -J, -J),
+          result_rot: new THREE.Vector3(-Math.PI / 2, 0, 0),
+        })
+      }
+      const mm = new MatMul(mm_params, getText)
+      this.mms.push(mm)
+      this.group.add(mm.group)
     }
-    if (mm1_params.K != mm2_params.J) {
-      throw Error(`MLP: mm1_params.K ${mm1_params.K} mm2_params.J ${mm2_params.J}`)
-    }
 
-    this.H = mm1_params.I
-    this.D = mm1_params.J + mm2_params.I
-    this.W = mm1_params.K
-
-    // TODO offset from parent pos
-    this.mm1_params = mm1_params
-    this.mm1_params.left_legend = { name: "w0" }
-    this.mm1_params.right_legend = { name: "x0" }
-    this.mm1_params.result_legend = { name: "x1", height: "", width: "" }
-    this.mm1_params.pos = new THREE.Vector3(-this.W / 2, this.H / 2, -this.D / 2)
-    this.mm1 = new MatMul(this.mm1_params, getText)
-    this.group.add(this.mm1.group)
-
-    this.mm2_params = mm2_params
-    this.mm2_params.left_legend = { name: "w1", backward: true }
-    this.mm2_params.result_legend = { name: "x2", height: "" }
-    this.mm2_params.pos = new THREE.Vector3(-this.W / 2, this.H / 2, -this.D / 2 + mm1_params.J)
-    // this.mm2_params.left_pos = new THREE.Vector3(0, 0, 1)
-    this.mm2_params.left_pos = new THREE.Vector3(this.W + 1, 0, 1)
-    this.mm2_params.left_rot = new THREE.Vector3(Math.PI, Math.PI, -Math.PI / 2)
-    this.mm2_params.right = this.mm1.result
-    this.mm2_params.result_pos = new THREE.Vector3(0, -this.H, -mm2_params.I + 1) // bot
-    this.mm2_params.result_rot = new THREE.Vector3(-Math.PI / 2, 0, 0)
-    this.mm2 = new MatMul(this.mm2_params, getText)
-    this.group.add(this.mm2.group)
-
+    this.setPosition()
   }
 
-  bump() {
-    this.mm1.bump()
-    this.mm2.bump()
+  setPosition() {
+    const last_mm = this.mms[this.mms.length - 1]
+    this.H = last_mm.group.position.y - last_mm.H
+    this.D = last_mm.group.position.z + last_mm.D
+    this.W = last_mm.group.position.x + last_mm.W
+
+    // center cube on 0,0,0 if no pos given
+    // note: don't save into params
+    const pos = this.params.pos ? this.params.pos :
+      new THREE.Vector3(-this.W / 2, -this.H / 2, -this.D / 2)
+    this.group.position.x = pos.x
+    this.group.position.y = pos.y
+    this.group.position.z = pos.z
   }
 
   setGuides(enabled) {
@@ -1110,3 +1165,4 @@ export class MLP {
     this.mm2.setLegends(enabled)
   }
 }
+

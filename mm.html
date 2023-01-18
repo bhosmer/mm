@@ -254,8 +254,6 @@
         getObj().setEpilog(val)
       })
 
-      gui_data.open()
-
       const gui_vis = gui.addFolder('vis')
 
       gui_vis.add(params, 'animation', ['itemwise', 'dotprod', 'mvprod', 'vmprod', 'none']).onChange(function (val) {
@@ -285,8 +283,6 @@
         setParams({ axes: val })
         initAxes(val)
       })
-
-      gui_vis.open()
 
       const gui_colors = gui.addFolder('colors')
 
@@ -319,9 +315,6 @@
         setParams({ 'hue spread': val })
         getObj().initVis(params)
       })
-
-      gui_colors.open()
-
     }
 
 
