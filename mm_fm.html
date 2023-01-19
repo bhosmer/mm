@@ -207,7 +207,7 @@
         }
       })
 
-      gui.add(params, 'animation', ['itemwise', 'dotprod', 'mvprod', 'vmprod', 'none']).onChange(function (val) {
+      gui.add(params, 'animation', ['dotprod', 'mvprod', 'vmprod', 'none']).onChange(function (val) {
         setParams({ animation: val })
         getObj().initVis(params)
       })

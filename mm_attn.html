@@ -282,7 +282,7 @@
 
       const gui_vis = gui.addFolder('vis')
 
-      gui_vis.add(params, 'animation', ['itemwise', 'dotprod', 'mvprod', 'vmprod', 'none']).onChange(function (val) {
+      gui_vis.add(params, 'animation', ['dotprod', 'mvprod', 'vmprod', 'none']).onChange(function (val) {
         setParams({ animation: val })
         getObj().initVis(params)
       })

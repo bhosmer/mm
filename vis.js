@@ -407,45 +407,28 @@ export class Mat {
           const name = getText(props.name, props.name_color, props.name_size)
           const { h, w } = util.bbhw(name.geometry)
           name.geometry.rotateZ(Math.PI)
-          if (props.backward) {
-            name.geometry.translate(w + util.center(this.w - 1, w), h + util.center(this.h - 1, h), 1 + h / 2)
-          } else {
-            name.geometry.rotateY(Math.PI)
-            name.geometry.translate(util.center(this.w - 1, w), h + util.center(this.h - 1, h), -(1 + h / 2))
-          }
+          name.geometry.rotateY(Math.PI)
+          name.geometry.translate(util.center(this.w - 1, w), h + util.center(this.h - 1, h), -(1 + h / 2))
           this.legends.add(name)
         }
         if (props.height) {
           const height = getText(`${props.height} = ${this.h}`, props.dim_color, props.dim_size)
           const { h, w } = util.bbhw(height.geometry)
-          if (props.backward) {
-            const zrot = (props.hleft ? 1 : -1) * Math.PI / 2
-            height.geometry.rotateZ(zrot)
-          } else {
-            height.geometry.rotateX(Math.PI)
-            const zrot = (props.hleft ? -1 : 1) * Math.PI / 2
-            height.geometry.rotateZ(zrot)
-          }
+          height.geometry.rotateX(Math.PI)
+          const zrot = (props.hleft ? -1 : 1) * Math.PI / 2
+          height.geometry.rotateZ(zrot)
           const spacer = 0.5
-          const xoff = props.backward ?
-            (props.hleft ? -h * 1 - spacer : this.w + h) :
-            (props.hleft ? -h * 1 - spacer : this.w - 1 + h + spacer)
-          const yoff = props.backward ?
-            (props.hleft ? util.center(this.h - 1, w) : w + util.center(this.h - 1, w)) :
-            (props.hleft ? w + util.center(this.h - 1, w) : util.center(this.h - 1, w))
+          const xoff = props.hleft ? -h * 1 - spacer : this.w - 1 + h + spacer
+          const yoff = props.hleft ? w + util.center(this.h - 1, w) : util.center(this.h - 1, w)
           height.geometry.translate(xoff, yoff, 0)
           this.legends.add(height)
         }
         if (props.width) {
           const width = getText(`${props.width} = ${this.w}`, props.dim_color, props.dim_size)
           const { h, w } = util.bbhw(width.geometry)
-          if (props.backward) {
-            width.geometry.rotateZ(Math.PI)
-          } else {
-            width.geometry.rotateX(Math.PI)
-          }
+          width.geometry.rotateX(Math.PI)
           const spacer = 0.5
-          const xoff = (props.backward ? w : 0) + util.center(this.w - 1, w)
+          const xoff = util.center(this.w - 1, w)
           const yoff = props.wtop ? -h * 1 - spacer : this.h - 1 + h * 1.5 + spacer
           width.geometry.translate(xoff, yoff, 0)
           this.legends.add(width)
@@ -656,15 +639,6 @@ export class MatMul {
       this.bump = this.bump_dotprod
       this.curi = this.H - 1
       this.curk = this.W - 1
-    } else if (this.animation == 'itemwise') {
-      this.result.hideAll()
-      const itemwise_init = (y, x, h, w) => this.dotprod_val(0, 0, x)
-      this.itemwise = Mat.fromInit(1, 1, itemwise_init, this)
-      this.group.add(this.itemwise.points)
-      this.bump = this.bump_itemwise
-      this.curi = this.H - 1
-      this.curj = this.D - 1
-      this.curk = this.W - 1
     } else if (this.animation == 'mvprod') {
       this.result.hideAll()
       const mvprod_init = (y, x, h, w) => this.dotprod_val(0, y, x)
@@ -693,7 +667,7 @@ export class MatMul {
 
   _result_val(a, b, i, j) {
     let x = 0.0
-    const n = this.animation == 'itemwise' ? this.curk : a.w
+    const n = a.w
     for (let k = 0; k < n; k++) {
       x += a.get(i, k) * b.get(k, j)
     }
@@ -820,47 +794,6 @@ export class MatMul {
     for (let z = 0; z < this.dotprod.numel(); z++) {
       this.dotprod.setData(0, z, this.dotprod_val(i, k, z))
     }
-  }
-
-  bump_itemwise() {
-    const oldi = this.curi
-    const oldj = this.curj
-    const oldk = this.curk
-
-    if (oldj < this.D - 1) {
-      this.curj += 1
-    } else {
-      this.curj = 0
-      if (oldk < this.W - 1) {
-        this.curk += 1
-      } else {
-        this.curk = 0
-        this.curi = oldi < this.H - 1 ? this.curi + 1 : 0
-      }
-    }
-
-    const i = this.curi
-    const j = this.curj
-    const k = this.curk
-
-    // update result face
-    if (i == 0 && k == 0) {
-      this.result.hideAll()
-    }
-    this.result.show(i, k)
-
-    // hilight operand row/cols
-    this.left.bumpColor(oldi, oldj, false)
-    this.left.bumpColor(i, j, true)
-
-    this.right.bumpColor(oldj, oldk, false)
-    this.right.bumpColor(j, k, true)
-
-    // move and recolor multiple item
-    this.itemwise.points.position.x = this.right.points.geometry.attributes.position.array[k * 3]
-    this.itemwise.points.position.y = -this.left.points.geometry.attributes.position.array[i * this.D * 3 + 1]
-    this.itemwise.points.position.z = this.left.points.geometry.attributes.position.array[j * 3]
-    this.itemwise.setData(0, 0, this.dotprod_val(i, k, j))
   }
 
   setGuides(enabled) {
@@ -995,20 +928,15 @@ export class Attn {
         left: this.mm1.result,
         'right init': this.params['v init'],
         'right sparsity': this.params['v sparsity'],
-
-        // right_legend: { name: "V", height: "n_kv", width: "d_v", backward: true },
         right_legend: { name: "V", height: "n_kv", width: "d_v" },
-
         result_legend: { name: "out", height: "n_q", width: "d_v", wtop: true },
         epilog: this.params['result epilog'],
-
         right_rot: new THREE.Vector3(0, Math.PI, 0),
 
         // alternating
         right_pos: new THREE.Vector3(0, -this.H - 1, 0),
 
         result_rot: new THREE.Vector3(0, Math.PI, 0),
-
         rot: new THREE.Vector3(0, Math.PI / 2, 0),
         pos: new THREE.Vector3(0, 0, this.mm1.D + 1),
 
@@ -1101,7 +1029,6 @@ export class MLP {
               width: (i == 0 ? "in" : `h${i}`) + " features",
               height: (i == nlayers - 1 ? "out" : `h${i + 1}`) + " features"
             },
-            ...(i % 2 == 1 ? { backward: true } : {})
           },
           right_legend: {
             name: i == 0 ? "in" : `x${i}`,

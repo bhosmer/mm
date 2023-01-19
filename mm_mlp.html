@@ -47,6 +47,9 @@
       I_2: init_dims.i,
       I_3: init_dims.i,
       I_4: init_dims.i,
+      I_5: init_dims.i,
+      I_6: init_dims.i,
+      I_7: init_dims.i,
       K: init_dims.k,
       alternating: true,
       animation: 'none',
@@ -217,23 +220,24 @@
               initObj()
             }
           })
-
         }
       }
 
-      gui_layers.add(params, 'K', 1, 128).onChange(function (val) {
+      gui_layers.add(params, 'K', 1, 256).onChange(function (val) {
         val = Math.floor(val)
         setParams({ K: val })
         if (val != getObj().params.K) {
-          getObj().setK(val)
+          initObj()
         }
       })
 
       params['add layer'] = () => {
-        params[`I_${params.nlayers}`] = init_dims.i
-        params[`J_${params.nlayers}`] = params[`I_${params.nlayers - 1}`]
-        params.nlayers += 1
-        getObj().addLayer(params)
+        if (params.nlayers < 8) {
+          params[`I_${params.nlayers}`] = init_dims.i
+          params[`J_${params.nlayers}`] = params[`I_${params.nlayers - 1}`]
+          params.nlayers += 1
+          initObj()
+        }
       }
 
       params['remove layer'] = () => {
@@ -241,7 +245,7 @@
           delete params[`I_${params.nlayers - 1}`]
           delete params[`J_${params.nlayers - 1}`]
           params.nlayers -= 1
-          getObj().removeLayer(params)
+          initObj()
         }
       }
 
@@ -292,7 +296,7 @@
         initObj() // TODO initVis
       })
 
-      gui_vis.add(params, 'animation', ['itemwise', 'dotprod', 'mvprod', 'vmprod', 'none']).onChange(function (val) {
+      gui_vis.add(params, 'animation', ['dotprod', 'mvprod', 'vmprod', 'none']).onChange(function (val) {
         setParams({ animation: val })
         getObj().initVis(params)
       })
