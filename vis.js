@@ -572,6 +572,10 @@ export class MatMul {
   }
 
   initResultVis() {
+    if (this.params.result) {
+      this.result = this.params.result
+      return
+    }
     if (this.result) {
       this.group.remove(this.result.group)
     }
@@ -655,6 +659,8 @@ export class MatMul {
       this.curi = this.H - 1
     } else if (this.animation == 'none') {
       this.result.showAll()
+    } else if (this.animation == 'none (inputs only)' && !this.params.result) {
+      this.result.hideAll()
     }
   }
 
@@ -846,7 +852,7 @@ export class MatMul {
 }
 
 //
-// Attn (Q @ K^T) @ V
+// Attn (Q @ K.T) @ V
 //
 
 export class Attn {
@@ -903,7 +909,7 @@ export class Attn {
         left_legend: { name: "Q", height: "n_q", width: "d_qk" },
         'right init': this.params['k^t init'],
         'right sparsity': this.params['k^t sparsity'],
-        right_legend: { name: "K^T", height: "d_qk", width: "n_kv" },
+        right_legend: { name: "K.T", height: "d_qk", width: "n_kv" },
         result_legend: { name: "attn", height: "", width: "" },
         epilog: this.params['attn epilog'],
         pos: new THREE.Vector3(0, 0, 0),
@@ -1084,7 +1090,7 @@ export class MLP {
 }
 
 //
-// MLP pytorch style (x @ w0^T) @ w1^T @ ...
+// MLP pytorch style (x @ w0.T) @ w1.T @ ...
 //
 
 export class MLPT {
@@ -1169,6 +1175,185 @@ export class MLPT {
   setLegends(enabled) {
     this.mm1.setLegends(enabled)
     this.mm2.setLegends(enabled)
+  }
+}
+
+//
+// Attn (Q @ K.T) @ V
+//
+
+export class Attn2 {
+  constructor(params, getText) {
+    this.getText = getText
+    this.params = { ...params }
+    this.group = new THREE.Group()
+
+    this.H = params.n_q
+    this.D = params.d_qk + this.params.d_v
+    this.W = params.n_kv
+
+    this.initVis()
+  }
+
+  initVis(params = undefined) {
+    if (params) {
+      this.params = { ...params }
+    }
+    this.group.clear()
+
+    this.initmm1()
+    this.initqmm()
+    this.initkmm()
+
+    this.initmm2()
+    this.initvmm()
+    this.initff()
+
+    this.setPosition()
+  }
+
+  setPosition() {
+    const pos = this.params.pos ? this.params.pos :
+      new THREE.Vector3(-this.W / 2, this.H / 2, -this.D / 2)
+    this.group.position.x = pos.x
+    this.group.position.y = pos.y
+    this.group.position.z = pos.z
+  }
+
+  initmm1() {
+    const mm1_params = {
+      ...this.params, ...{
+        I: this.params.n_q,
+        J: this.params.d_qk,
+        K: this.params.n_kv,
+        'left init': this.params['q init'],
+        'left sparsity': this.params['q sparsity'],
+        left_legend: { name: "Q", height: "n_q", width: "d_qk" },
+        'right init': this.params['k^t init'],
+        'right sparsity': this.params['k^t sparsity'],
+        right_legend: { name: "K.T", height: "d_qk", width: "n_kv" },
+        result_legend: { name: "attn", height: "", width: "" },
+        epilog: this.params['attn epilog'],
+        pos: new THREE.Vector3(0, 0, 0),
+      }
+    }
+    this.mm1 = new MatMul(mm1_params, this.getText)
+    this.group.add(this.mm1.group)
+  }
+
+  initqmm() {
+    const qmm_params = {
+      ...this.params, ...{
+        I: this.params.n_q,
+        J: this.params.d_in ? this.params.d_in : 64,
+        K: this.params.d_qk,
+        'left init': this.params['q init'],
+        'left sparsity': this.params['q sparsity'],
+        left_legend: { name: "in", height: "n_q", width: "d_in", hleft: false },
+        'right init': this.params['k^t init'],
+        'right sparsity': this.params['k^t sparsity'],
+        right_legend: { name: "in->Q", height: "d_in", width: "d_qk" },
+        right_pos: new THREE.Vector3(0, -this.params.n_q - 1, 0),
+        result: this.mm1.left,  // TODO own it here
+        epilog: this.params['attn epilog'],
+        pos: new THREE.Vector3(-2, 0, 0),
+        rot: new THREE.Vector3(0, -Math.PI / 2, 0)
+      }
+    }
+    this.qmm = new MatMul(qmm_params, this.getText)
+    this.group.add(this.qmm.group)
+  }
+
+  initkmm() {
+    const kmm_params = {
+      ...this.params, ...{
+        I: this.params.d_qk,
+        J: this.params.d_in ? this.params.d_in : 64,
+        K: this.params.n_kv,
+        'left init': this.params['q init'],
+        'left sparsity': this.params['q sparsity'],
+        left_legend: { name: "in.T->K.T", height: "d_qk", width: "d_in" },
+        'right init': this.params['k^t init'],
+        'right sparsity': this.params['k^t sparsity'],
+        right_legend: { name: "in.T", height: "d_in", width: "n_kv" },
+        left_pos: new THREE.Vector3(this.params.n_kv + 1, 0, 0),
+        result: this.mm1.right,  // TODO own it here
+        epilog: this.params['attn epilog'],
+        pos: new THREE.Vector3(0, 2, 0),
+        rot: new THREE.Vector3(-Math.PI / 2, 0, 0)
+      }
+    }
+    this.kmm = new MatMul(kmm_params, this.getText)
+    this.group.add(this.kmm.group)
+  }
+
+  initmm2() {
+    const mm2_params = {
+      ...this.params, ...{
+        I: this.params.n_q,
+        J: this.params.n_kv,
+        K: this.params.d_v,
+        left: this.mm1.result,
+        'right init': this.params['v init'],
+        'right sparsity': this.params['v sparsity'],
+        right_legend: { name: "V", height: "", width: "d_v" },
+        result_legend: { name: "out", height: "n_q", width: "d_v", wtop: true },
+        epilog: this.params['result epilog'],
+        right_rot: new THREE.Vector3(0, Math.PI, 0),
+
+        // alternating
+        right_pos: new THREE.Vector3(0, -this.H - 1, 0),
+
+        result_rot: new THREE.Vector3(0, Math.PI, 0),
+        rot: new THREE.Vector3(0, Math.PI / 2, 0),
+        pos: new THREE.Vector3(0, 0, this.mm1.D + 1),
+      }
+    }
+    this.mm2 = new MatMul(mm2_params, this.getText)
+    this.group.add(this.mm2.group)
+  }
+
+  initvmm() {
+    const vmm_params = {
+      ...this.params, ...{
+        I: this.params.n_kv,
+        J: this.params.d_in ? this.params.d_in : 64,
+        K: this.params.d_v,
+        'left init': this.params['q init'],
+        'left sparsity': this.params['q sparsity'],
+        left_legend: { name: "in", height: "n_kv", width: "d_in", hleft: false },
+        'right init': this.params['k^t init'],
+        'right sparsity': this.params['k^t sparsity'],
+        right_legend: { name: "in->V", height: "d_in", width: "d_v" },
+        left_pos: new THREE.Vector3(this.params.d_v + 1, 0, 0),
+        result: this.mm2.right,  // TODO own it here
+        epilog: this.params['attn epilog'],
+        pos: new THREE.Vector3(0, -this.params.n_q - 1, this.params.d_qk + 1),
+        rot: new THREE.Vector3(Math.PI / 2, 0, Math.PI / 2)
+      }
+    }
+    this.kmm = new MatMul(vmm_params, this.getText)
+    this.group.add(this.kmm.group)
+  }
+
+  initff() {
+    const ff_params = {
+      ...this.params, ...{
+        I: this.params.n_q,
+        J: this.params.d_v,
+        K: this.params.d_out ? this.params.d_out : 64,
+        left: this.mm2.result,
+        'right init': this.params['k^t init'],
+        'right sparsity': this.params['k^t sparsity'],
+        right_legend: { name: "V->out", height: "d_v", width: "d_out" },
+        result_legend: { name: "out", height: "n_q", width: "d_out" },
+        epilog: this.params['attn epilog'],
+        pos: new THREE.Vector3(this.params.n_kv + 1, 0, this.params.d_qk + 1),
+        // rot: new THREE.Vector3(Math.PI / 2, 0, Math.PI / 2)
+      }
+    }
+    this.kmm = new MatMul(ff_params, this.getText)
+    this.group.add(this.kmm.group)
   }
 }
 
