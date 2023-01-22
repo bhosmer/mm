@@ -41,17 +41,17 @@
 
     const params = {
       nlayers: 5,
-      I_0: init_dims.i,
+      I: init_dims.i,
       J_0: init_dims.j,
-      I_1: init_dims.i,
-      I_2: init_dims.i,
-      I_3: init_dims.i,
-      I_4: init_dims.i,
-      I_5: init_dims.i,
-      I_6: init_dims.i,
-      I_7: init_dims.i,
-      K: init_dims.k,
-      lhs: 'alternating',
+      K_0: init_dims.k,
+      K_1: init_dims.k,
+      K_2: init_dims.k,
+      K_3: init_dims.k,
+      K_4: init_dims.k,
+      K_5: init_dims.k,
+      K_6: init_dims.k,
+      K_7: init_dims.k,
+      rhs: 'alternating',
       animation: 'none',
       speed: 8,
       pause: false,
@@ -147,7 +147,7 @@
         if (obj) {
           scene.remove(obj.group)
         }
-        obj = new vis.MLP(params, getText)
+        obj = new vis.MLPT(params, getText)
         scene.add(obj.group)
       }
       initObj()
@@ -203,17 +203,17 @@
 
       const gui_layers = gui.addFolder('layers')
 
-      for (let i = 0; i < params.nlayers; i++) {
-        gui_layers.add(params, `I_${i}`, 1, 256).onChange(function (val) {
-          val = Math.floor(val)
-          setParams({ [`I_${i}`]: val })
-          if (val != getObj().params[`I_${i}`]) {
-            initObj()
-          }
-        })
+      gui_layers.add(params, `I`, 1, 784).onChange(function (val) {
+        val = Math.floor(val)
+        setParams({ I: val })
+        if (val != getObj().params.I) {
+          initObj()
+        }
+      })
 
+      for (let i = 0; i < params.nlayers; i++) {
         if (i == 0) {
-          gui_layers.add(params, `J_${i}`, 1, 256).onChange(function (val) {
+          gui_layers.add(params, `J_${i}`, 1, 784).onChange(function (val) {
             val = Math.floor(val)
             setParams({ [`J_${i}`]: val })
             if (val != getObj().params[`J_${i}`]) {
@@ -221,15 +221,15 @@
             }
           })
         }
-      }
 
-      gui_layers.add(params, 'K', 1, 256).onChange(function (val) {
-        val = Math.floor(val)
-        setParams({ K: val })
-        if (val != getObj().params.K) {
-          initObj()
-        }
-      })
+        gui_layers.add(params, `K_${i}`, 1, 784).onChange(function (val) {
+          val = Math.floor(val)
+          setParams({ [`K_${i}`]: val })
+          if (val != getObj().params[`K_${i}`]) {
+            initObj()
+          }
+        })
+      }
 
       params['add layer'] = () => {
         if (params.nlayers < 8) {
@@ -291,8 +291,8 @@
 
       const gui_vis = gui.addFolder('vis')
 
-      gui_vis.add(params, 'lhs', ['left', 'right', 'alternating']).onChange(function (val) {
-        setParams({ lhs: val })
+      gui_vis.add(params, 'rhs', ['up', 'down', 'alternating']).onChange(function (val) {
+        setParams({ rhs: val })
         initObj() // TODO initVis
       })
 

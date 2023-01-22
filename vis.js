@@ -214,9 +214,6 @@ export class Mat {
 
   // TODO 
   // param plumbing
-  // parameterized orientation 
-
-  // orientation for front facing, right side up, left to right is {x: 1, y: -1, z: 1} 
 
   static fromParams(h, w, params, getText) {
     const data = Mat.dataFromParams(h, w, params)
@@ -1031,12 +1028,12 @@ export class MLP {
             },
           },
           right_legend: {
-            name: i == 0 ? "in" : `x${i}`,
+            name: i == 0 ? "in^T" : `x${i}^T`,
             width: i == 0 ? "batch size" : "",
             height: (i == 0 ? "in" : `h${i} `) + " features"
           },
           result_legend: {
-            name: i == nlayers - 1 ? "out" : `h${i + 1} `,
+            name: i == nlayers - 1 ? "out^T" : `h${i + 1}^T`,
             height: i == nlayers - 1 ? "out features" : "",
             width: i == nlayers - 1 ? "batch size" : ""
           },
@@ -1052,8 +1049,8 @@ export class MLP {
           ,
         },
         ...(i % 2 == 0 ? {} : {
-          // alternating
-          left_pos: new THREE.Vector3(params.alternating ? this.mms[0].W + 1 : 0, 0, 0),
+          // left_pos: new THREE.Vector3(params.lhs == 'alternating' ? this.mms[0].W + 1 : 0, 0, 0),
+          left_pos: new THREE.Vector3({ left: 0, right: K + 1, alternating: i % 2 == 1 ? K + 1 : 0 }[params.lhs], 0, 0),
           left_rot: new THREE.Vector3(-Math.PI / 2, Math.PI, 0),
           result_pos: new THREE.Vector3(0, -J, -J),
           result_rot: new THREE.Vector3(-Math.PI / 2, 0, 0),
@@ -1068,15 +1065,122 @@ export class MLP {
   }
 
   setPosition() {
-    const last_mm = this.mms[this.mms.length - 1]
-    this.H = last_mm.group.position.y - last_mm.H
-    this.D = last_mm.group.position.z + last_mm.D
-    this.W = last_mm.group.position.x + last_mm.W
+    const first_mm = this.mms[0]
+    const n = this.mms.length
+    const last_mm = this.mms[n - 1]
+
+    this.H = last_mm.group.position.y - (n % 2 == 0 ? last_mm.D : last_mm.H) + first_mm.group.position.y
+    this.D = last_mm.group.position.z + (n % 2 == 0 ? last_mm.H : last_mm.D) - first_mm.group.position.z
+    this.W = last_mm.group.position.x + last_mm.W - first_mm.group.position.x
 
     // center cube on 0,0,0 if no pos given
     // note: don't save into params
     const pos = this.params.pos ? this.params.pos :
       new THREE.Vector3(-this.W / 2, -this.H / 2, -this.D / 2)
+    console.log(`HEY ${pos.x} ${pos.y} ${pos.z}`)
+    this.group.position.x = pos.x
+    this.group.position.y = pos.y
+    this.group.position.z = pos.z
+  }
+
+  setGuides(enabled) {
+    this.mm1.setGuides(enabled)
+    this.mm2.setGuides(enabled)
+  }
+
+  setLegends(enabled) {
+    this.mm1.setLegends(enabled)
+    this.mm2.setLegends(enabled)
+  }
+}
+
+//
+// MLP pytorch style (x @ w0^T) @ w1^T @ ...
+//
+
+export class MLPT {
+  constructor(params, getText) {
+    this.getText = getText
+    this.params = { ...params }
+    this.group = new THREE.Group()
+
+    this.mms = []
+    const nlayers = params.nlayers ? params.nlayers : 5
+    for (let i = 0; i < nlayers; i++) {
+      const I = params.I
+      const J = i == 0 ? params.J_0 : params[`K_${i - 1}`]
+      const K = params[`K_${i}`]
+      const mm_params = {
+        I: I,
+        J: J,
+        K: K,
+        ...this.params,
+        ...(i > 0 ? { left: this.mms[i - 1].result } : {}),
+        ...{
+          left_legend: {
+            ...{
+              name: i == 0 ? "in" : `x${i}`,
+              width: (i == 0 ? "in" : `h${i}`) + " features",
+              height: "batch size"
+            },
+          },
+          right_legend: {
+            name: `w${i}^T`,
+            width: `h${i} features`,
+            height: i == 0 ? "in features" : `h${i - 1} features`,
+          },
+          result_legend: {
+            name: i == nlayers - 1 ? "out" : `h${i} `,
+            height: i == nlayers - 1 ? "batch size" : "",
+            width: i == nlayers - 1 ? "out features" : `h${i} features`,
+          },
+          pos: i == 0 ?
+            new THREE.Vector3(0, 0, 0) :
+            (prev =>
+              new THREE.Vector3(
+                prev.group.position.x - (i % 2 == 0 ? -prev.D - 1 : 0),
+                0,
+                prev.group.position.z + (i % 2 == 1 ? prev.D + 1 : 0),
+              )
+            )(this.mms[i - 1])
+          ,
+          // pos: new THREE.Vector3(0, 0, this.mm1.D + 1),
+          // rot: new THREE.Vector3(0, Math.PI / 2, 0),
+        },
+        ...{
+          right_pos: new THREE.Vector3(
+            0,
+            { up: 0, down: -I - 1, alternating: i % 2 == 1 ? -I - 1 : 0 }[params.rhs],
+            0,
+          )
+        },
+        ...(i % 2 == 0 ? {} : {
+          right_rot: new THREE.Vector3(0, Math.PI, Math.PI / 2),
+          result_pos: new THREE.Vector3(J, 0, -J),
+          result_rot: new THREE.Vector3(0, Math.PI / 2, 0),
+        })
+      }
+      const mm = new MatMul(mm_params, getText)
+      this.mms.push(mm)
+      this.group.add(mm.group)
+    }
+
+    this.setPosition()
+  }
+
+  setPosition() {
+    const first_mm = this.mms[0]
+    const n = this.mms.length
+    const last_mm = this.mms[n - 1]
+
+    this.H = last_mm.group.position.y + last_mm.H
+    this.W = last_mm.group.position.x + (n % 2 == 0 ? last_mm.D : last_mm.W) - first_mm.group.position.x
+    this.D = last_mm.group.position.z + (n % 2 == 0 ? last_mm.W : last_mm.D) - first_mm.group.position.z
+
+    // center cube on 0,0,0 if no pos given
+    // note: don't save into params
+    const pos = this.params.pos ? this.params.pos :
+      new THREE.Vector3(-this.W / 2, this.H / 2, -this.D / 2)
     this.group.position.x = pos.x
     this.group.position.y = pos.y
     this.group.position.z = pos.z
