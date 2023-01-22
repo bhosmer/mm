@@ -1020,23 +1020,9 @@ export class MLP {
         ...this.params,
         ...(i > 0 ? { right: this.mms[i - 1].result } : {}),
         ...{
-          left_legend: {
-            ...{
-              name: `w${i}`,
-              width: (i == 0 ? "in" : `h${i}`) + " features",
-              height: (i == nlayers - 1 ? "out" : `h${i + 1}`) + " features"
-            },
-          },
-          right_legend: {
-            name: i == 0 ? "in^T" : `x${i}^T`,
-            width: i == 0 ? "batch size" : "",
-            height: (i == 0 ? "in" : `h${i} `) + " features"
-          },
-          result_legend: {
-            name: i == nlayers - 1 ? "out^T" : `h${i + 1}^T`,
-            height: i == nlayers - 1 ? "out features" : "",
-            width: i == nlayers - 1 ? "batch size" : ""
-          },
+          left_legend: { name: `L${i}`, height: `i${i}`, width: i == 0 ? "j0" : `j${i} = i${i - 1}` },
+          right_legend: i == 0 ? { name: `R${i}`, height: `j${i}`, width: "k" } : {},
+          result_legend: { name: `R${i + 1} = L${i} R${i}`, height: `i${i}`, width: "k", hleft: i % 2 == 1 },
           pos: i == 0 ?
             new THREE.Vector3(0, 0, 0) :
             (prev =>
@@ -1048,14 +1034,17 @@ export class MLP {
             )(this.mms[i - 1])
           ,
         },
+        ...{
+          left_pos: new THREE.Vector3({ left: 0, right: K + 1, alternating: i % 2 == 1 ? K + 1 : 0 }[params.lhs], 0, 0),
+        },
         ...(i % 2 == 0 ? {} : {
           // left_pos: new THREE.Vector3(params.lhs == 'alternating' ? this.mms[0].W + 1 : 0, 0, 0),
-          left_pos: new THREE.Vector3({ left: 0, right: K + 1, alternating: i % 2 == 1 ? K + 1 : 0 }[params.lhs], 0, 0),
           left_rot: new THREE.Vector3(-Math.PI / 2, Math.PI, 0),
           result_pos: new THREE.Vector3(0, -J, -J),
           result_rot: new THREE.Vector3(-Math.PI / 2, 0, 0),
         })
       }
+
       const mm = new MatMul(mm_params, getText)
       this.mms.push(mm)
       this.group.add(mm.group)
@@ -1117,23 +1106,9 @@ export class MLPT {
         ...this.params,
         ...(i > 0 ? { left: this.mms[i - 1].result } : {}),
         ...{
-          left_legend: {
-            ...{
-              name: i == 0 ? "in" : `x${i}`,
-              width: (i == 0 ? "in" : `h${i}`) + " features",
-              height: "batch size"
-            },
-          },
-          right_legend: {
-            name: `w${i}^T`,
-            width: `h${i} features`,
-            height: i == 0 ? "in features" : `h${i - 1} features`,
-          },
-          result_legend: {
-            name: i == nlayers - 1 ? "out" : `h${i} `,
-            height: i == nlayers - 1 ? "batch size" : "",
-            width: i == nlayers - 1 ? "out features" : `h${i} features`,
-          },
+          left_legend: { name: `L${i}`, height: "i", width: `j${i}` },
+          right_legend: { name: `R${i}`, height: i == 0 ? "j0" : `j${i} = k${i - 1}`, width: `k${i} ` },
+          result_legend: { name: `L${i + 1} = L${i} R${i}`, height: "i", width: `k${i}`, wtop: i % 2 == 1 },
           pos: i == 0 ?
             new THREE.Vector3(0, 0, 0) :
             (prev =>
