@@ -244,10 +244,10 @@ export class Mat {
     const custom = params.legend_props ? params.legend_props : {}
     const gm = Math.sqrt(h * w)
     const defaults = {
-      name_color: 0xccccff,
-      name_size: gm / 16,
+      name_color: 0x88ccff,
+      name_size: gm / 160,
       dim_color: 0x00aaff,
-      dim_size: gm / 32,
+      dim_size: gm / 320,
     }
     return { ...defaults, ...custom }
   }
@@ -490,6 +490,10 @@ export class MatMul {
   }
 
   initResultData() {
+    if (this.params.result) {
+      this.result_data = this.params.result.data
+      return
+    }
     const result_init = (y, x, h, w) => this._result_val(this.left_data, this.right_data, y, x)
     this.result_data = new Array(this.H, this.W, result_init)
   }
@@ -815,11 +819,12 @@ export class MatMul {
     const sa_geo = Math.sqrt(this.H * this.D) + Math.sqrt(this.D * this.W) + Math.sqrt(this.H * this.W)
     const defaults = {
       name_color: 0xccccff,
-      name_size: sa_geo / 32,
+      name_size: sa_geo / 48,
       dim_color: 0x00aaff,
       dim_size: sa_geo / 96,
     }
-    return { ...defaults, ...custom }
+    const res = { ...defaults, ...custom }
+    return res
   }
 
   setLeftLegends(enabled) {
@@ -1072,7 +1077,6 @@ export class MLP {
     // note: don't save into params
     const pos = this.params.pos ? this.params.pos :
       new THREE.Vector3(-this.W / 2, -this.H / 2, -this.D / 2)
-    console.log(`HEY ${pos.x} ${pos.y} ${pos.z}`)
     this.group.position.x = pos.x
     this.group.position.y = pos.y
     this.group.position.z = pos.z
@@ -1207,7 +1211,7 @@ export class Attn2 {
 
     this.initmm2()
     this.initvmm()
-    this.initff()
+    this.initomm()
 
     this.setPosition()
   }
@@ -1228,10 +1232,10 @@ export class Attn2 {
         K: this.params.n_kv,
         'left init': this.params['q init'],
         'left sparsity': this.params['q sparsity'],
-        left_legend: { name: "Q", height: "n_q", width: "d_qk" },
+        left_legend: { name: "Q", height: "n_q", width: "d_k" },
         'right init': this.params['k^t init'],
         'right sparsity': this.params['k^t sparsity'],
-        right_legend: { name: "K.T", height: "d_qk", width: "n_kv" },
+        right_legend: { name: "K.T", height: "d_k", width: "n_kv" },
         result_legend: { name: "attn", height: "", width: "" },
         epilog: this.params['attn epilog'],
         pos: new THREE.Vector3(0, 0, 0),
@@ -1245,14 +1249,14 @@ export class Attn2 {
     const qmm_params = {
       ...this.params, ...{
         I: this.params.n_q,
-        J: this.params.d_in ? this.params.d_in : 64,
+        J: this.params.d_model,
         K: this.params.d_qk,
         'left init': this.params['q init'],
         'left sparsity': this.params['q sparsity'],
-        left_legend: { name: "in", height: "n_q", width: "d_in", hleft: false },
+        left_legend: { name: "in", height: "n_q", width: "d_model", hleft: false, wtop: true },
         'right init': this.params['k^t init'],
         'right sparsity': this.params['k^t sparsity'],
-        right_legend: { name: "in->Q", height: "d_in", width: "d_qk" },
+        right_legend: { name: "wQ", height: "d_model", width: "d_qk", wtop: false },
         right_pos: new THREE.Vector3(0, -this.params.n_q - 1, 0),
         result: this.mm1.left,  // TODO own it here
         epilog: this.params['attn epilog'],
@@ -1268,14 +1272,14 @@ export class Attn2 {
     const kmm_params = {
       ...this.params, ...{
         I: this.params.d_qk,
-        J: this.params.d_in ? this.params.d_in : 64,
+        J: this.params.d_model,
         K: this.params.n_kv,
         'left init': this.params['q init'],
         'left sparsity': this.params['q sparsity'],
-        left_legend: { name: "in.T->K.T", height: "d_qk", width: "d_in" },
+        left_legend: { name: "wK.T", height: "d_qk", width: "d_model", hleft: false },
         'right init': this.params['k^t init'],
         'right sparsity': this.params['k^t sparsity'],
-        right_legend: { name: "in.T", height: "d_in", width: "n_kv" },
+        right_legend: { name: "in.T", height: "d_model", width: "n_kv", hleft: true, wtop: false },
         left_pos: new THREE.Vector3(this.params.n_kv + 1, 0, 0),
         result: this.mm1.right,  // TODO own it here
         epilog: this.params['attn epilog'],
@@ -1297,7 +1301,7 @@ export class Attn2 {
         'right init': this.params['v init'],
         'right sparsity': this.params['v sparsity'],
         right_legend: { name: "V", height: "", width: "d_v" },
-        result_legend: { name: "out", height: "n_q", width: "d_v", wtop: true },
+        result_legend: { name: "attn @ V", height: "n_q", width: "d_v", wtop: true },
         epilog: this.params['result epilog'],
         right_rot: new THREE.Vector3(0, Math.PI, 0),
 
@@ -1317,14 +1321,14 @@ export class Attn2 {
     const vmm_params = {
       ...this.params, ...{
         I: this.params.n_kv,
-        J: this.params.d_in ? this.params.d_in : 64,
+        J: this.params.d_model,
         K: this.params.d_v,
         'left init': this.params['q init'],
         'left sparsity': this.params['q sparsity'],
-        left_legend: { name: "in", height: "n_kv", width: "d_in", hleft: false },
+        left_legend: { name: "in", height: "n_kv", width: "d_model", hleft: false },
         'right init': this.params['k^t init'],
         'right sparsity': this.params['k^t sparsity'],
-        right_legend: { name: "in->V", height: "d_in", width: "d_v" },
+        right_legend: { name: "wV", height: "d_model", width: "d_v", wtop: false, hleft: true },
         left_pos: new THREE.Vector3(this.params.d_v + 1, 0, 0),
         result: this.mm2.right,  // TODO own it here
         epilog: this.params['attn epilog'],
@@ -1336,16 +1340,16 @@ export class Attn2 {
     this.group.add(this.kmm.group)
   }
 
-  initff() {
+  initomm() {
     const ff_params = {
       ...this.params, ...{
         I: this.params.n_q,
         J: this.params.d_v,
-        K: this.params.d_out ? this.params.d_out : 64,
+        K: this.params.d_model,
         left: this.mm2.result,
         'right init': this.params['k^t init'],
         'right sparsity': this.params['k^t sparsity'],
-        right_legend: { name: "V->out", height: "d_v", width: "d_out" },
+        right_legend: { name: "wO", height: "d_v", width: "d_out" },
         result_legend: { name: "out", height: "n_q", width: "d_out" },
         epilog: this.params['attn epilog'],
         pos: new THREE.Vector3(this.params.n_kv + 1, 0, this.params.d_qk + 1),
@@ -1356,4 +1360,3 @@ export class Attn2 {
     this.group.add(this.kmm.group)
   }
 }
-

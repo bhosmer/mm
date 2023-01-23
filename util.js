@@ -40,12 +40,12 @@ export function axes(window) {
 
 // rowguide
 
-export function rowguide(nr, h, w, c = 0xcccccc) {
+export function rowguide(nr, h, w, c = 0xffffff) {
   const group = new THREE.Group()
   const denom = 4
   if (w > 1) {
     const n = nr / denom
-    const spacing = Math.max(Math.floor(n / 10), 1)
+    const spacing = Math.max(Math.floor(n / 8), 1)
     for (let i = 0; i < n; i += spacing) {
       const start = new THREE.Vector3(0, i * h, 0)
       const end = new THREE.Vector3(w / denom * (1 - i / n), 0, 0)

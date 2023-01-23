@@ -36,7 +36,7 @@
     import { EffectComposer } from 'https://threejs.org/examples/jsm/postprocessing/EffectComposer.js'
     import { RenderPass } from 'https://threejs.org/examples/jsm/postprocessing/RenderPass.js'
 
-    const init_dims = { n_q: 128, d_qk: 32, d_v: 32, n_kv: 128 }
+    const init_dims = { n_q: 128, d_qk: 32, d_v: 32, n_kv: 128, d_model: 128 }
     const init_funcs = ['rows', 'cols', 'row major', 'col major', 'uniform', 'gaussian', 'tril', 'triu', 'eye', 'diff', 'ones', 'zeros']
 
     const params = {
@@ -44,6 +44,7 @@
       'n_kv': init_dims.n_kv,
       'd_qk': init_dims.d_qk,
       'd_v': init_dims.d_v,
+      'd_model': init_dims.d_model,
       'animation': 'none',
       'speed': 8,
       'pause': false,
@@ -198,7 +199,7 @@
         val = Math.floor(val)
         setParams({ n_q: val })
         if (val != getObj().params.n_q) {
-          getObj().setNQ(val)
+          initObj()
         }
       })
 
@@ -206,7 +207,7 @@
         val = Math.floor(val)
         setParams({ n_kv: val })
         if (val != getObj().params.n_kv) {
-          getObj().setNKV(val)
+          initObj()
         }
       })
 
@@ -221,6 +222,14 @@
       gui.add(params, 'd_v', 1, 512).onChange(function (val) {
         val = Math.floor(val)
         setParams({ d_v: val })
+        if (val != getObj().params.d_v) {
+          initObj()
+        }
+      })
+
+      gui.add(params, 'd_model', 1, 512).onChange(function (val) {
+        val = Math.floor(val)
+        setParams({ d_model: val })
         if (val != getObj().params.d_v) {
           initObj()
         }
