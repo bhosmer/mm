@@ -37,7 +37,8 @@
     import { RenderPass } from 'https://threejs.org/examples/jsm/postprocessing/RenderPass.js'
 
     const init_dims = { n_q: 128, d_qk: 32, d_v: 32, n_kv: 128 }
-    const init_funcs = ['rows', 'cols', 'row major', 'col major', 'uniform', 'gaussian', 'tril', 'triu', 'eye', 'diff', 'ones', 'zeros']
+    const init_funcs = ['rows', 'cols', 'row major', 'col major', 'pt_linear', 'uniform', 'gaussian', 'tril', 'triu', 'eye', 'diff', 'ones', 'zeros']
+    const epilogs = ['x/J', 'x/sqrt(J)', 'softmax(x/sqrt(J))', 'tanh(x)', 'relu(x)', 'none']
 
     const params = {
       'n_q': init_dims.n_q,
@@ -55,7 +56,7 @@
       'v sparsity': 0,
       'init min': -1,
       'init max': 1,
-      'attn epilog': 'none', // TODO softmax(1)
+      'attn epilog': 'none',
       'result epilog': 'none',
       'zero hue': 0.25,
       'zero size': 0.25,
@@ -268,12 +269,12 @@
         initObj()
       })
 
-      gui_data.add(params, 'attn epilog', ['x/J', 'x/sqrt(J)', 'tanh(x)', 'relu(x)', 'none']).onChange(function (val) {
+      gui_data.add(params, 'attn epilog', epilogs).onChange(function (val) {
         setParams({ 'attn epilog': val })
         getObj().setAttnEpilog(val)
       })
 
-      gui_data.add(params, 'result epilog', ['x/J', 'x/sqrt(J)', 'tanh(x)', 'relu(x)', 'none']).onChange(function (val) {
+      gui_data.add(params, 'result epilog', epilogs).onChange(function (val) {
         setParams({ 'result epilog': val })
         getObj().setResultEpilog(val)
       })

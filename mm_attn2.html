@@ -37,27 +37,30 @@
     import { RenderPass } from 'https://threejs.org/examples/jsm/postprocessing/RenderPass.js'
 
     const init_dims = { n_q: 128, d_qk: 32, d_v: 32, n_kv: 128, d_model: 128 }
-    const init_funcs = ['rows', 'cols', 'row major', 'col major', 'uniform', 'gaussian', 'tril', 'triu', 'eye', 'diff', 'ones', 'zeros']
+    const init_funcs = ['rows', 'cols', 'row major', 'col major', 'pt linear', 'pt linear+', 'uniform', 'gaussian', 'tril', 'triu', 'eye', 'diff', 'ones', 'zeros']
+    const epilog_funcs = ['none', 'x/J', 'x/sqrt(J)', 'softmax(x/sqrt(J))', 'tanh(x)', 'relu(x)']
 
     const params = {
       'n_q': init_dims.n_q,
-      'n_kv': init_dims.n_kv,
+      // 'n_kv': init_dims.n_kv,
       'd_qk': init_dims.d_qk,
       'd_v': init_dims.d_v,
       'd_model': init_dims.d_model,
       'animation': 'none',
       'speed': 8,
       'pause': false,
-      'q init': 'rows',
-      'k^t init': 'cols',
-      'v init': 'rows',
+      'input init': 'pt linear+',
+      'wQ init': 'pt linear',
+      'wK.T init': 'pt linear',
+      'wV init': 'pt linear',
+      'wO init': 'pt linear',
       'q sparsity': 0,
       'k^t sparsity': 0,
       'v sparsity': 0,
       'init min': -1,
       'init max': 1,
-      'attn epilog': 'none', // TODO softmax(1)
-      'result epilog': 'none',
+      'attn epilog': 'softmax(x/sqrt(J))',
+      'result epilog': 'relu(x)',
       'zero hue': 0.25,
       'zero size': 0.25,
       'zero light': 0.15,
@@ -68,9 +71,9 @@
       'legends': true,
       'axes': false,
       // set from orbit control
-      'xcam': -init_dims.n_q * 2,
-      'ycam': init_dims.d_qk + init_dims.d_v,
-      'zcam': init_dims.n_kv * 2,
+      'xcam': -init_dims.n_q * 4,
+      'ycam': (init_dims.d_qk + init_dims.d_v) * 2,
+      'zcam': init_dims.n_q * 4,
     };
 
     let addressBarUpdatePending = false
@@ -203,13 +206,13 @@
         }
       })
 
-      gui.add(params, 'n_kv', 1, 512).onChange(function (val) {
-        val = Math.floor(val)
-        setParams({ n_kv: val })
-        if (val != getObj().params.n_kv) {
-          initObj()
-        }
-      })
+      // gui.add(params, 'n_kv', 1, 512).onChange(function (val) {
+      //   val = Math.floor(val)
+      //   setParams({ n_kv: val })
+      //   if (val != getObj().params.n_kv) {
+      //     initObj()
+      //   }
+      // })
 
       gui.add(params, 'd_qk', 1, 512).onChange(function (val) {
         val = Math.floor(val)
@@ -237,34 +240,44 @@
 
       const gui_data = gui.addFolder('data')
 
-      gui_data.add(params, 'q init', init_funcs).onChange(function (val) {
-        setParams({ 'q init': val })
-        getObj().initQ(params)
+      gui_data.add(params, 'input init', init_funcs).onChange(function (val) {
+        setParams({ 'input init': val })
+        initObj()
       })
 
-      gui_data.add(params, 'k^t init', init_funcs).onChange(function (val) {
-        setParams({ 'k^t init': val })
-        getObj().initK(params)
+      gui_data.add(params, 'wQ init', init_funcs).onChange(function (val) {
+        setParams({ 'wQ init': val })
+        initObj()
       })
 
-      gui_data.add(params, 'v init', init_funcs).onChange(function (val) {
-        setParams({ 'v init': val })
-        getObj().initV(params)
+      gui_data.add(params, 'wK.T init', init_funcs).onChange(function (val) {
+        setParams({ 'wK.T init': val })
+        initObj()
+      })
+
+      gui_data.add(params, 'wV init', init_funcs).onChange(function (val) {
+        setParams({ 'wV init': val })
+        initObj()
+      })
+
+      gui_data.add(params, 'wO init', init_funcs).onChange(function (val) {
+        setParams({ 'wO init': val })
+        initObj()
       })
 
       gui_data.add(params, 'q sparsity', 0.0, 1.0).onChange(function (val) {
         setParams({ 'q sparsity': val })
-        getObj().initQ(params)
+        initObj()
       })
 
       gui_data.add(params, 'k^t sparsity', 0.0, 1.0).onChange(function (val) {
         setParams({ 'k^t sparsity': val })
-        getObj().initK(params)
+        initObj()
       })
 
       gui_data.add(params, 'v sparsity', 0.0, 1.0).onChange(function (val) {
         setParams({ 'v sparsity': val })
-        getObj().initV(params)
+        initObj()
       })
 
       gui_data.add(params, 'init min', -1.0, 1.0).onChange(function (val) {
@@ -277,14 +290,14 @@
         initObj()
       })
 
-      gui_data.add(params, 'attn epilog', ['x/J', 'x/sqrt(J)', 'tanh(x)', 'relu(x)', 'none']).onChange(function (val) {
+      gui_data.add(params, 'attn epilog', epilog_funcs).onChange(function (val) {
         setParams({ 'attn epilog': val })
-        getObj().setAttnEpilog(val)
+        initObj()
       })
 
-      gui_data.add(params, 'result epilog', ['x/J', 'x/sqrt(J)', 'tanh(x)', 'relu(x)', 'none']).onChange(function (val) {
+      gui_data.add(params, 'result epilog', epilog_funcs).onChange(function (val) {
         setParams({ 'result epilog': val })
-        getObj().setResultEpilog(val)
+        initObj()
       })
 
       gui_data.open()
