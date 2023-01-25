@@ -1325,6 +1325,7 @@ export class Attn2 {
       'left sparsity': this.params['q sparsity'], // TODO        
       'left sparsity': this.params['q sparsity'], // TODO        
       left_legend: { name: "input", height: "n_q", width: "d_model", hleft: false, wtop: true },
+      left_data: this.params.input_data,
 
       'right init': this.params['wQ init'],
       'right sparsity': this.params['k^t sparsity'], // TODO
@@ -1339,7 +1340,6 @@ export class Attn2 {
       rot: new THREE.Vector3(0, -Math.PI / 2, 0)
     }
     this.qmm = new MatMul(qmm_params, this.getText)
-    this.input_data = this.qmm.left.data // NOTE
     this.group.add(this.qmm.group)
   }
 
@@ -1357,7 +1357,7 @@ export class Attn2 {
       left_pos: new THREE.Vector3(this.params.n_q + 1, 0, 0),
 
       right_legend: { name: "input.T", height: "d_model", width: "n_q", hleft: true, wtop: false },
-      right_data: this.input_data.transpose(),
+      right_data: this.params.input_data.transpose(),
 
       result_legend: { name: "K.T", height: "d_k", width: "n_q" },
       result_pos: new THREE.Vector3(0, 0, -this.params.d_model - 1),
@@ -1401,7 +1401,7 @@ export class Attn2 {
       K: this.params.d_v,
 
       left_legend: { name: "input", height: "n_q", width: "d_model", hleft: false },
-      left_data: this.input_data, // NOTE
+      left_data: this.params.input_data, // NOTE
       left_pos: new THREE.Vector3(this.params.d_v + 1, 0, 0),
 
       'right init': this.params['wV init'],
@@ -1490,25 +1490,25 @@ export class Attn3 {
 
     const zspace = 5 * Math.sqrt(this.D) * this.params['head spacing']
 
-    if (this.params['show single input']) {
-      const input_params = {
-        ...this.params,
-        'left init': this.params['input init'],
-        'left sparsity': this.params['q sparsity'], // TODO
-        legend: { name: "input", height: "n_q", width: "d_model", hleft: false, wtop: true },
-      }
-      const input = Mat.fromParams(this.params.n_q, this.params.d_model, input_params, this.getText)
-      input.group.rotation.x = Math.PI
-      input.group.position.x = -this.params.d_model / 2
-      input.group.position.y = this.params.n_q / 2
-      input.group.position.z = -zspace
-      this.group.add(input.group)
+    // shared input
+    const input_params = {
+      ...this.params,
+      'left init': this.params['input init'],
+      'left sparsity': this.params['q sparsity'], // TODO
+      legend: { name: "input", height: "n_q", width: "d_model", hleft: false, wtop: true },
     }
+    const input = Mat.fromParams(this.params.n_q, this.params.d_model, input_params, this.getText)
+    input.group.rotation.x = Math.PI
+    input.group.position.x = -this.params.d_model / 2
+    input.group.position.y = this.params.n_q / 2
+    input.group.position.z = -zspace
+    this.group.add(input.group)
+    this.params.input_data = input.data
 
     for (let i = 0; i < num_heads; i++) {
       const a = new Attn2(this.params, this.getText)
-      a.group.position.z = i * zspace
-      if (this.params['show single input']) {
+      a.group.position.z = i * (this.D + zspace)
+      if (this.params['hide copied inputs']) {
         a.qmm.left.hideAll()
         a.kmm.right.hideAll()
         a.vmm.left.hideAll()
@@ -1516,8 +1516,7 @@ export class Attn3 {
       this.group.add(a.group)
     }
 
-    // this.group.position.x = -xspace * (nheads - 1) / 2
-    this.group.position.z = -zspace * (num_heads - 1) / 2
+    this.group.position.z = -(zspace * (num_heads - 1) + this.D * num_heads) / 2
   }
 
   setPosition() {

@@ -63,8 +63,8 @@
       'attn epilog': 'softmax(x/sqrt(J))',
       'result epilog': 'relu(x)',
       // viz
-      'show single input': false,
       'head spacing': 5,
+      'hide copied inputs': false,
       'guides': true,
       'legends': true,
       'axes': true,
@@ -321,13 +321,13 @@
 
       const gui_vis = gui.addFolder('vis')
 
-      gui_vis.add(params, 'show single input', params.rowguides).onChange(function (val) {
-        setParams({ 'show single input': val })
+      gui_vis.add(params, 'head spacing', 1, 10).onChange(function (val) {
+        setParams({ 'head spacing': val })
         initObj() // TODO
       })
 
-      gui_vis.add(params, 'head spacing', 1, 10).onChange(function (val) {
-        setParams({ 'head spacing': val })
+      gui_vis.add(params, 'hide copied inputs', params.rowguides).onChange(function (val) {
+        setParams({ 'hide copied inputs': val })
         initObj() // TODO
       })
 
