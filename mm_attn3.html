@@ -43,6 +43,7 @@
 
     const params = {
       // shape
+      'num_heads': 4,
       'n_q': init_dims.n_q,
       // 'n_kv': init_dims.n_kv,
       'd_qk': init_dims.d_qk,
@@ -206,7 +207,17 @@
     function initGui(getObj, initObj, initAxes) {
       const gui = new GUI();
 
-      gui.add(params, 'n_q', 1, 512).onChange(function (val) {
+      const gui_shape = gui.addFolder('shape')
+
+      gui_shape.add(params, 'num_heads', 1, 8).onChange(function (val) {
+        val = Math.floor(val)
+        setParams({ num_heads: val })
+        if (val != getObj().params.num_heads) {
+          initObj()
+        }
+      })
+
+      gui_shape.add(params, 'n_q', 1, 512).onChange(function (val) {
         val = Math.floor(val)
         setParams({ n_q: val })
         if (val != getObj().params.n_q) {
@@ -214,7 +225,7 @@
         }
       })
 
-      // gui.add(params, 'n_kv', 1, 512).onChange(function (val) {
+      // gui_shape.add(params, 'n_kv', 1, 512).onChange(function (val) {
       //   val = Math.floor(val)
       //   setParams({ n_kv: val })
       //   if (val != getObj().params.n_kv) {
@@ -222,7 +233,7 @@
       //   }
       // })
 
-      gui.add(params, 'd_qk', 1, 512).onChange(function (val) {
+      gui_shape.add(params, 'd_qk', 1, 512).onChange(function (val) {
         val = Math.floor(val)
         setParams({ d_qk: val })
         if (val != getObj().params.d_qk) {
@@ -230,7 +241,7 @@
         }
       })
 
-      gui.add(params, 'd_v', 1, 512).onChange(function (val) {
+      gui_shape.add(params, 'd_v', 1, 512).onChange(function (val) {
         val = Math.floor(val)
         setParams({ d_v: val })
         if (val != getObj().params.d_v) {
@@ -238,7 +249,7 @@
         }
       })
 
-      gui.add(params, 'd_model', 1, 512).onChange(function (val) {
+      gui_shape.add(params, 'd_model', 1, 512).onChange(function (val) {
         val = Math.floor(val)
         setParams({ d_model: val })
         if (val != getObj().params.d_v) {
@@ -308,8 +319,6 @@
         initObj()
       })
 
-      gui_data.open()
-
       const gui_vis = gui.addFolder('vis')
 
       gui_vis.add(params, 'show single input', params.rowguides).onChange(function (val) {
@@ -350,8 +359,6 @@
         setParams({ pause: val })
       })
 
-      gui_vis.open()
-
       const gui_colors = gui.addFolder('colors')
 
       gui_colors.add(params, 'sensitivity', sensitivity).onChange(function (val) {
@@ -388,8 +395,6 @@
         setParams({ 'hue spread': val })
         getObj().initVis(params)
       })
-
-      gui_colors.open()
 
     }
 

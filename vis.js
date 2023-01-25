@@ -1486,7 +1486,7 @@ export class Attn3 {
     }
     this.group.clear()
 
-    const nheads = this.params.nheads ? this.params.nheads : 4
+    const num_heads = this.params.num_heads
 
     const zspace = 5 * Math.sqrt(this.D) * this.params['head spacing']
 
@@ -1505,7 +1505,7 @@ export class Attn3 {
       this.group.add(input.group)
     }
 
-    for (let i = 0; i < nheads; i++) {
+    for (let i = 0; i < num_heads; i++) {
       const a = new Attn2(this.params, this.getText)
       a.group.position.z = i * zspace
       if (this.params['show single input']) {
@@ -1517,7 +1517,7 @@ export class Attn3 {
     }
 
     // this.group.position.x = -xspace * (nheads - 1) / 2
-    this.group.position.z = -zspace * (nheads - 1) / 2
+    this.group.position.z = -zspace * (num_heads - 1) / 2
   }
 
   setPosition() {
