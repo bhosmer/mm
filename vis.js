@@ -138,10 +138,14 @@ class Array {
     }
     // absmax
     this.absmax = 0
+    this.absmin = Infinity
     for (ptr = 0; ptr < this.data.length; ptr++) {
       const absx = Math.abs(this.data[ptr])
       if (absx > this.absmax) {
         this.absmax = absx
+      }
+      if (absx < this.absmin) {
+        this.absmin = absx
       }
     }
   }
@@ -157,6 +161,7 @@ class Array {
     const oldabsx = Math.abs(this.get(i, j))
     this.data[this.addr(i, j)] = x
     const absx = Math.abs(x)
+    // TODO do we really need this
     if (absx > this.absmax) {
       this.absmax = absx
     } else if (absx < this.absmax && oldabsx == this.absmax) {
@@ -165,6 +170,15 @@ class Array {
         return absx > acc ? absx : acc
       })
     }
+    if (absx < this.absmin) {
+      this.absmin = absx
+    } else if (absx > this.absmin && oldabsx == this.absmin) {
+      this.absmin = this.data.reduce(function (acc, x) {
+        const absx = Math.abs(x)
+        return absx < acc ? absx : acc
+      })
+    }
+
   }
 
   addr(i, j) {
@@ -182,9 +196,6 @@ class Array {
 //
 // mats always have (0, 0, 0) as their minimum point
 // cubes also
-// cubes are either concave or convex
-// convex: 
-//
 //
 
 // move
@@ -210,7 +221,7 @@ function rotFromOrient(orient) {
 // Mat
 //
 export class Mat {
-  ELEM_SIZE = 1792
+  ELEM_SIZE = 1792 // 1536
   ELEM_SAT = 1.0
   ELEM_LIGHT = 0.6
 
@@ -218,15 +229,21 @@ export class Mat {
     if (isNaN(x)) {
       return 0
     }
+
     const zsize = this.zero_size * this.ELEM_SIZE
     const range = (1 - this.zero_size) * this.ELEM_SIZE
 
-    // const size = zsize + range * Math.abs(x) / Math.max(this.container.global_absmax, 0.001)
+    // const from_vol = Math.cbrt(Math.abs(x) / Math.max(this.container.global_absmax, 0.001))
 
-    const from_vol = Math.cbrt(Math.abs(x) / Math.max(this.container.global_absmax, 0.001))
-    // const from_vol = Math.cbrt(Math.abs(x) / Math.max(this.data.absmax, 0.001))
+    // const nz = x => Math.max(x, 0.00000001)
+    const vol = this.sens ?
+      this.data.absmax == this.data.absmin ? 1 : (Math.abs(x) - this.data.absmin) / (this.data.absmax - this.data.absmin) :
+      // (Math.abs(x) - this.data.absmin) / nz(this.data.absmax - this.data.absmin) :
+      this.container.global_absmax == 0 ? 0 : Math.abs(x) / this.container.global_absmax
 
-    const size = zsize + range * from_vol
+    const size = zsize + range * Math.cbrt(vol)
+
+    // console.log(`HEY size ${size} vol ${vol} absx ${Math.abs(x)} absmax ${this.data.absmax} absmin ${this.data.absmin} zsize ${zsize} range ${range}`)
 
     return size
   }
@@ -239,12 +256,23 @@ export class Mat {
     }
 
     const gap = (x == 0 ? 1 : Math.sign(x)) * this.hue_gap
-    const h = (this.zero_hue + gap + (Math.cbrt(x / this.container.global_absmax) * this.hue_spread)) % 1
+
+    const hvol = this.sense ?
+      (this.data.absmax == this.data.absmin ? x : x / (this.data.absmax - this.data.absmin)) :
+      x / this.container.global_absmax
+
+    const h = (this.zero_hue + gap + (Math.cbrt(hvol) * this.hue_spread)) % 1
     // const h = (this.zero_hue + gap + (Math.cbrt(x / this.data.absmax) * this.hue_spread)) % 1
     // const h = (this.zero_hue + gap + (x / this.data.absmax * this.hue_spread)) % 1
 
-    const lrange = this.max_light - this.zero_light
-    l = this.zero_light + lrange * Math.cbrt(Math.abs(x) / Math.max(this.data.absmax, 0.01))
+    const range = this.max_light - this.zero_light
+
+    // const lvol = Math.abs(x) / Math.max(this.data.absmax, 0.01)
+    const lvol = this.sens ?
+      this.data.absmax == this.data.absmin ? 1 : (Math.abs(x) - this.data.absmin) / (this.data.absmax - this.data.absmin) :
+      this.data.absmax == 0 ? 0 : Math.abs(x) / this.data.absmax
+
+    l = this.zero_light + range * Math.cbrt(lvol)
 
     const c = new THREE.Color().setHSL(h, s, l)
     c.toArray(a, i * 3)
@@ -256,9 +284,6 @@ export class Mat {
 
   // --------
 
-  // TODO 
-  // param plumbing
-
   static fromParams(h, w, params, getText) {
     const data = Mat.dataFromParams(h, w, params)
 
@@ -269,7 +294,8 @@ export class Mat {
     // this.setLeftLegends(params.legends)
     const custom = params.legend ? params.legend : {}
     const defaults = { name: "X", height: "i", width: "j", hleft: true, wtop: false }
-    const props = { ...m.getLegendProps(h, w, params), ...defaults, ...custom }
+    // const props = { ...m.getLegendProps(h, w, params), ...defaults, ...custom }
+    const props = { ...m.getLegendProps(), ...defaults, ...custom }
     m.setLegends(params.legends, props, getText)
 
     return m
@@ -279,21 +305,25 @@ export class Mat {
     const init_base = params['init min']
     const init_range = Math.max(0, params['init max'] - params['init min'])
     const init_name = params['left init']
+    if (!init_name) {
+      throw Error(`no initializer specified at params['left_init']`)
+    }
     const sparsity = params['left sparsity']
     const init = getInitFunc(init_name, sparsity, init_base, init_range)
     return new Array(h, w, init)
   }
 
-  getLegendProps(h, w, params) {
-    const custom = params.legend_props ? params.legend_props : {}
-    const gm = Math.sqrt(h * w)
+  getLegendProps() {
+    const custom = this.container.params.legend_props ? this.container.params.legend_props : {}
+    const sa_geo = Math.cbrt(this.h * this.w)
     const defaults = {
-      name_color: 0x88ccff,
-      name_size: gm / 160,
+      name_color: 0xccccff,
+      name_size: sa_geo / 4,
       dim_color: 0x00aaff,
-      dim_size: gm / 320,
+      dim_size: sa_geo / 8,
     }
-    return { ...defaults, ...custom }
+    const res = { ...defaults, ...custom }
+    return res
   }
 
   // --------
@@ -315,7 +345,7 @@ export class Mat {
       this.params = { ...params }
       this.orient = orientFromParams(this.params)
     }
-
+    this.sens = this.container.params.sensitivity == 'local'
     this.zero_hue = this.container.params['zero hue']
     this.zero_size = this.container.params['zero size']
     this.zero_light = this.container.params['zero light']
@@ -339,6 +369,12 @@ export class Mat {
     g.setAttribute('pointSize', new THREE.Float32BufferAttribute(sizes, 1))
     g.setAttribute('pointColor', new THREE.Float32BufferAttribute(colors, 3))
     this.points = new THREE.Points(g, MATERIAL)
+
+    // const self = this // oh js
+    // this.points.onRollover = function (intersect) {
+    //   console.log(`HEY onRollover h ${self.h} w ${self.w} point x ${intersect.point.x} y ${intersect.point.y} z ${intersect.point.z}`)
+    // }
+
     this.group = new THREE.Group()
     this.group.add(this.points)
 
@@ -564,7 +600,6 @@ export class MatMul {
     this._setAbsmax(this.left_data, this.right_data, this.result_data)
     // console.log(`HEY MatMul this.global_absmax ${this.global_absmax}`)
 
-
     this.initLeftVis()
     this.initRightVis()
     this.initResultVis()
@@ -738,6 +773,11 @@ export class MatMul {
       x += a.get(i, k) * b.get(k, j)
     }
     const epi = this.params.epilog
+
+    // if (epi == 'softmax(x/sqrt(J))') {
+    //   console.log(`HEY x ${x} this.D ${this.D} Math.sqrt(this.D) ${Math.sqrt(this.D)} x / Math.sqrt(this.D) ${x / Math.sqrt(this.D)}`)
+    // }
+
     return epi == 'x/J' ? x / this.D :
       epi == 'x/sqrt(J)' || epi == 'softmax(x/sqrt(J))' ? x / Math.sqrt(this.D) :
         epi == 'tanh(x)' ? Math.tanh(x) :
@@ -873,45 +913,38 @@ export class MatMul {
     this.result.setGuides(enabled)
   }
 
-  getLegendProps() {
-    const custom = this.params.legend_props ? this.params.legend_props : {}
-    const sa_geo = Math.sqrt(this.H * this.D) + Math.sqrt(this.D * this.W) + Math.sqrt(this.H * this.W)
-    const defaults = {
-      name_color: 0xccccff,
-      name_size: sa_geo / 48,
-      dim_color: 0x00aaff,
-      dim_size: sa_geo / 96,
-    }
-    const res = { ...defaults, ...custom }
-    return res
-  }
-
   setLeftLegends(enabled) {
     const custom = this.params.left_legend ? this.params.left_legend : {}
     const defaults = { name: "X", height: "i", width: "j", hleft: true, wtop: false }
-    const props = { ...this.getLegendProps(), ...defaults, ...custom }
+    const props = { ...this.left.getLegendProps(), ...defaults, ...custom }
     this.left.setLegends(enabled, props, this.getText)
   }
 
   setRightLegends(enabled) {
     const custom = this.params.right_legend ? this.params.right_legend : {}
     const defaults = { name: "Y", height: "j", width: "k", hleft: false, wtop: true }
-    const props = { ...this.getLegendProps(), ...defaults, ...custom }
+    const props = { ...this.right.getLegendProps(), ...defaults, ...custom }
     this.right.setLegends(enabled, props, this.getText)
   }
 
   setResultLegends(enabled) {
     const custom = this.params.result_legend ? this.params.result_legend : {}
     const defaults = { name: "XY", height: "i", width: "k", hleft: false, wtop: false }
-    const props = { ...this.getLegendProps(), ...defaults, ...custom }
+    const props = { ...this.result.getLegendProps(), ...defaults, ...custom }
     this.result.setLegends(enabled, props, this.getText)
   }
 
   setLegends(enabled) {
     this.params.legends = enabled
-    this.setLeftLegends(enabled)
-    this.setRightLegends(enabled)
-    this.setResultLegends(enabled)
+    if (!this.params.left) {
+      this.setLeftLegends(enabled)
+    }
+    if (!this.params.right) {
+      this.setRightLegends(enabled)
+    }
+    if (!this.params.result) {
+      this.setResultLegends(enabled)
+    }
   }
 }
 
@@ -964,20 +997,19 @@ export class Attn {
       this.group.remove(this.mm1.group)
     }
     const mm1_params = {
-      ...this.params, ...{
-        I: this.params.n_q,
-        J: this.params.d_qk,
-        K: this.params.n_q,
-        'left init': this.params['q init'],
-        'left sparsity': this.params['q sparsity'],
-        left_legend: { name: "Q", height: "n_q", width: "d_qk" },
-        'right init': this.params['k^t init'],
-        'right sparsity': this.params['k^t sparsity'],
-        right_legend: { name: "K.T", height: "d_qk", width: "n_q" },
-        result_legend: { name: "attn", height: "", width: "" },
-        epilog: this.params['attn epilog'],
-        pos: new THREE.Vector3(0, 0, 0),
-      }
+      ...this.params,
+      I: this.params.n_q,
+      J: this.params.d_qk,
+      K: this.params.n_q,
+      'left init': this.params['q init'],
+      'left sparsity': this.params['q sparsity'],
+      left_legend: { name: "Q", height: "n_q", width: "d_qk" },
+      'right init': this.params['k^t init'],
+      'right sparsity': this.params['k^t sparsity'],
+      right_legend: { name: "K.T", height: "d_qk", width: "n_q" },
+      result_legend: { name: "attn", height: "", width: "" },
+      epilog: this.params['attn epilog'],
+      pos: new THREE.Vector3(0, 0, 0),
     }
     this.mm1 = new MatMul(mm1_params, this.getText)
     this.group.add(this.mm1.group)
@@ -988,27 +1020,25 @@ export class Attn {
       this.group.remove(this.mm2.group)
     }
     const mm2_params = {
-      ...this.params, ...{
-        I: this.params.n_q,
-        J: this.params.n_q,
-        K: this.params.d_v,
-        left: this.mm1.result,
-        'right init': this.params['v init'],
-        'right sparsity': this.params['v sparsity'],
-        right_legend: { name: "V", height: "n_q", width: "d_v" },
-        result_legend: { name: "out", height: "n_q", width: "d_v", wtop: true },
-        epilog: this.params['result epilog'],
-        right_rot: new THREE.Vector3(0, Math.PI, 0),
+      ...this.params,
+      I: this.params.n_q,
+      J: this.params.n_q,
+      K: this.params.d_v,
+      left: this.mm1.result,
+      'right init': this.params['v init'],
+      'right sparsity': this.params['v sparsity'],
+      right_legend: { name: "V", height: "n_q", width: "d_v" },
+      result_legend: { name: "out", height: "n_q", width: "d_v", wtop: true },
+      epilog: this.params['result epilog'],
+      right_rot: new THREE.Vector3(0, Math.PI, 0),
 
-        // alternating
-        right_pos: new THREE.Vector3(0, -this.H - 1, 0),
+      // alternating
+      right_pos: new THREE.Vector3(0, -this.H - 1, 0),
 
-        result_rot: new THREE.Vector3(0, Math.PI, 0),
-        rot: new THREE.Vector3(0, Math.PI / 2, 0),
-        pos: new THREE.Vector3(0, 0, this.mm1.D + 1),
+      result_rot: new THREE.Vector3(0, Math.PI, 0),
+      rot: new THREE.Vector3(0, Math.PI / 2, 0),
+      pos: new THREE.Vector3(0, 0, this.mm1.D + 1),
 
-
-      }
     }
     this.mm2 = new MatMul(mm2_params, this.getText)
     this.group.add(this.mm2.group)
@@ -1084,29 +1114,30 @@ export class MLP {
       const J = i == 0 ? params.J_0 : params[`I_${i - 1}`]
       const K = params.K
       const mm_params = {
+        ...this.params,
+
         I: I,
         J: J,
         K: K,
-        ...this.params,
+
         ...(i > 0 ? { right: this.mms[i - 1].result } : {}),
-        ...{
-          left_legend: { name: `L${i}`, height: `i${i}`, width: i == 0 ? "j0" : `j${i} = i${i - 1}` },
-          right_legend: i == 0 ? { name: `R${i}`, height: `j${i}`, width: "k" } : {},
-          result_legend: { name: `R${i + 1} = L${i} R${i}`, height: `i${i}`, width: "k", hleft: i % 2 == 1 },
-          pos: i == 0 ?
-            new THREE.Vector3(0, 0, 0) :
-            (prev =>
-              new THREE.Vector3(
-                0,
-                prev.group.position.y + (i % 2 == 0 ? -prev.D - 1 : 0),
-                prev.group.position.z + (i % 2 == 1 ? prev.D + 1 : 0)
-              )
-            )(this.mms[i - 1])
-          ,
-        },
-        ...{
-          left_pos: new THREE.Vector3({ left: 0, right: K + 1, alternating: i % 2 == 1 ? K + 1 : 0 }[params.lhs], 0, 0),
-        },
+
+        left_legend: { name: `L${i}`, height: `i${i}`, width: i == 0 ? "j0" : `j${i} = i${i - 1}` },
+        right_legend: i == 0 ? { name: `R${i}`, height: `j${i}`, width: "k" } : {},
+        result_legend: { name: `R${i + 1} = L${i} R${i}`, height: `i${i}`, width: "k", hleft: i % 2 == 1 },
+
+        pos: i == 0 ?
+          new THREE.Vector3(0, 0, 0) :
+          (prev =>
+            new THREE.Vector3(
+              0,
+              prev.group.position.y + (i % 2 == 0 ? -prev.D - 1 : 0),
+              prev.group.position.z + (i % 2 == 1 ? prev.D + 1 : 0)
+            )
+          )(this.mms[i - 1]),
+
+        left_pos: new THREE.Vector3({ left: 0, right: K + 1, alternating: i % 2 == 1 ? K + 1 : 0 }[params.lhs], 0, 0),
+
         ...(i % 2 == 0 ? {} : {
           // left_pos: new THREE.Vector3(params.lhs == 'alternating' ? this.mms[0].W + 1 : 0, 0, 0),
           left_rot: new THREE.Vector3(-Math.PI / 2, Math.PI, 0),
@@ -1169,35 +1200,33 @@ export class MLPT {
       const J = i == 0 ? params.J_0 : params[`K_${i - 1}`]
       const K = params[`K_${i}`]
       const mm_params = {
+        ...this.params,
         I: I,
         J: J,
         K: K,
-        ...this.params,
+
         ...(i > 0 ? { left: this.mms[i - 1].result } : {}),
-        ...{
-          left_legend: { name: `L${i}`, height: "i", width: `j${i}` },
-          right_legend: { name: `R${i}`, height: i == 0 ? "j0" : `j${i} = k${i - 1}`, width: `k${i} ` },
-          result_legend: { name: `L${i + 1} = L${i} R${i}`, height: "i", width: `k${i}`, wtop: i % 2 == 1 },
-          pos: i == 0 ?
-            new THREE.Vector3(0, 0, 0) :
-            (prev =>
-              new THREE.Vector3(
-                prev.group.position.x - (i % 2 == 0 ? -prev.D - 1 : 0),
-                0,
-                prev.group.position.z + (i % 2 == 1 ? prev.D + 1 : 0),
-              )
-            )(this.mms[i - 1])
-          ,
-          // pos: new THREE.Vector3(0, 0, this.mm1.D + 1),
-          // rot: new THREE.Vector3(0, Math.PI / 2, 0),
-        },
-        ...{
-          right_pos: new THREE.Vector3(
-            0,
-            { up: 0, down: -I - 1, alternating: i % 2 == 1 ? -I - 1 : 0 }[params.rhs],
-            0,
-          )
-        },
+
+        left_legend: { name: `L${i}`, height: "i", width: `j${i}` },
+        right_legend: { name: `R${i}`, height: i == 0 ? "j0" : `j${i} = k${i - 1}`, width: `k${i} ` },
+        result_legend: { name: `L${i + 1} = L${i} R${i}`, height: "i", width: `k${i}`, wtop: i % 2 == 1 },
+
+        pos: i == 0 ?
+          new THREE.Vector3(0, 0, 0) :
+          (prev =>
+            new THREE.Vector3(
+              prev.group.position.x - (i % 2 == 0 ? -prev.D - 1 : 0),
+              0,
+              prev.group.position.z + (i % 2 == 1 ? prev.D + 1 : 0),
+            )
+          )(this.mms[i - 1]),
+
+        right_pos: new THREE.Vector3(
+          0,
+          { up: 0, down: -I - 1, alternating: i % 2 == 1 ? -I - 1 : 0 }[params.rhs],
+          0,
+        ),
+
         ...(i % 2 == 0 ? {} : {
           right_rot: new THREE.Vector3(0, Math.PI, Math.PI / 2),
           result_pos: new THREE.Vector3(J, 0, -J),
@@ -1285,28 +1314,29 @@ export class Attn2 {
 
   initqmm() {
     const qmm_params = {
-      ...this.params, ...{
-        I: this.params.n_q,
-        J: this.params.d_model,
-        K: this.params.d_qk,
+      ...this.params,
 
-        'left init': this.params['input init'],
-        'left sparsity': this.params['q sparsity'], // TODO        
-        left_legend: { name: "input", height: "n_q", width: "d_model", hleft: false, wtop: true },
+      I: this.params.n_q,
+      J: this.params.d_model,
+      K: this.params.d_qk,
 
-        'right init': this.params['wQ init'],
-        'right sparsity': this.params['k^t sparsity'], // TODO
-        right_legend: { name: "wQ", height: "d_model", width: "d_qk", wtop: false },
-        right_pos: new THREE.Vector3(0, -this.params.n_q - 1, 0),
+      'left init': this.params['input init'],
+      'left sparsity': this.params['q sparsity'], // TODO        
+      'left sparsity': this.params['q sparsity'], // TODO        
+      'left sparsity': this.params['q sparsity'], // TODO        
+      left_legend: { name: "input", height: "n_q", width: "d_model", hleft: false, wtop: true },
 
-        // result: this.mm1.left,  // TODO own it here
-        result_legend: { name: "Q", height: "n_q", width: "d_qk" },
-        result_pos: new THREE.Vector3(0, 0, -this.params.d_model - 1),
-        epilog: 'relu(x)', // TODO
+      'right init': this.params['wQ init'],
+      'right sparsity': this.params['k^t sparsity'], // TODO
+      right_legend: { name: "wQ", height: "d_model", width: "d_qk", wtop: false },
+      right_pos: new THREE.Vector3(0, -this.params.n_q - 1, 0),
 
-        pos: new THREE.Vector3(-2, 0, 0),
-        rot: new THREE.Vector3(0, -Math.PI / 2, 0)
-      }
+      result_legend: { name: "Q", height: "n_q", width: "d_qk" },
+      result_pos: new THREE.Vector3(0, 0, -this.params.d_model - 1),
+      epilog: 'relu(x)', // TODO
+
+      pos: new THREE.Vector3(-2, 0, 0),
+      rot: new THREE.Vector3(0, -Math.PI / 2, 0)
     }
     this.qmm = new MatMul(qmm_params, this.getText)
     this.input_data = this.qmm.left.data // NOTE
@@ -1315,27 +1345,26 @@ export class Attn2 {
 
   initkmm() {
     const kmm_params = {
-      ...this.params, ...{
-        I: this.params.d_qk,
-        J: this.params.d_model,
-        K: this.params.n_q,
+      ...this.params,
 
-        'left init': this.params['wK.T init'],
-        'left sparsity': this.params['q sparsity'], // TODO
-        left_legend: { name: "wK.T", height: "d_qk", width: "d_model", hleft: false },
-        left_pos: new THREE.Vector3(this.params.n_q + 1, 0, 0),
+      I: this.params.d_qk,
+      J: this.params.d_model,
+      K: this.params.n_q,
 
-        right_legend: { name: "input.T", height: "d_model", width: "n_q", hleft: true, wtop: false },
-        right_data: this.input_data.transpose(),
+      'left init': this.params['wK.T init'],
+      'left sparsity': this.params['q sparsity'], // TODO
+      left_legend: { name: "wK.T", height: "d_qk", width: "d_model", hleft: false },
+      left_pos: new THREE.Vector3(this.params.n_q + 1, 0, 0),
 
-        // result: this.mm1.right,  // TODO own it here
-        result_legend: { name: "K.T", height: "d_k", width: "n_q" },
-        result_pos: new THREE.Vector3(0, 0, -this.params.d_model - 1),
-        epilog: 'relu(x)', // TODO
+      right_legend: { name: "input.T", height: "d_model", width: "n_q", hleft: true, wtop: false },
+      right_data: this.input_data.transpose(),
 
-        pos: new THREE.Vector3(0, 2, 0),
-        rot: new THREE.Vector3(-Math.PI / 2, 0, 0)
-      }
+      result_legend: { name: "K.T", height: "d_k", width: "n_q" },
+      result_pos: new THREE.Vector3(0, 0, -this.params.d_model - 1),
+      epilog: 'relu(x)', // TODO
+
+      pos: new THREE.Vector3(0, 2, 0),
+      rot: new THREE.Vector3(-Math.PI / 2, 0, 0)
     }
     this.kmm = new MatMul(kmm_params, this.getText)
     this.group.add(this.kmm.group)
@@ -1343,84 +1372,72 @@ export class Attn2 {
 
   initmm1() {
     const mm1_params = {
-      ...this.params, ...{
-        I: this.params.n_q,
-        J: this.params.d_qk,
-        K: this.params.n_q,
+      ...this.params,
+      I: this.params.n_q,
+      J: this.params.d_qk,
+      K: this.params.n_q,
 
-        // 'left init': this.params['q init'],
-        // 'left sparsity': this.params['q sparsity'],
-        // left_legend: { name: "Q", height: "n_q", width: "d_k" },
-        left: this.qmm.result,
+      left: this.qmm.result,
 
-        // 'right init': this.params['k^t init'],
-        // 'right sparsity': this.params['k^t sparsity'],
-        // right_legend: { name: "K.T", height: "d_k", width: "n_q" },
-        right: this.kmm.result,
+      right: this.kmm.result,
 
-        result_legend: { name: "attn", height: "", width: "" },
-        epilog: this.params['attn epilog'],
+      result_legend: { name: "attn", height: "", width: "" },
+      epilog: this.params['attn epilog'],
 
-        pos: new THREE.Vector3(0, 0, 0),
-      }
+      pos: new THREE.Vector3(0, 0, 0),
     }
     this.mm1 = new MatMul(mm1_params, this.getText)
     this.group.add(this.mm1.group)
+
+    // console.log(`HEY result data absmax ${this.mm1.result.data.absmax} absmin ${this.mm1.result.data.absmin} ${this.mm1.result.data}`)
+
   }
 
   initvmm() {
     const vmm_params = {
-      ...this.params, ...{
-        I: this.params.n_q,
-        J: this.params.d_model,
-        K: this.params.d_v,
+      ...this.params,
+      I: this.params.n_q,
+      J: this.params.d_model,
+      K: this.params.d_v,
 
-        // 'left init': this.params['q init'],
-        // 'left sparsity': this.params['q sparsity'],
-        left_legend: { name: "input", height: "n_q", width: "d_model", hleft: false },
-        left_data: this.input_data, // NOTE
-        left_pos: new THREE.Vector3(this.params.d_v + 1, 0, 0),
+      left_legend: { name: "input", height: "n_q", width: "d_model", hleft: false },
+      left_data: this.input_data, // NOTE
+      left_pos: new THREE.Vector3(this.params.d_v + 1, 0, 0),
 
-        'right init': this.params['wV init'],
-        'right sparsity': this.params['wV sparsity'],
-        right_legend: { name: "wV", height: "d_model", width: "d_v", wtop: false, hleft: true },
+      'right init': this.params['wV init'],
+      'right sparsity': this.params['wV sparsity'],
+      right_legend: { name: "wV", height: "d_model", width: "d_v", wtop: false, hleft: true },
 
-        // result: this.mm2.right,  // TODO own it here
-        result_legend: { name: "V", height: "n_q", width: "d_v" },
-        result_pos: new THREE.Vector3(0, 0, -this.params.d_model - 1),
-        epilog: 'relu(x)', // TODO
+      result_legend: { name: "V", height: "n_q", width: "d_v" },
+      result_pos: new THREE.Vector3(0, 0, -this.params.d_model - 1),
+      epilog: 'relu(x)', // TODO
 
-        pos: new THREE.Vector3(0, -this.params.n_q - 1, this.params.d_qk + 1),
-        rot: new THREE.Vector3(Math.PI / 2, 0, Math.PI / 2)
-      }
+      pos: new THREE.Vector3(0, -this.params.n_q - 1, this.params.d_qk + 1),
+      rot: new THREE.Vector3(Math.PI / 2, 0, Math.PI / 2)
     }
-    this.kmm = new MatMul(vmm_params, this.getText)
-    this.group.add(this.kmm.group)
+    this.vmm = new MatMul(vmm_params, this.getText)
+    this.group.add(this.vmm.group)
   }
 
   initmm2() {
     const mm2_params = {
-      ...this.params, ...{
-        I: this.params.n_q,
-        J: this.params.n_q,
-        K: this.params.d_v,
+      ...this.params,
+      I: this.params.n_q,
+      J: this.params.n_q,
+      K: this.params.d_v,
 
-        left: this.mm1.result,
+      left: this.mm1.result,
 
-        // 'right init': this.params['v init'],
-        // 'right sparsity': this.params['v sparsity'],
-        // right_legend: { name: "V", height: "", width: "d_v" },
-        right: this.kmm.result,
-        right_rot: new THREE.Vector3(0, Math.PI, 0),
-        right_pos: new THREE.Vector3(0, -this.H - 1, 0),
+      right: this.vmm.result,
+      right_rot: new THREE.Vector3(0, Math.PI, 0),
+      right_pos: new THREE.Vector3(0, -this.H - 1, 0),
 
-        result_legend: { name: "attn @ V", height: "n_q", width: "d_v", wtop: true },
-        epilog: 'none', // this.params['result epilog'],
-        result_rot: new THREE.Vector3(0, Math.PI, 0),
+      result_legend: { name: "attn @ V", height: "n_q", width: "d_v", wtop: true },
+      epilog: 'none', // this.params['result epilog'],
+      result_rot: new THREE.Vector3(0, Math.PI, 0),
 
-        rot: new THREE.Vector3(0, Math.PI / 2, 0),
-        pos: new THREE.Vector3(0, 0, this.mm1.D + 1),
-      }
+      rot: new THREE.Vector3(0, Math.PI / 2, 0),
+      pos: new THREE.Vector3(0, 0, this.mm1.D + 1),
     }
     this.mm2 = new MatMul(mm2_params, this.getText)
     this.group.add(this.mm2.group)
@@ -1428,25 +1445,87 @@ export class Attn2 {
 
   initomm() {
     const ff_params = {
-      ...this.params, ...{
-        I: this.params.n_q,
-        J: this.params.d_v,
-        K: this.params.d_model,
+      ...this.params,
+      I: this.params.n_q,
+      J: this.params.d_v,
+      K: this.params.d_model,
 
-        left: this.mm2.result,
+      left: this.mm2.result,
 
-        'right init': this.params['wO init'],
-        'right sparsity': this.params['w0 sparsity'],
-        right_legend: { name: "wO", height: "d_v", width: "d_model" },
+      'right init': this.params['wO init'],
+      'right sparsity': this.params['w0 sparsity'],
+      right_legend: { name: "wO", height: "d_v", width: "d_model" },
 
-        result_legend: { name: "out", height: "n_q", width: "d_model" },
-        epilog: this.params['result epilog'],
+      result_legend: { name: "out", height: "n_q", width: "d_model" },
+      epilog: this.params['result epilog'],
 
-        pos: new THREE.Vector3(this.params.n_q + 1, 0, this.params.d_qk + 1),
-        // rot: new THREE.Vector3(Math.PI / 2, 0, Math.PI / 2)
-      }
+      pos: new THREE.Vector3(this.params.n_q + 1, 0, this.params.d_qk + 1),
+      // rot: new THREE.Vector3(Math.PI / 2, 0, Math.PI / 2)
     }
-    this.kmm = new MatMul(ff_params, this.getText)
-    this.group.add(this.kmm.group)
+    this.omm = new MatMul(ff_params, this.getText)
+    this.group.add(this.omm.group)
   }
+}
+
+export class Attn3 {
+  constructor(params, getText) {
+    this.getText = getText
+    this.params = { ...params }
+    this.group = new THREE.Group()
+
+    this.H = params.n_q
+    this.D = params.d_qk + params.d_v
+    this.W = params.d_model
+
+    this.initVis()
+  }
+
+  initVis(params = undefined) {
+    if (params) {
+      this.params = { ...params }
+    }
+    this.group.clear()
+
+    const nheads = this.params.nheads ? this.params.nheads : 4
+
+    const zspace = 5 * Math.sqrt(this.D) * this.params['head spacing']
+
+    if (this.params['show single input']) {
+      const input_params = {
+        ...this.params,
+        'left init': this.params['input init'],
+        'left sparsity': this.params['q sparsity'], // TODO
+        legend: { name: "input", height: "n_q", width: "d_model", hleft: false, wtop: true },
+      }
+      const input = Mat.fromParams(this.params.n_q, this.params.d_model, input_params, this.getText)
+      input.group.rotation.x = Math.PI
+      input.group.position.x = -this.params.d_model / 2
+      input.group.position.y = this.params.n_q / 2
+      input.group.position.z = -zspace
+      this.group.add(input.group)
+    }
+
+    for (let i = 0; i < nheads; i++) {
+      const a = new Attn2(this.params, this.getText)
+      a.group.position.z = i * zspace
+      if (this.params['show single input']) {
+        a.qmm.left.hideAll()
+        a.kmm.right.hideAll()
+        a.vmm.left.hideAll()
+      }
+      this.group.add(a.group)
+    }
+
+    // this.group.position.x = -xspace * (nheads - 1) / 2
+    this.group.position.z = -zspace * (nheads - 1) / 2
+  }
+
+  setPosition() {
+    const pos = this.params.pos ? this.params.pos :
+      new THREE.Vector3(-this.W / 2, this.H / 2, -this.D / 2)
+    this.group.position.x = pos.x
+    this.group.position.y = pos.y
+    this.group.position.z = pos.z
+  }
+
 }

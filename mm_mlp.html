@@ -38,6 +38,7 @@
 
     const init_dims = { i: 32, j: 32, k: 32 }
     const init_funcs = ['rows', 'cols', 'row major', 'col major', 'uniform', 'gaussian', 'tril', 'triu', 'eye', 'diff', 'ones', 'zeros']
+    const sensitivity = ['local', 'global']
 
     const params = {
       nlayers: 5,
@@ -62,6 +63,7 @@
       'init min': -1,
       'init max': 1,
       epilog: 'none',
+      sensitivity: 'local',
       'zero hue': 0.25,
       'zero size': 0.25,
       'zero light': 0.15,
@@ -325,6 +327,11 @@
       })
 
       const gui_colors = gui.addFolder('colors')
+
+      gui_colors.add(params, 'sensitivity', sensitivity).onChange(function (val) {
+        setParams({ sensitivity: val })
+        initObj() // TODO
+      })
 
       gui_colors.add(params, 'zero hue', 0.0, 1.0).onChange(function (val) {
         setParams({ 'zero hue': val })

@@ -36,24 +36,19 @@
     import { EffectComposer } from 'https://threejs.org/examples/jsm/postprocessing/EffectComposer.js'
     import { RenderPass } from 'https://threejs.org/examples/jsm/postprocessing/RenderPass.js'
 
-    //
-    // params
-    // 
-
     const init_dims = { n_q: 128, d_qk: 32, d_v: 32, n_kv: 128, d_model: 128 }
     const init_funcs = ['rows', 'cols', 'row major', 'col major', 'pt linear', 'pt linear+', 'uniform', 'gaussian', 'tril', 'triu', 'eye', 'diff', 'ones', 'zeros']
     const epilog_funcs = ['none', 'x/J', 'x/sqrt(J)', 'softmax(x/sqrt(J))', 'tanh(x)', 'relu(x)']
     const sensitivity = ['local', 'global']
 
     const params = {
+      // shape
       'n_q': init_dims.n_q,
       // 'n_kv': init_dims.n_kv,
       'd_qk': init_dims.d_qk,
       'd_v': init_dims.d_v,
       'd_model': init_dims.d_model,
-      'animation': 'none',
-      'speed': 8,
-      'pause': false,
+      // data
       'input init': 'pt linear+',
       'wQ init': 'pt linear',
       'wK.T init': 'pt linear',
@@ -66,6 +61,16 @@
       'init max': 1,
       'attn epilog': 'softmax(x/sqrt(J))',
       'result epilog': 'relu(x)',
+      // viz
+      'show single input': false,
+      'head spacing': 5,
+      'guides': true,
+      'legends': true,
+      'axes': true,
+      'animation': 'none',
+      'speed': 8,
+      'pause': false,
+      // colors/sizes
       'sensitivity': 'local',
       'zero hue': 0.25,
       'zero size': 0.25,
@@ -73,24 +78,18 @@
       'max light': 0.65,
       'hue gap': 0.25,
       'hue spread': 0.01,
-      'guides': false,
-      'legends': true,
-      'axes': false,
       // set from orbit control
       'xcam': -init_dims.n_q * 4,
       'ycam': (init_dims.d_qk + init_dims.d_v) * 2,
       'zcam': init_dims.n_q * 4,
     };
 
-    // 
-    // update URL when params change - throttled
-    //
-
     let addressBarUpdatePending = false
     function setParams(obj) {
       for (const k in obj) {
         params[k] = obj[k]
       }
+      // throttle address bar update
       if (!addressBarUpdatePending) {
         addressBarUpdatePending = true
         setTimeout(function () {
@@ -101,13 +100,9 @@
       }
     }
 
-    //
-    // load a font and then call init()
-    // awkwardly stuffs the entire execution path into
-    // a handler bc I'm too lazy to think through making
-    // things in here async
-    //
-
+    // note: everything is kicked off from this handler 
+    // bc I'm too lazy to find out the right way to make
+    // everything async/await
     let getText
     const loader = new FontLoader();
     loader.load('examples/fonts/droid/droid_sans_regular.typeface.json', function (font) {
@@ -127,24 +122,9 @@
       animate()
     })
 
-    //
-    // main
-    //
-
     function init() {
       const scene = new THREE.Scene()
 
-      // load params from url
-      const searchParams = new URL(window.location).searchParams
-      for (const [k, v] of searchParams.entries()) {
-        params[k] = util.castToType(v, typeof params[k], k)
-      }
-
-      //
-      // set up objects 
-      //
-
-      // axes
       let axes = util.axes(window)
       function initAxes(enabled) {
         if (enabled) {
@@ -154,11 +134,16 @@
         }
       }
 
+      // load params from url
+      const searchParams = new URL(window.location).searchParams
+      for (const [k, v] of searchParams.entries()) {
+        params[k] = util.castToType(v, typeof params[k], k)
+      }
+
       if (params.axes) {
         initAxes(true)
       }
 
-      // main object
       let obj
       function getObj() {
         return obj
@@ -168,18 +153,10 @@
         if (obj) {
           scene.remove(obj.group)
         }
-        obj = new vis.Attn2(params, getText)
+        obj = new vis.Attn3(params, getText)
         scene.add(obj.group)
       }
       initObj()
-
-      // rollover tracking
-      const raycaster = new THREE.Raycaster()
-      const pointer = new THREE.Vector2()
-
-      //
-      // rendering
-      //
 
       const renderer = new THREE.WebGLRenderer({ antialias: true });
       renderer.setPixelRatio(window.devicePixelRatio)
@@ -193,58 +170,25 @@
       const composer = new EffectComposer(renderer)
       composer.addPass(new RenderPass(scene, camera))
 
-      //
-      // interaction
-      //
-
-      const orbit = new OrbitControls(camera, renderer.domElement)
+      let orbit = new OrbitControls(camera, renderer.domElement)
       orbit.addEventListener('change', function () {
         setParams({ xcam: camera.position.x, ycam: camera.position.y, zcam: camera.position.z })
       }, false)
 
-      //
-      // more freedom of movement but hard to keep things level
-      // 
       // let arcball = new ArcballControls(camera, renderer.domElement, scene);
       // arcball.addEventListener('change', function () {
       //   setParams({ xcam: camera.position.x, ycam: camera.position.y, zcam: camera.position.z })
       // }, false)
 
-      window.addEventListener('resize', function () {
+      function onWindowResize() {
         camera.aspect = window.innerWidth / window.innerHeight
         camera.updateProjectionMatrix()
         composer.setSize(window.innerWidth, window.innerHeight)
         renderer.setSize(window.innerWidth, window.innerHeight)
-      }, false)
-
-      window.addEventListener('pointermove', function (event) {
-        pointer.x = (event.clientX / window.innerWidth) * 2 - 1
-        pointer.y = - (event.clientY / window.innerHeight) * 2 + 1
-      })
-
-      //
-      // gui
-      //
+      }
+      window.addEventListener('resize', onWindowResize, false)
 
       initGui(getObj, initObj, initAxes)
-
-      //
-      // rendering and animation
-      //
-
-      function render() {
-        // raycaster.setFromCamera(pointer, camera)
-
-        // const intersects = raycaster.intersectObject(obj.group)
-        // if (intersects.length > 0) {
-        //   const intersect = intersects[0]
-        //   if (intersect.object.onRollover) {
-        //     intersect.object.onRollover(intersect)
-        //   }
-        // }
-
-        composer.render(scene, camera)
-      }
 
       let last = 0
       function animate() {
@@ -253,19 +197,11 @@
           obj.bump()
           last = t
         }
-        render()
+        composer.render(scene, camera)
         requestAnimationFrame(animate)
       }
-
-      // return the animation function
       return animate
     }
-
-    //
-    // init GUI - adds itself to the dom I guess
-    // currently the correspondence between this and params struct
-    // is hand-maintained but it's getting harder
-    // 
 
     function initGui(getObj, initObj, initAxes) {
       const gui = new GUI();
@@ -376,17 +312,14 @@
 
       const gui_vis = gui.addFolder('vis')
 
-      gui_vis.add(params, 'animation', ['dotprod', 'mvprod', 'vmprod', 'none', 'none (inputs only)']).onChange(function (val) {
-        setParams({ animation: val })
-        initObj()
+      gui_vis.add(params, 'show single input', params.rowguides).onChange(function (val) {
+        setParams({ 'show single input': val })
+        initObj() // TODO
       })
 
-      gui_vis.add(params, 'speed', 1, 10).onChange(function (val) {
-        setParams({ speed: Math.floor(val) })
-      })
-
-      gui_vis.add(params, 'pause').onChange(function (val) {
-        setParams({ pause: val })
+      gui_vis.add(params, 'head spacing', 1, 10).onChange(function (val) {
+        setParams({ 'head spacing': val })
+        initObj() // TODO
       })
 
       gui_vis.add(params, 'guides', params.rowguides).onChange(function (val) {
@@ -402,6 +335,19 @@
       gui_vis.add(params, 'axes').onChange(function (val) {
         setParams({ axes: val })
         initAxes(val)
+      })
+
+      gui_vis.add(params, 'animation', ['dotprod', 'mvprod', 'vmprod', 'none', 'none (inputs only)']).onChange(function (val) {
+        setParams({ animation: val })
+        initObj()
+      })
+
+      gui_vis.add(params, 'speed', 1, 10).onChange(function (val) {
+        setParams({ speed: Math.floor(val) })
+      })
+
+      gui_vis.add(params, 'pause').onChange(function (val) {
+        setParams({ pause: val })
       })
 
       gui_vis.open()

@@ -37,8 +37,9 @@
     import { RenderPass } from 'https://threejs.org/examples/jsm/postprocessing/RenderPass.js'
 
     const init_dims = { n_q: 128, d_qk: 32, d_v: 32, n_kv: 128 }
-    const init_funcs = ['rows', 'cols', 'row major', 'col major', 'pt_linear', 'uniform', 'gaussian', 'tril', 'triu', 'eye', 'diff', 'ones', 'zeros']
+    const init_funcs = ['rows', 'cols', 'row major', 'col major', 'pt linear', 'pt linear+', 'uniform', 'gaussian', 'tril', 'triu', 'eye', 'diff', 'ones', 'zeros']
     const epilogs = ['x/J', 'x/sqrt(J)', 'softmax(x/sqrt(J))', 'tanh(x)', 'relu(x)', 'none']
+    const sensitivity = ['local', 'global']
 
     const params = {
       'n_q': init_dims.n_q,
@@ -58,6 +59,7 @@
       'init max': 1,
       'attn epilog': 'none',
       'result epilog': 'none',
+      'sensitivity': 'local',
       'zero hue': 0.25,
       'zero size': 0.25,
       'zero light': 0.15,
@@ -314,6 +316,11 @@
       gui_vis.open()
 
       const gui_colors = gui.addFolder('colors')
+
+      gui_colors.add(params, 'sensitivity', sensitivity).onChange(function (val) {
+        setParams({ sensitivity: val })
+        initObj() // TODO
+      })
 
       gui_colors.add(params, 'zero hue', 0.0, 1.0).onChange(function (val) {
         setParams({ 'zero hue': val })
