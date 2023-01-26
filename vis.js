@@ -340,7 +340,7 @@ export class Mat {
 
   getLegendProps() {
     const custom = this.container.params.legend_props ? this.container.params.legend_props : {}
-    const sa_geo = Math.cbrt(this.h * this.w)
+    const sa_geo = Math.cbrt(Math.max(5, this.h) * Math.max(this.w, 5))
     const defaults = {
       name_color: 0xccccff,
       name_size: sa_geo / 4,
@@ -753,8 +753,16 @@ export class MatMul {
   }
 
   setAnimation(animation) {
+    const maybe_hide_inputs = () => {
+      if (this.params['hide inputs']) {
+        this.left.hideAll()
+        this.right.hideAll()
+      }
+    }
+
     this.animation = animation
     if (this.animation == 'dotprod') {
+      maybe_hide_inputs()
       this.result.hideAll()
       const dotprod_init = (y, x, h, w) => this.dotprod_val(0, 0, x)
       this.dotprod = Mat.fromInit(1, this.D, dotprod_init, this)
@@ -764,6 +772,7 @@ export class MatMul {
       this.curi = this.H - 1
       this.curk = this.W - 1
     } else if (this.animation == 'mvprod') {
+      maybe_hide_inputs()
       this.result.hideAll()
       const mvprod_init = (y, x, h, w) => this.dotprod_val(0, y, x)
       this.mvprod = Mat.fromInit(this.H, this.D, mvprod_init, this)
@@ -773,6 +782,7 @@ export class MatMul {
       this.bump = this.bump_mvprod
       this.curk = this.W - 1
     } else if (this.animation == 'vmprod') {
+      maybe_hide_inputs()
       this.result.hideAll()
       const vmprod_init = (y, x, h, w) => this.dotprod_val(y, 0, x)
       this.vmprod = Mat.fromInit(this.D, this.W, vmprod_init, this)
@@ -780,15 +790,28 @@ export class MatMul {
       this.group.add(this.vmprod.points)
       this.bump = this.bump_vmprod
       this.curi = this.H - 1
+    } else if (this.animation == 'vvprod') {
+      maybe_hide_inputs()
+      this.result.hideAll()
+      const vvprod_init = (y, x, h, w) => this.dotprod_val(y, x, 0)
+      this.vvprod = Mat.fromInit(this.D, this.W, vvprod_init, this)
+      this.vvprod.points.rotation.x = Math.PI / 2
+      this.group.add(this.vvprod.points)
+      this.bump = this.bump_vvprod
+      this.curj = this.D - 1
     } else if (this.animation == 'none') {
+      this.left.showAll()
+      this.right.showAll()
       this.result.showAll()
     } else if (this.animation == 'none (inputs only)' && !this.params.result) {
+      this.left.showAll()
+      this.right.showAll()
       this.result.hideAll()
     }
   }
 
-  dotprod_val(i, j, k) {
-    return this.left.getData(i, k) * this.right.getData(k, j)
+  dotprod_val(i, k, j) {
+    return this.left.getData(i, j) * this.right.getData(j, k)
   }
 
   _result_val(a, b, i, j) {
@@ -798,11 +821,6 @@ export class MatMul {
       x += a.get(i, k) * b.get(k, j)
     }
     const epi = this.params.epilog
-
-    // if (epi == 'softmax(x/sqrt(J))') {
-    //   console.log(`HEY x ${x} this.D ${this.D} Math.sqrt(this.D) ${Math.sqrt(this.D)} x / Math.sqrt(this.D) ${x / Math.sqrt(this.D)}`)
-    // }
-
     return epi == 'x/J' ? x / this.D :
       epi == 'x/sqrt(J)' || epi == 'softmax(x/sqrt(J))' ? x / Math.sqrt(this.D) :
         epi == 'tanh(x)' ? Math.tanh(x) :
@@ -1529,7 +1547,7 @@ export class Attn3 {
     input.group.rotation.x = Math.PI
     input.group.position.x = -this.params.d_model / 2
     input.group.position.y = this.params.n_q / 2
-    input.group.position.z = -zspace
+    input.group.position.z = -(2 * this.D) - zspace
     this.group.add(input.group)
     this.params.input_data = input.data
 

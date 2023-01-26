@@ -37,17 +37,15 @@
     import { RenderPass } from 'https://threejs.org/examples/jsm/postprocessing/RenderPass.js'
 
     const init_dims = { i: 32, j: 32, k: 32 }
-    const init_funcs = ['rows', 'cols', 'row major', 'col major', 'uniform', 'gaussian', 'tril', 'triu', 'eye', 'diff', 'ones', 'zeros']
+    const init_funcs = ['rows', 'cols', 'row major', 'col major', 'pt linear', 'pt linear+', 'uniform', 'gaussian', 'tril', 'triu', 'eye', 'diff', 'ones', 'zeros']
     const epilog_funcs = ['none', 'x/J', 'x/sqrt(J)', 'softmax(x/sqrt(J))', 'tanh(x)', 'relu(x)']
     const sensitivity = ['local', 'global']
+    const animation = ['dotprod', 'mvprod', 'vmprod', 'vvprod', 'none']
 
     const params = {
       I: init_dims.i,
       J: init_dims.j,
       K: init_dims.k,
-      animation: 'none',
-      speed: 8,
-      pause: false,
       'left init': 'rows',
       'left sparsity': 0,
       'right init': 'cols',
@@ -56,6 +54,10 @@
       'init max': 1,
       epilog: 'none',
       sensitivity: 'global',
+      animation: 'none',
+      'hide inputs': false,
+      speed: 8,
+      pause: false,
       'zero hue': 0.25,
       'zero size': 0.25,
       'zero light': 0.15,
@@ -192,7 +194,7 @@
     function initGui(getObj, initObj, initAxes) {
       const gui = new GUI();
 
-      gui.add(params, 'I', 1, 128).onChange(function (val) {
+      gui.add(params, 'I', 1, 1024).onChange(function (val) {
         val = Math.floor(val)
         setParams({ I: val })
         if (val != getObj().params.I) {
@@ -200,7 +202,7 @@
         }
       })
 
-      gui.add(params, 'J', 1, 128).onChange(function (val) {
+      gui.add(params, 'J', 1, 1024).onChange(function (val) {
         val = Math.floor(val)
         setParams({ J: val })
         if (val != getObj().params.J) {
@@ -208,7 +210,7 @@
         }
       })
 
-      gui.add(params, 'K', 1, 128).onChange(function (val) {
+      gui.add(params, 'K', 1, 1024).onChange(function (val) {
         val = Math.floor(val)
         setParams({ K: val })
         if (val != getObj().params.K) {
@@ -259,8 +261,13 @@
 
       const gui_vis = gui.addFolder('vis')
 
-      gui_vis.add(params, 'animation', ['dotprod', 'mvprod', 'vmprod', 'none']).onChange(function (val) {
+      gui_vis.add(params, 'animation', animation).onChange(function (val) {
         setParams({ animation: val })
+        getObj().initVis(params)
+      })
+
+      gui_vis.add(params, 'hide inputs').onChange(function (val) {
+        setParams({ 'hide inputs': val })
         getObj().initVis(params)
       })
 
