@@ -64,6 +64,7 @@
       'result epilog': 'relu(x)',
       // viz
       'head spacing': 5,
+      'hide attn heads': false,
       'hide copied inputs': false,
       'guides': true,
       'legends': true,
@@ -323,6 +324,11 @@
 
       gui_vis.add(params, 'head spacing', 1, 10).onChange(function (val) {
         setParams({ 'head spacing': val })
+        initObj() // TODO
+      })
+
+      gui_vis.add(params, 'hide attn heads').onChange(function (val) {
+        setParams({ 'hide attn heads': val })
         initObj() // TODO
       })
 

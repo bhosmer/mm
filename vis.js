@@ -120,26 +120,31 @@ function getInPlaceEpilog(name) {
 // Array
 //
 class Array {
-  constructor(h, w, f, epi = undefined) {
-    this.h = h
-    this.w = w
-    this.data = new Float32Array(h * w)
-    this.epi = epi
+
+  static fromInit(h, w, f, epi = undefined) {
+    const data = new Float32Array(h * w)
     let ptr = 0
     for (let i = 0; i < h; i++) {
       for (let j = 0; j < w; j++, ptr++) {
-        const x = f(i, j, h, w)
-        this.data[ptr] = x
+        data[ptr] = f(i, j, h, w)
       }
     }
-    const epi_func = epi && getInPlaceEpilog(epi)
-    if (epi_func) {
-      epi_func(this.h, this.w, this.data)
+    const epi_func_ = epi && getInPlaceEpilog(epi)
+    if (epi_func_) {
+      epi_func_(h, w, data)
     }
-    // absmax
+    return new Array(h, w, data, epi)
+  }
+
+  constructor(h, w, data, epi = undefined) {
+    this.h = h
+    this.w = w
+    this.data = data
+    this.epi = epi
+    // set absmin, absmax
     this.absmax = 0
     this.absmin = Infinity
-    for (ptr = 0; ptr < this.data.length; ptr++) {
+    for (let ptr = 0; ptr < this.data.length; ptr++) {
       const absx = Math.abs(this.data[ptr])
       if (absx > this.absmax) {
         this.absmax = absx
@@ -186,7 +191,19 @@ class Array {
   }
 
   transpose() {
-    return new Array(this.w, this.h, (i, j, h, w) => this.get(j, i))
+    return Array.fromInit(this.w, this.h, (i, j, h, w) => this.get(j, i))
+  }
+
+  add(a) {
+    if (a.h != this.h || a.w != this.w) {
+      throw Error(`shape error: this ${this.h} ${this.w} a ${a.h} ${a.w}`)
+    }
+    const n = this.h * this.w
+    const data = new Float32Array(n)
+    for (let ptr = 0; ptr < n; ptr++) {
+      data[ptr] = this.data[ptr] + a.data[ptr]
+    }
+    return new Array(this.h, this.w, data)
   }
 }
 
@@ -279,13 +296,21 @@ export class Mat {
   }
 
   static fromInit(h, w, init, container) {
-    return new Mat(h, w, new Array(h, w, init), container)
+    return new Mat(h, w, Array.fromInit(h, w, init), container)
   }
 
   // --------
 
   static fromParams(h, w, params, getText) {
-    const data = Mat.dataFromParams(h, w, params)
+    let data
+    if (params.data) {
+      if (params.data.h != h || params.data.w != w) {
+        throw Error(`shape mismatch: h ${h} w ${w} params.data.h ${params.data.h} w ${params.data.w}`)
+      }
+      data = params.data
+    } else {
+      data = Mat.dataFromParams(h, w, params)
+    }
 
     const m = new Mat(h, w, data, undefined, params)
 
@@ -310,7 +335,7 @@ export class Mat {
     }
     const sparsity = params['left sparsity']
     const init = getInitFunc(init_name, sparsity, init_base, init_range)
-    return new Array(h, w, init)
+    return Array.fromInit(h, w, init)
   }
 
   getLegendProps() {
@@ -560,7 +585,7 @@ export class MatMul {
     const init = this.params['left init']
     const sparsity = this.params['left sparsity']
     const left_init = getInitFunc(init, sparsity, this.init_base, this.init_range)
-    this.left_data = new Array(this.H, this.D, left_init)
+    this.left_data = Array.fromInit(this.H, this.D, left_init)
   }
 
   initRightData() {
@@ -575,7 +600,7 @@ export class MatMul {
     const init = this.params['right init']
     const sparsity = this.params['right sparsity']
     const right_init = getInitFunc(init, sparsity, this.init_base, this.init_range)
-    this.right_data = new Array(this.D, this.W, right_init)
+    this.right_data = Array.fromInit(this.D, this.W, right_init)
   }
 
   initResultData() {
@@ -588,7 +613,7 @@ export class MatMul {
       return
     }
     const result_init = (y, x, h, w) => this._result_val(this.left_data, this.right_data, y, x)
-    this.result_data = new Array(this.H, this.W, result_init, this.params.epilog)
+    this.result_data = Array.fromInit(this.H, this.W, result_init, this.params.epilog)
   }
 
   initVis(params = undefined) {
@@ -1320,12 +1345,13 @@ export class Attn2 {
       J: this.params.d_model,
       K: this.params.d_qk,
 
-      'left init': this.params['input init'],
-      'left sparsity': this.params['q sparsity'], // TODO        
-      'left sparsity': this.params['q sparsity'], // TODO        
-      'left sparsity': this.params['q sparsity'], // TODO        
+      ...(this.params.input_data ? {
+        left_data: this.params.input_data
+      } : {
+        'left init': this.params['input init'],
+        'left sparsity': this.params['q sparsity'], // TODO        
+      }),
       left_legend: { name: "input", height: "n_q", width: "d_model", hleft: false, wtop: true },
-      left_data: this.params.input_data,
 
       'right init': this.params['wQ init'],
       'right sparsity': this.params['k^t sparsity'], // TODO
@@ -1341,6 +1367,7 @@ export class Attn2 {
     }
     this.qmm = new MatMul(qmm_params, this.getText)
     this.group.add(this.qmm.group)
+    this.input_data = this.qmm.left_data // NOTE
   }
 
   initkmm() {
@@ -1357,7 +1384,7 @@ export class Attn2 {
       left_pos: new THREE.Vector3(this.params.n_q + 1, 0, 0),
 
       right_legend: { name: "input.T", height: "d_model", width: "n_q", hleft: true, wtop: false },
-      right_data: this.params.input_data.transpose(),
+      right_data: this.input_data.transpose(),
 
       result_legend: { name: "K.T", height: "d_k", width: "n_q" },
       result_pos: new THREE.Vector3(0, 0, -this.params.d_model - 1),
@@ -1401,7 +1428,7 @@ export class Attn2 {
       K: this.params.d_v,
 
       left_legend: { name: "input", height: "n_q", width: "d_model", hleft: false },
-      left_data: this.params.input_data, // NOTE
+      left_data: this.input_data, // NOTE
       left_pos: new THREE.Vector3(this.params.d_v + 1, 0, 0),
 
       'right init': this.params['wV init'],
@@ -1444,7 +1471,7 @@ export class Attn2 {
   }
 
   initomm() {
-    const ff_params = {
+    const omm_params = {
       ...this.params,
       I: this.params.n_q,
       J: this.params.d_v,
@@ -1462,7 +1489,7 @@ export class Attn2 {
       pos: new THREE.Vector3(this.params.n_q + 1, 0, this.params.d_qk + 1),
       // rot: new THREE.Vector3(Math.PI / 2, 0, Math.PI / 2)
     }
-    this.omm = new MatMul(ff_params, this.getText)
+    this.omm = new MatMul(omm_params, this.getText)
     this.group.add(this.omm.group)
   }
 }
@@ -1487,6 +1514,7 @@ export class Attn3 {
     this.group.clear()
 
     const num_heads = this.params.num_heads
+    const show_heads = !this.params['hide attn heads']
 
     const zspace = 5 * Math.sqrt(this.D) * this.params['head spacing']
 
@@ -1505,26 +1533,35 @@ export class Attn3 {
     this.group.add(input.group)
     this.params.input_data = input.data
 
+    let output_data = input.data
     for (let i = 0; i < num_heads; i++) {
       const a = new Attn2(this.params, this.getText)
-      a.group.position.z = i * (this.D + zspace)
-      if (this.params['hide copied inputs']) {
-        a.qmm.left.hideAll()
-        a.kmm.right.hideAll()
-        a.vmm.left.hideAll()
+      output_data = output_data.add(a.omm.result.data)
+      if (show_heads) {
+        a.group.position.z = i * (this.D + zspace)
+        if (this.params['hide copied inputs']) {
+          a.qmm.left.hideAll()
+          a.kmm.right.hideAll()
+          a.vmm.left.hideAll()
+        }
+        this.group.add(a.group)
       }
-      this.group.add(a.group)
     }
 
-    this.group.position.z = -(zspace * (num_heads - 1) + this.D * num_heads) / 2
-  }
+    // summed output w/residual
+    const output_params = {
+      ...this.params,
+      data: output_data,
+      legend: { name: "output", height: "n_q", width: "d_model", hleft: false, wtop: true },
+    }
+    const output = Mat.fromParams(this.params.n_q, this.params.d_model, output_params, this.getText)
+    output.group.rotation.x = Math.PI
+    output.group.position.x = -this.params.d_model / 2
+    output.group.position.y = this.params.n_q / 2
+    output.group.position.z = (this.D + zspace) * (show_heads ? num_heads : 1)
+    this.group.add(output.group)
 
-  setPosition() {
-    const pos = this.params.pos ? this.params.pos :
-      new THREE.Vector3(-this.W / 2, this.H / 2, -this.D / 2)
-    this.group.position.x = pos.x
-    this.group.position.y = pos.y
-    this.group.position.z = pos.z
+    //
+    this.group.position.z = show_heads ? -(zspace * (num_heads - 1) + this.D * num_heads) / 2 : 0
   }
-
 }
