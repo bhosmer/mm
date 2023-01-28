@@ -109,9 +109,25 @@ function softmax_(h, w, data) {
   }
 }
 
+function layernorm_(h, w, data) {
+  // (x - x.mean()) / torch.sqrt((x ** 2).mean() - x.mean() ** 2)
+  const mean = data.reduce((acc, x) => acc + x) / data.length
+  const data2 = data.map(x => x ** 2)
+  const mean2 = data2.reduce((acc, x) => acc + x) / data2.length
+  const denom = Math.sqrt(mean2 - mean ** 2)
+  const n = h * w
+  for (let ptr = 0; ptr < n; ptr++) {
+    const x = data[ptr]
+    data[ptr] = (x - mean) / denom
+  }
+}
+
 function getInPlaceEpilog(name) {
   if (name.startsWith('softmax')) {
     return softmax_
+  }
+  if (name.startsWith('layernorm')) {
+    return layernorm_
   }
   return undefined
 }
@@ -194,16 +210,28 @@ class Array {
     return Array.fromInit(this.w, this.h, (i, j, h, w) => this.get(j, i))
   }
 
-  add(a) {
+  map(f) {
+    const data = new Float32Array(n)
+    for (let ptr = 0; ptr < n; ptr++) {
+      data[ptr] = f(this.data[ptr])
+    }
+    return new Array(this.h, this.w, data)
+  }
+
+  map2(f, a) {
     if (a.h != this.h || a.w != this.w) {
       throw Error(`shape error: this ${this.h} ${this.w} a ${a.h} ${a.w}`)
     }
     const n = this.h * this.w
     const data = new Float32Array(n)
     for (let ptr = 0; ptr < n; ptr++) {
-      data[ptr] = this.data[ptr] + a.data[ptr]
+      data[ptr] = f(this.data[ptr], a.data[ptr])
     }
     return new Array(this.h, this.w, data)
+  }
+
+  add(a) {
+    return this.map2((x, y) => x + y, a)
   }
 }
 
@@ -343,9 +371,9 @@ export class Mat {
     const sa_geo = Math.cbrt(Math.max(5, this.h) * Math.max(this.w, 5))
     const defaults = {
       name_color: 0xccccff,
-      name_size: sa_geo / 4,
+      name_size: sa_geo / 3,
       dim_color: 0x00aaff,
-      dim_size: sa_geo / 8,
+      dim_size: sa_geo / 6,
     }
     const res = { ...defaults, ...custom }
     return res
@@ -1412,7 +1440,7 @@ export class Attn2 {
 
       result_legend: { name: "Q", height: "n_q", width: "d_qk" },
       result_pos: new THREE.Vector3(0, 0, -this.params.d_model - 1),
-      epilog: 'relu(x)', // TODO
+      // epilog: 'relu(x)', // TODO
 
       pos: new THREE.Vector3(-2, 0, 0),
       rot: new THREE.Vector3(0, -Math.PI / 2, 0)
@@ -1440,7 +1468,7 @@ export class Attn2 {
 
       result_legend: { name: "K.T", height: "d_k", width: "n_q" },
       result_pos: new THREE.Vector3(0, 0, -this.params.d_model - 1),
-      epilog: 'relu(x)', // TODO
+      // epilog: 'relu(x)', // TODO
 
       pos: new THREE.Vector3(0, 2, 0),
       rot: new THREE.Vector3(-Math.PI / 2, 0, 0)
@@ -1489,7 +1517,7 @@ export class Attn2 {
 
       result_legend: { name: "V", height: "n_q", width: "d_v" },
       result_pos: new THREE.Vector3(0, 0, -this.params.d_model - 1),
-      epilog: 'relu(x)', // TODO
+      // epilog: 'relu(x)', // TODO
 
       pos: new THREE.Vector3(0, -this.params.n_q - 1, this.params.d_qk + 1),
       rot: new THREE.Vector3(Math.PI / 2, 0, Math.PI / 2)
@@ -1535,7 +1563,7 @@ export class Attn2 {
       'right sparsity': this.params['w0 sparsity'],
       right_legend: { name: "wO", height: "d_v", width: "d_model" },
 
-      result_legend: { name: "out", height: "n_q", width: "d_model" },
+      result_legend: { name: "head out", height: "n_q", width: "d_model" },
       epilog: this.params['result epilog'],
 
       pos: new THREE.Vector3(this.params.n_q + 1, 0, this.params.d_qk + 1),
@@ -1610,7 +1638,7 @@ export class Attn3 {
     output.group.rotation.x = Math.PI
     output.group.position.x = -this.params.d_model / 2
     output.group.position.y = this.params.n_q / 2
-    output.group.position.z = (this.D + zspace) * (show_heads ? num_heads : 1)
+    output.group.position.z = (this.D + zspace) * (show_heads ? num_heads : 1) + zspace
     this.group.add(output.group)
 
     //

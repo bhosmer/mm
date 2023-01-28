@@ -38,7 +38,7 @@
 
     const init_dims = { n_q: 128, d_qk: 32, d_v: 32, n_kv: 128, d_model: 128 }
     const init_funcs = ['rows', 'cols', 'row major', 'col major', 'pt linear', 'pt linear+', 'uniform', 'gaussian', 'tril', 'triu', 'eye', 'diff', 'ones', 'zeros']
-    const epilog_funcs = ['none', 'x/J', 'x/sqrt(J)', 'softmax(x/sqrt(J))', 'tanh(x)', 'relu(x)']
+    const epilog_funcs = ['none', 'x/J', 'x/sqrt(J)', 'softmax(x/sqrt(J))', 'tanh(x)', 'relu(x)', 'layernorm']
     const sensitivity = ['local', 'global']
 
     const params = {
@@ -365,7 +365,7 @@
         setParams({ pause: val })
       })
 
-      const gui_colors = gui.addFolder('colors')
+      const gui_colors = gui.addFolder('colors and sizes')
 
       gui_colors.add(params, 'sensitivity', sensitivity).onChange(function (val) {
         setParams({ sensitivity: val })

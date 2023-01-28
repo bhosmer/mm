@@ -38,7 +38,7 @@
 
     const init_dims = { i: 32, j: 32, k: 32 }
     const init_funcs = ['rows', 'cols', 'row major', 'col major', 'pt linear', 'pt linear+', 'uniform', 'gaussian', 'tril', 'triu', 'eye', 'diff', 'ones', 'zeros']
-    const epilog_funcs = ['none', 'x/J', 'x/sqrt(J)', 'softmax(x/sqrt(J))', 'tanh(x)', 'relu(x)']
+    const epilog_funcs = ['none', 'x/J', 'x/sqrt(J)', 'softmax(x/sqrt(J))', 'tanh(x)', 'relu(x)', 'layernorm']
     const sensitivity = ['local', 'global']
     const animation = ['dotprod', 'mvprod', 'vmprod', 'vvprod', 'none']
 
@@ -254,7 +254,7 @@
         }
       })
 
-      gui_data.add(params, 'epilog', ['none', 'x/J', 'x/sqrt(J)', 'softmax(x/sqrt(J))', 'tanh(x)', 'relu(x)']).onChange(function (val) {
+      gui_data.add(params, 'epilog', epilog_funcs).onChange(function (val) {
         setParams({ 'epilog': val })
         getObj().setEpilog(val)
       })
