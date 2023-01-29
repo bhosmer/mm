@@ -3,6 +3,53 @@ import * as THREE from 'three'
 import { LineGeometry } from 'https://threejs.org/examples/jsm/lines/LineGeometry.js';
 import { LineMaterial } from 'https://threejs.org/examples/jsm/lines/LineMaterial.js';
 
+//
+// reading/writing params
+//
+
+export function updateFromSearchParams(obj, searchParams, strict = false) {
+  function err(msg) {
+    if (strict) {
+      throw Error(msg)
+    } else {
+      console.log(`Warning: ${msg}`)
+    }
+  }
+
+  for (const [k, v] of searchParams.entries()) {
+    if (k in obj) {
+      const t = typeof obj[k]
+      const x = castToType(v, t)
+      if (x !== undefined) {
+        obj[k] = x
+      } else {
+        err(`don't know how to cast param '${k}' to type ${t}`)
+      }
+    } else {
+      err(`unknown param '${k}'`)
+    }
+  }
+}
+
+// we only know a limited set of value types for simplicity
+function castToType(v, t) {
+  switch (t) {
+    case 'boolean':
+      return v == 'true'
+    case 'number':
+      return Number(v)
+    case 'string':
+      return String(v)
+    default:
+      return undefined
+  }
+}
+
+//
+// things with lines
+//
+
+// draw line segment
 function lineSeg(start, end, rgb, nsteps = 1000) {
   const points = []
   const colors = []
@@ -27,9 +74,8 @@ function lineSeg(start, end, rgb, nsteps = 1000) {
   return line
 }
 
-// axes
-
-export function axes(window) {
+// make group with x y z axis lines
+export function axes() {
   const origin = new THREE.Vector3(0, 0, 0)
   const group = new THREE.Group()
   group.add(lineSeg(origin, new THREE.Vector3(16, 0, 0), 0xff0000))
@@ -38,8 +84,7 @@ export function axes(window) {
   return group
 }
 
-// rowguide
-
+// make group with row guide lines
 export function rowguide(nr, h, w, c = 0xffffff) {
   const group = new THREE.Group()
   const denom = 4
@@ -55,22 +100,6 @@ export function rowguide(nr, h, w, c = 0xffffff) {
   }
   return group
 }
-
-// ugh js
-
-export function castToType(x, t, name) {
-  switch (t) {
-    case 'boolean':
-      return x == 'true'
-    case 'number':
-      return Number(x)
-    case 'string':
-      return String(x)
-    default:
-      throw Error(`don't know how to cast to ${t}, x ${x} ${name ? name : ''}`)
-  }
-}
-
 
 //
 // bounding box stuff for text positioning

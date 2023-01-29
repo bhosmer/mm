@@ -121,6 +121,9 @@
     function init() {
       const scene = new THREE.Scene()
 
+      // load params from url
+      util.updateFromSearchParams(params, new URL(window.location).searchParams)
+
       let axes = util.axes(window)
       function initAxes(enabled) {
         if (enabled) {
@@ -128,12 +131,6 @@
         } else {
           scene.remove(axes)
         }
-      }
-
-      // load params from url
-      const searchParams = new URL(window.location).searchParams
-      for (const [k, v] of searchParams.entries()) {
-        params[k] = util.castToType(v, typeof params[k], k)
       }
 
       if (params.axes) {

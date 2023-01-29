@@ -1563,7 +1563,7 @@ export class Attn2 {
       'right sparsity': this.params['w0 sparsity'],
       right_legend: { name: "wO", height: "d_v", width: "d_model" },
 
-      result_legend: { name: "head out", height: "n_q", width: "d_model" },
+      result_legend: { name: "out", height: "n_q", width: "d_model" },
       epilog: this.params['result epilog'],
 
       pos: new THREE.Vector3(this.params.n_q + 1, 0, this.params.d_qk + 1),

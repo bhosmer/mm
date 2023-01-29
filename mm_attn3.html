@@ -127,19 +127,15 @@
     function init() {
       const scene = new THREE.Scene()
 
-      let axes = util.axes(window)
+      util.updateFromSearchParams(params, new URL(window.location).searchParams)
+
+      let axes = util.axes()
       function initAxes(enabled) {
         if (enabled) {
           scene.add(axes)
         } else {
           scene.remove(axes)
         }
-      }
-
-      // load params from url
-      const searchParams = new URL(window.location).searchParams
-      for (const [k, v] of searchParams.entries()) {
-        params[k] = util.castToType(v, typeof params[k], k)
       }
 
       if (params.axes) {
@@ -210,7 +206,7 @@
 
       const gui_shape = gui.addFolder('shape')
 
-      gui_shape.add(params, 'num_heads', 1, 8).onChange(function (val) {
+      gui_shape.add(params, 'num_heads', 1, 12).onChange(function (val) {
         val = Math.floor(val)
         setParams({ num_heads: val })
         if (val != getObj().params.num_heads) {

@@ -135,10 +135,7 @@
       const scene = new THREE.Scene()
 
       // load params from url
-      const searchParams = new URL(window.location).searchParams
-      for (const [k, v] of searchParams.entries()) {
-        params[k] = util.castToType(v, typeof params[k], k)
-      }
+      util.updateFromSearchParams(params, new URL(window.location).searchParams)
 
       //
       // set up objects 
