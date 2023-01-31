@@ -784,121 +784,25 @@ export class MatMul {
   }
 
   setAnimation(animation) {
-    const maybe_hide_inputs = () => {
+    const maybe_hide_things = () => {
       if (this.params['hide inputs']) {
         this.left.hideAll()
         this.right.hideAll()
       }
+      if (this.params['hide result']) {
+        this.result.hideAll()
+      }
     }
 
     this.animation = animation
-    if (this.animation == 'dotprod') {
-      maybe_hide_inputs()
-
-      this.dotprods = []
-      this.dpgroup = new THREE.Group()
-      this.dpresults = []
-      const nh = this.params.horizontal
-      const hp = Math.floor(this.H / nh)
-      const nd = this.params.depthwise
-      const dp = Math.floor(this.D / nd)
-      const nv = this.params.vertical
-      const vp = Math.floor(this.W / nv)
-      if (nd > 1) {
-        for (let di = 0; di < nd; di++) {
-          const dpresult_init = (y, x, h, w) => this.result_val(y, x, di * dp, (di + 1) * dp)
-          const dpresult = Mat.fromInit(this.H, this.W, dpresult_init, this)
-          dpresult.group.position.z = di * dp + dp - 1
-          dpresult.group.rotation.x = Math.PI
-          if (this.params.result_rot) {
-            Object.keys(this.params.result_rot).map(k => dpresult.group.rotation[k] += this.params.result_rot[k])
-          }
-          if (this.params.result_pos) {
-            Object.keys(this.params.result_pos).map(k => dpresult.group.position[k] += this.params.result_pos[k])
-          }
-          this.dpresults.push(dpresult)
-          this.group.add(dpresult.group)
-          dpresult.hideAll()
-        }
-      }
-      for (let hi = 0; hi < nh; hi++) {
-        for (let vi = 0; vi < nv; vi++) {
-          const dotprod_init = (i, j, h, w) => this.dotprod_val(hi * hp, j, vi * vp)
-          const dotprod = Mat.fromInit(1, this.D, dotprod_init, this)
-          dotprod.points.rotation.y = -Math.PI / 2
-          dotprod.points.position.y -= hi * hp
-          dotprod.points.position.x += vi * vp
-          this.dotprods.push(dotprod)
-          this.dpgroup.add(dotprod.points)
-        }
-      }
-      this.group.add(this.dpgroup)
-
-      let curi = hp - 1
-      let curk = vp - 1
-
-      this.bump = () => {
-        const oldi = curi
-        const oldk = curk
-
-        if (oldk < vp - 1) {
-          curk += 1
-        } else {
-          curk = 0
-          curi = oldi < hp - 1 ? curi + 1 : 0
-        }
-
-        // update result faces
-        if (curi == 0 && curk == 0) {
-          this.result.hideAll()
-          this.dpresults.forEach(dpresult => dpresult.hideAll())
-        }
-        for (let hi = 0; hi < nh; hi++) {
-          for (let vi = 0; vi < nv; vi++) {
-            this.result.show(hi * hp + curi, vi * vp + curk)
-            this.dpresults.forEach(dpresult => {
-              dpresult.show(hi * hp + curi, vi * vp + curk)
-            })
-          }
-        }
-
-        // hilight operand row/cols
-        if (oldk != curk) {
-          for (let vi = 0; vi < nv; vi++) {
-            this.right.bumpColumnColor(oldk + vi * vp, false)
-            this.right.bumpColumnColor(curk + vi * vp, true)
-          }
-        }
-        if (oldi != curi) {
-          for (let hi = 0; hi < nh; hi++) {
-            this.left.bumpRowColor(oldi + hi * hp, false)
-            this.left.bumpRowColor(curi + hi * hp, true)
-          }
-        }
-
-        // move and recolor dot product vectors
-        this.dpgroup.position.x = curk
-        this.dpgroup.position.y = -curi
-        for (let hi = 0; hi < nh; hi++) {
-          for (let vi = 0; vi < nv; vi++) {
-            const dotprod = this.dotprods[hi * nh + vi]
-            for (let j = 0; j < this.D; j++) {
-              dotprod.setData(0, j, this.dotprod_val(hi * hp + curi, j, vi * vp + curk))
-            }
-          }
-        }
-      }
-
-      // const dotprod_init = (i, j, h, w) => this.dotprod_val(0, j, 0)
-      // this.dotprod = Mat.fromInit(1, this.D, dotprod_init, this)
-      // this.dotprod.points.rotation.y = -Math.PI / 2
-      // this.group.add(this.dotprod.points)
-      // this.bump = this.bump_dotprod
-      // this.curi = this.H - 1
-      // this.curk = this.W - 1
-
+    if (this.animation == 'itemwise') {
+      maybe_hide_things()
+      this.initAnimItemwise()
+    } else if (this.animation == 'dotprod') {
+      maybe_hide_things()
+      this.initAnimDotprod()
     } else if (this.animation == 'mvprod') {
-      maybe_hide_inputs()
+      maybe_hide_things()
       this.result.hideAll()
       const mvprod_init = (i, j, h, w) => this.dotprod_val(0, j, i)
       this.mvprod = Mat.fromInit(this.H, this.D, mvprod_init, this)
@@ -908,7 +812,7 @@ export class MatMul {
       this.bump = this.bump_mvprod
       this.curk = this.W - 1
     } else if (this.animation == 'vmprod') {
-      maybe_hide_inputs()
+      maybe_hide_things()
       this.result.hideAll()
       const vmprod_init = (i, j, h, w) => this.dotprod_val(i, j, 0)
       this.vmprod = Mat.fromInit(this.D, this.W, vmprod_init, this)
@@ -917,7 +821,7 @@ export class MatMul {
       this.bump = this.bump_vmprod
       this.curi = this.H - 1
     } else if (this.animation == 'vvprod') {
-      maybe_hide_inputs()
+      maybe_hide_things()
       this.result.hideAll()
       const vvprod_init = (i, j, h, w) => this.dotprod_val(i, 0, j)
       this.vvprod = Mat.fromInit(this.H, this.W, vvprod_init, this)
@@ -939,7 +843,6 @@ export class MatMul {
   }
 
   dotprod_val(i, j, k) {
-    // console.log(`HEY this.left.getData(${i}, ${j}) * this.right.getData(${j}, ${k}) ${this.left.getData(i, j) * this.right.getData(j, k)}`)
     return this.left.getData(i, j) * this.right.getData(j, k)
   }
 
@@ -972,6 +875,221 @@ export class MatMul {
 
   setAbsmax() {
     this._setAbsmax(this.left.data, this.right.data, this.result.data)
+  }
+
+  initAnimDotprod() {
+    this.dotprods = []
+    this.dpgroup = new THREE.Group()
+    this.dpresults = []
+    const nh = this.params.horizontal
+    const hp = Math.floor(this.H / nh)
+    const nd = this.params.depthwise
+    const dp = Math.floor(this.D / nd)
+    const nv = this.params.vertical
+    const vp = Math.floor(this.W / nv)
+
+    if (nd > 1) {
+      for (let di = 0; di < nd; di++) {
+        const dpresult_init = (y, x, h, w) => this.result_val(y, x, di * dp, (di + 1) * dp)
+        const dpresult = Mat.fromInit(this.H, this.W, dpresult_init, this)
+        dpresult.group.position.z = di * dp + dp - 1
+        dpresult.group.rotation.x = Math.PI
+        if (this.params.result_rot) {
+          Object.keys(this.params.result_rot).map(k => dpresult.group.rotation[k] += this.params.result_rot[k])
+        }
+        if (this.params.result_pos) {
+          Object.keys(this.params.result_pos).map(k => dpresult.group.position[k] += this.params.result_pos[k])
+        }
+        this.dpresults.push(dpresult)
+        this.group.add(dpresult.group)
+        dpresult.hideAll()
+      }
+    }
+
+    for (let hi = 0; hi < nh; hi++) {
+      for (let vi = 0; vi < nv; vi++) {
+        const dotprod_init = (i, j, h, w) => this.dotprod_val(hi * hp, j, vi * vp)
+        const dotprod = Mat.fromInit(1, this.D, dotprod_init, this)
+        dotprod.points.rotation.y = -Math.PI / 2
+        dotprod.points.position.y -= hi * hp
+        dotprod.points.position.x += vi * vp
+        this.dotprods.push(dotprod)
+        this.dpgroup.add(dotprod.points)
+      }
+    }
+    this.group.add(this.dpgroup)
+
+    let curi = hp - 1
+    let curk = vp - 1
+
+    this.bump = () => {
+      const oldi = curi
+      const oldk = curk
+
+      if (oldk < vp - 1) {
+        curk += 1
+      } else {
+        curk = 0
+        curi = oldi < hp - 1 ? curi + 1 : 0
+      }
+
+      // update result faces
+      if (curi == 0 && curk == 0) {
+        this.result.hideAll()
+        this.dpresults.forEach(dpresult => dpresult.hideAll())
+      }
+      for (let hi = 0; hi < nh; hi++) {
+        for (let vi = 0; vi < nv; vi++) {
+          if (!this.params['hide result']) {
+            this.result.show(hi * hp + curi, vi * vp + curk)
+          }
+          this.dpresults.forEach(dpresult => {
+            dpresult.show(hi * hp + curi, vi * vp + curk)
+          })
+        }
+      }
+
+      // hilight operand row/cols
+      if (oldk != curk) {
+        for (let vi = 0; vi < nv; vi++) {
+          this.right.bumpColumnColor(oldk + vi * vp, false)
+          this.right.bumpColumnColor(curk + vi * vp, true)
+        }
+      }
+      if (oldi != curi) {
+        for (let hi = 0; hi < nh; hi++) {
+          this.left.bumpRowColor(oldi + hi * hp, false)
+          this.left.bumpRowColor(curi + hi * hp, true)
+        }
+      }
+
+      // move and recolor dot product vectors
+      this.dpgroup.position.x = curk
+      this.dpgroup.position.y = -curi
+      for (let hi = 0; hi < nh; hi++) {
+        for (let vi = 0; vi < nv; vi++) {
+          const dotprod = this.dotprods[hi * nh + vi]
+          for (let j = 0; j < this.D; j++) {
+            dotprod.setData(0, j, this.dotprod_val(hi * hp + curi, j, vi * vp + curk))
+          }
+        }
+      }
+    }
+  }
+
+  initAnimItemwise() {
+    this.dotprods = []
+    this.dpgroup = new THREE.Group()
+    this.dpresults = []
+    const nh = this.params.horizontal
+    const hp = Math.floor(this.H / nh)
+    const nd = this.params.depthwise
+    const dp = Math.floor(this.D / nd)
+    const nv = this.params.vertical
+    const vp = Math.floor(this.W / nv)
+
+    if (nd > 1) {
+      for (let di = 0; di < nd; di++) {
+        const dpresult_init = (y, x, h, w) => this.result_val(y, x, di * dp, (di + 1) * dp)
+        const dpresult = Mat.fromInit(this.H, this.W, dpresult_init, this)
+        dpresult.group.position.z = di * dp + dp - 1
+        dpresult.group.rotation.x = Math.PI
+        if (this.params.result_rot) {
+          Object.keys(this.params.result_rot).map(k => dpresult.group.rotation[k] += this.params.result_rot[k])
+        }
+        if (this.params.result_pos) {
+          Object.keys(this.params.result_pos).map(k => dpresult.group.position[k] += this.params.result_pos[k])
+        }
+        this.dpresults.push(dpresult)
+        this.group.add(dpresult.group)
+        dpresult.hideAll()
+      }
+    }
+
+    for (let hi = 0; hi < nh; hi++) {
+      for (let vi = 0; vi < nv; vi++) {
+        for (let di = 0; di < nd; di++) {
+          const dotprod_init = (i, j, h, w) => this.dotprod_val(hi * hp, di * dp + j, vi * vp)
+          const dotprod = Mat.fromInit(1, 1, dotprod_init, this)
+          dotprod.points.rotation.y = -Math.PI / 2
+          dotprod.points.position.x += vi * vp
+          dotprod.points.position.y -= hi * hp
+          dotprod.points.position.z += di * dp
+          this.dotprods.push(dotprod)
+          this.dpgroup.add(dotprod.points)
+        }
+      }
+    }
+    this.group.add(this.dpgroup)
+
+    let curi = hp - 1
+    let curj = dp - 1
+    let curk = vp - 1
+
+    this.bump = () => {
+      const oldi = curi
+      const oldj = curj
+      const oldk = curk
+
+      if (oldj < dp - 1) {
+        curj += 1
+      } else {
+        curj = 0
+        if (oldk < vp - 1) {
+          curk += 1
+        } else {
+          curk = 0
+          curi = oldi < hp - 1 ? curi + 1 : 0
+        }
+      }
+
+      // update result faces
+      if (curi == 0 && curj == 0 && curk == 0) {
+        this.result.hideAll()
+        this.dpresults.forEach(dpresult => dpresult.hideAll())
+      }
+      for (let hi = 0; hi < nh; hi++) {
+        for (let vi = 0; vi < nv; vi++) {
+          if (curj == dp - 1 && !this.params['hide result']) {
+            this.result.show(hi * hp + curi, vi * vp + curk)
+          }
+          for (let di = 0; di < nd; di++) {
+            const i = hi * hp + curi
+            const k = vi * vp + curk
+            this.dpresults[di].setData(i, k, this.result_val(i, k, di * dp, di * dp + curj))
+          }
+        }
+      }
+
+      // hilight operand items
+      for (let hi = 0; hi < nh; hi++) {
+        for (let di = 0; di < nd; di++) {
+          this.left.bumpColor(hi * hp + oldi, di * dp + oldj, false)
+          this.left.bumpColor(hi * hp + curi, di * dp + curj, true)
+        }
+      }
+      for (let di = 0; di < nd; di++) {
+        for (let vi = 0; vi < nv; vi++) {
+          this.right.bumpColor(di * dp + oldj, vi * vp + oldk, false)
+          this.right.bumpColor(di * dp + curj, vi * vp + curk, true)
+        }
+      }
+
+      // move and recolor dot product vectors
+      this.dpgroup.position.x = curk
+      this.dpgroup.position.y = -curi
+      this.dpgroup.position.z = curj
+      for (let hi = 0, ptr = 0; hi < nh; hi++) {
+        for (let vi = 0; vi < nv; vi++) {
+          for (let di = 0; di < nd; di++, ptr++) {
+            const dotprod = this.dotprods[ptr]
+            for (let j = 0; j < this.D; j++) {
+              dotprod.setData(0, 0, this.dotprod_val(hi * hp + curi, j, vi * vp + curk))
+            }
+          }
+        }
+      }
+    }
   }
 
   bump_vmprod() {
@@ -1065,49 +1183,6 @@ export class MatMul {
       for (let k = 0; k < this.W; k++) {
         this.vvprod.setData(i, k, this.dotprod_val(i, j, k))
       }
-    }
-  }
-
-  bump_dotprod() {
-    const oldi = this.curi
-    const oldk = this.curk
-
-    if (oldk < this.W - 1) {
-      this.curk += 1
-    } else {
-      this.curk = 0
-      this.curi = oldi < this.H - 1 ? this.curi + 1 : 0
-    }
-
-    const i = this.curi
-    const k = this.curk
-
-    // update result face
-    if (i == 0 && k == 0) {
-      this.result.hideAll()
-    }
-    this.result.show(i, k)
-
-    // hilight operand row/cols
-    if (oldk != k) {
-      if (oldk >= 0) {
-        this.right.bumpColumnColor(oldk, false)
-      }
-      this.right.bumpColumnColor(k, true)
-    }
-
-    if (oldi != i) {
-      if (oldi >= 0) {
-        this.left.bumpRowColor(oldi, false)
-      }
-      this.left.bumpRowColor(i, true)
-    }
-
-    // move and recolor dot product vector
-    this.dotprods.points.position.x = this.right.points.geometry.attributes.position.array[k * 3]
-    this.dotprods.points.position.y = -this.left.points.geometry.attributes.position.array[i * this.D * 3 + 1]
-    for (let j = 0; j < this.D; j++) {
-      this.dotprods.setData(0, j, this.dotprod_val(i, j, k))
     }
   }
 

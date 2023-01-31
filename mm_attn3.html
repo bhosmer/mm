@@ -127,6 +127,7 @@
     function init() {
       const scene = new THREE.Scene()
 
+      // load params from url
       util.updateFromSearchParams(params, new URL(window.location).searchParams)
 
       let axes = util.axes()
