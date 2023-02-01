@@ -228,33 +228,6 @@ class Array {
   }
 }
 
-
-//
-// rules:
-//
-// mats always have (0, 0, 0) as their minimum point
-// cubes also
-//
-
-// move
-function orientFromParams(params) {
-  if (params.orient) {
-    return params.orient
-  }
-  const x = params['left/right'] == 'left' ? -1 : 1
-  const y = params['up/down'] == 'down' ? -1 : 1
-  const z = params['front/back'] == 'back' ? -1 : 1
-  return { x: x, y: y, z: z }
-}
-
-function rotFromOrient(orient) {
-  return {
-    x: orient.x == -1 ? Math.PI : 0,
-    y: orient.y == -1 ? Math.PI : 0,
-    z: orient.z == -1 ? Math.PI : 0,
-  }
-}
-
 //
 // Mat
 //
@@ -380,16 +353,8 @@ export class Mat {
         throw Error('passed neither container nor params to Mat')
       }
       this.params = { ...params }
-      // this.global_absmax = data.absmax
       this.getGlobalAbsmax = () => data.absmax
-      // this.setAbsmax = function (x) {
-      //   const absx = Math.abs(x)
-      //   if (absx > this.global_absmax) {
-      //     this.global_absmax = absx
-      //   }
-      // }
     }
-    this.orient = orientFromParams(this.params)
     this.local_sens = this.params.sensitivity == 'local'
     this.zero_hue = this.params['zero hue']
     this.zero_size = this.params['zero size']
@@ -422,8 +387,6 @@ export class Mat {
 
     this.group = new THREE.Group()
     this.group.add(this.points)
-
-    this.group.rotation.setFromVector3(rotFromOrient(this.orient))
   }
 
   getAbsmax() {
