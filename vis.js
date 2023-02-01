@@ -151,11 +151,10 @@ class Array {
     return new Array(h, w, data, epi)
   }
 
-  constructor(h, w, data, epi = undefined) {
+  constructor(h, w, data) {
     this.h = h
     this.w = w
     this.data = data
-    this.epi = epi
     this.absmax = 0
     this.absmin = Infinity
     for (let ptr = 0; ptr < this.data.length; ptr++) {
