@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import * as util from './util.js'
 
 //
-//
+// shader
 //
 
 const TEXTURE = new THREE.TextureLoader().load('../examples/textures/sprites/ball.png')
@@ -39,7 +39,7 @@ const MATERIAL = new THREE.ShaderMaterial({
 })
 
 //
-//
+// initialization
 //
 
 // https://stackoverflow.com/questions/25582882/javascript-math-random-normal-distribution-gaussian-bell-curve
@@ -52,47 +52,41 @@ function gaussianRandom(mean = 0, stdev = 1) {
   return z * stdev + mean
 }
 
-// note: assumes x is in [0, 1]
-function squeeze(base, range, x) {
-  return base + range * x
+const INIT_FUNCS = {
+  rows: (i, j, h, w) => h > 1 ? i / (h - 1) : 0,
+  cols: (i, j, h, w) => w > 1 ? j / (w - 1) : 0,
+  'row major': (i, j, h, w) => h * w > 1 ? (i * w + j) / (h * w - 1) : 0,
+  'col major': (i, j, h, w) => h * w > 1 ? (j * h + i) / (h * w) : 0,
+  'pt linear': (i, j, h, w) => (2 * Math.random() - 1) / Math.sqrt(w),
+  'pt linear+': (i, j, h, w) => Math.max((2 * Math.random() - 1) / Math.sqrt(w)),
+  uniform: (i, j, h, w) => Math.random(),
+  gaussian: (i, j, h, w) => gaussianRandom(0.5, 0.5),
+  tril: (i, j, h, w) => j <= i ? 1 : 0,
+  triu: (i, j, h, w) => j >= i ? 1 : 0,
+  eye: (i, j, h, w) => i == j ? 1 : 0,
+  diff: (i, j, h, w) => i == j ? 1 : i == j + 1 ? -1 : 0,
+  ones: (i, j, h, w) => 1,
+  zeros: (i, j, h, w) => 0,
 }
 
-function getInitFunc(name, sparsity, base, range) {
-  const gate = sparsity > 0 ?
-    (f => Math.random() > sparsity ? f() : 0) :
-    (f => f())
-  switch (name) {
-    case 'rows':
-      return (i, j, h, w) => gate(() => squeeze(base, range, h > 1 ? i / (h - 1) : 0))
-    case 'cols':
-      return (i, j, h, w) => gate(() => squeeze(base, range, w > 1 ? j / (w - 1) : 0))
-    case 'row major':
-      return (i, j, h, w) => gate(() => squeeze(base, range, h * w > 1 ? (i * w + j) / (h * w - 1) : 0))
-    case 'col major':
-      return (i, j, h, w) => gate(() => squeeze(base, range, h * w > 1 ? (j * h + i) / (h * w) : 0))
-    case 'pt linear':
-      return (i, j, h, w) => gate(() => squeeze(-1 / Math.sqrt(w), 2 / Math.sqrt(w), Math.random()))
-    case 'pt linear+':
-      return (i, j, h, w) => gate(() => Math.max(0, squeeze(-1 / Math.sqrt(w), 2 / Math.sqrt(w), Math.random())))
-    case 'uniform':
-      return (i, j, h, w) => gate(() => squeeze(base, range, Math.random()))
-    case 'gaussian':
-      return (i, j, h, w) => gate(() => squeeze(base, range, gaussianRandom(0.5, 0.5)))
-    case 'tril':
-      return (i, j, h, w) => gate(() => (j <= i ? 1 : 0))
-    case 'triu':
-      return (i, j, h, w) => gate(() => (j >= i ? 1 : 0))
-    case 'eye':
-      return (i, j, h, w) => gate(() => (i == j ? 1 : 0))
-    case 'diff':
-      return (i, j, h, w) => gate(() => (i == j ? 1 : i == j + 1 ? -1 : 0))
-    case 'ones':
-      return (i, j, h, w) => gate(() => 1)
-    case 'zeros':
-      return (i, j, h, w) => gate(() => 0)
-    default:
-      throw Error(`unrecognized initializer: ${name}`)
+const USE_RANGE = ['rows', 'cols', 'row major', 'col major', 'uniform', 'gaussian']
+
+function useRange(name) {
+  return USE_RANGE.indexOf(name) >= 0
+}
+
+function getInitFunc(name, sparsity, base = 0, range = 1) {
+  const f = INIT_FUNCS[name]
+  if (!f) {
+    throw Error(`unrecognized initializer ${name}`)
   }
+  const scaled = useRange(name) && (base != 0 || range != 1) ?
+    (i, j, h, w) => base + range * f(i, j, h, w) :
+    f
+  const sparse = sparsity > 0 ?
+    (i, j, h, w) => Math.random() > sparsity ? scaled(i, j, h, w) : 0 :
+    scaled
+  return sparse
 }
 
 function softmax_(h, w, data) {
@@ -135,6 +129,7 @@ function getInPlaceEpilog(name) {
 //
 // Array
 //
+
 class Array {
 
   static fromInit(h, w, f, epi = undefined) {
@@ -142,12 +137,16 @@ class Array {
     let ptr = 0
     for (let i = 0; i < h; i++) {
       for (let j = 0; j < w; j++, ptr++) {
-        data[ptr] = f(i, j, h, w)
+        const x = f(i, j, h, w)
+        if (isNaN(x)) {
+          throw Error(`HEY fromInit f(${i}, ${j}, ${h}, ${w}) is NaN`)
+        }
+        data[ptr] = x
       }
     }
-    const epi_func_ = epi && getInPlaceEpilog(epi)
-    if (epi_func_) {
-      epi_func_(h, w, data)
+    const epi_ = epi && getInPlaceEpilog(epi)
+    if (epi_) {
+      epi_(h, w, data)
     }
     return new Array(h, w, data, epi)
   }
@@ -157,7 +156,6 @@ class Array {
     this.w = w
     this.data = data
     this.epi = epi
-    // set absmin, absmax
     this.absmax = 0
     this.absmin = Infinity
     for (let ptr = 0; ptr < this.data.length; ptr++) {
@@ -176,30 +174,25 @@ class Array {
   }
 
   set(i, j, x) {
-    // if (this.epi && getInPlaceEpilog(this.api)) {
-    //   throw Error(`HEY set(${i}, ${j}, ${x}) called with in-place epilog '${this.epi}'`)
-    // }
-    const oldabsx = Math.abs(this.get(i, j))
-    this.data[this.addr(i, j)] = x
-    const absx = Math.abs(x)
-    // TODO do we really need this
-    if (absx > this.absmax) {
-      this.absmax = absx
-    } else if (absx < this.absmax && oldabsx == this.absmax) {
-      this.absmax = this.data.reduce(function (acc, x) {
-        const absx = Math.abs(x)
-        return absx > acc ? absx : acc
-      })
-    }
-    if (absx < this.absmin) {
-      this.absmin = absx
-    } else if (absx > this.absmin && oldabsx == this.absmin) {
-      this.absmin = this.data.reduce(function (acc, x) {
-        const absx = Math.abs(x)
-        return absx < acc ? absx : acc
-      })
+    if (isNaN(x)) {
+      throw Error(`HEY set(${i}, ${j}, ${x})`)
     }
 
+    const ptr = this.addr(i, j)
+    const oldabsx = Math.abs(this.data[ptr])
+    this.data[ptr] = x
+
+    const absx = Math.abs(x)
+    if (absx > this.absmax) {
+      this.absmax = absx
+    } else if (absx < oldabsx && oldabsx == this.absmax) {
+      this.absmax = Math.max(...this.data.map(Math.abs))
+    }
+    if (absx <= this.absmin) {
+      this.absmin = absx
+    } else if (absx > oldabsx && oldabsx == this.absmin) {
+      this.absmin = Math.min(...this.data.map(Math.abs))
+    }
   }
 
   addr(i, j) {
@@ -266,7 +259,7 @@ function rotFromOrient(orient) {
 // Mat
 //
 export class Mat {
-  ELEM_SIZE = 1792 // 1536
+  ELEM_SIZE = 1792
   ELEM_SAT = 1.0
   ELEM_LIGHT = 0.6
 
@@ -275,59 +268,53 @@ export class Mat {
       return 0
     }
 
+    const absx = Math.abs(x)
+    const [min, max] = this.local_sens ? [this.data.absmin, this.data.absmax] : [0, this.getGlobalAbsmax()]
+    const vol = min == max ? 1 : (absx - min) / (max - min)
+
     const zsize = this.zero_size * this.ELEM_SIZE
-    const range = (1 - this.zero_size) * this.ELEM_SIZE
+    const size = zsize + (this.ELEM_SIZE - zsize) * Math.cbrt(vol)
 
-    // const from_vol = Math.cbrt(Math.abs(x) / Math.max(this.container.global_absmax, 0.001))
-
-    // const nz = x => Math.max(x, 0.00000001)
-    const vol = this.sens ?
-      this.data.absmax == this.data.absmin ? 1 : (Math.abs(x) - this.data.absmin) / (this.data.absmax - this.data.absmin) :
-      // (Math.abs(x) - this.data.absmin) / nz(this.data.absmax - this.data.absmin) :
-      this.container.global_absmax == 0 ? 0 : Math.abs(x) / this.container.global_absmax
-
-    const size = zsize + range * Math.cbrt(vol)
-
-    // console.log(`HEY size ${size} vol ${vol} absx ${Math.abs(x)} absmax ${this.data.absmax} absmin ${this.data.absmin} zsize ${zsize} range ${range}`)
+    if (size < 0 || size > this.ELEM_SIZE * 2) {
+      throw Error(`HEY size ${size} absx ${absx} max ${max} min ${min} zsize ${zsize} sens ${this.local_sens}`)
+    }
 
     return size
   }
 
-  setElemHSL(a, i, x, s = this.ELEM_SAT, l = this.ELEM_LIGHT) {
+  colorFromData(x) {
     if (isNaN(x)) {
-      const c = new THREE.Color().setHSL(0, 0, 0)
-      c.toArray(a, i * 3)
-      return
+      return new THREE.Color().setHSL(0, 0, 0)
     }
 
-    const gap = (x == 0 ? 1 : Math.sign(x)) * this.hue_gap
+    const absx = Math.abs(x)
+    const [min, max] = this.local_sens ? [this.data.absmin, this.data.absmax] : [0, this.getGlobalAbsmax()]
+    const hvol = min == max ? x : x / (max - min)
 
-    const hvol = this.sense ?
-      (this.data.absmax == this.data.absmin ? x : x / (this.data.absmax - this.data.absmin)) :
-      x / this.container.global_absmax
-
+    const gap = this.hue_gap * Math.sign(x)
     const h = (this.zero_hue + gap + (Math.cbrt(hvol) * this.hue_spread)) % 1
-    // const h = (this.zero_hue + gap + (Math.cbrt(x / this.data.absmax) * this.hue_spread)) % 1
-    // const h = (this.zero_hue + gap + (x / this.data.absmax * this.hue_spread)) % 1
 
     const range = this.max_light - this.zero_light
 
-    // const lvol = Math.abs(x) / Math.max(this.data.absmax, 0.01)
-    const lvol = this.sens ?
-      this.data.absmax == this.data.absmin ? 1 : (Math.abs(x) - this.data.absmin) / (this.data.absmax - this.data.absmin) :
-      this.data.absmax == 0 ? 0 : Math.abs(x) / this.data.absmax
+    // note: hue is always local?
+    const lvol = this.local_sens ?
+      this.data.absmax == this.data.absmin ? 1 : (absx - this.data.absmin) / (this.data.absmax - this.data.absmin) :
+      this.data.absmax == 0 ? 0 : absx / this.data.absmax
 
-    l = this.zero_light + range * Math.cbrt(lvol)
+    const l = this.zero_light + range * Math.cbrt(lvol)
 
-    const c = new THREE.Color().setHSL(h, s, l)
-    c.toArray(a, i * 3)
+    return new THREE.Color().setHSL(h, 1.0, l)
   }
+
+  setElemHSL(a, i, x) {
+    this.colorFromData(x).toArray(a, i * 3)
+  }
+
+  // --------
 
   static fromInit(h, w, init, container) {
     return new Mat(h, w, Array.fromInit(h, w, init), container)
   }
-
-  // --------
 
   static fromParams(h, w, params, getText) {
     let data
@@ -367,7 +354,7 @@ export class Mat {
   }
 
   getLegendProps() {
-    const custom = this.container.params.legend_props ? this.container.params.legend_props : {}
+    const custom = this.params.legend_props ? this.params.legend_props : {}
     const sa_geo = Math.cbrt(Math.max(5, this.h) * Math.max(this.w, 5))
     const defaults = {
       name_color: 0xccccff,
@@ -383,28 +370,33 @@ export class Mat {
 
   constructor(h, w, data, container, params) {
     if (container) {
-      this.container = container
       if (params) {
         throw Error('passed both container and params to Mat')
       }
-      this.orient = orientFromParams(this.container.params)
+      this.params = { ...container.params }
+      this.getGlobalAbsmax = () => container.getGlobalAbsmax()
     } else {
-      this.container = this
-      this.global_absmax = data.absmax
-      this.setAbsmax = () => this.global_absmax = data.absmax
       if (!params) {
         throw Error('passed neither container nor params to Mat')
       }
       this.params = { ...params }
-      this.orient = orientFromParams(this.params)
+      // this.global_absmax = data.absmax
+      this.getGlobalAbsmax = () => data.absmax
+      // this.setAbsmax = function (x) {
+      //   const absx = Math.abs(x)
+      //   if (absx > this.global_absmax) {
+      //     this.global_absmax = absx
+      //   }
+      // }
     }
-    this.sens = this.container.params.sensitivity == 'local'
-    this.zero_hue = this.container.params['zero hue']
-    this.zero_size = this.container.params['zero size']
-    this.zero_light = this.container.params['zero light']
-    this.max_light = this.container.params['max light']
-    this.hue_gap = this.container.params['hue gap']
-    this.hue_spread = this.container.params['hue spread']
+    this.orient = orientFromParams(this.params)
+    this.local_sens = this.params.sensitivity == 'local'
+    this.zero_hue = this.params['zero hue']
+    this.zero_size = this.params['zero size']
+    this.zero_light = this.params['zero light']
+    this.max_light = this.params['max light']
+    this.hue_gap = this.params['hue gap']
+    this.hue_spread = this.params['hue spread']
     this.h = h
     this.w = w
     this.data = data
@@ -432,6 +424,10 @@ export class Mat {
     this.group.add(this.points)
 
     this.group.rotation.setFromVector3(rotFromOrient(this.orient))
+  }
+
+  getAbsmax() {
+    return this.data.absmax
   }
 
   numel() {
@@ -465,8 +461,8 @@ export class Mat {
     this.points.geometry.attributes.pointSize.needsUpdate = true
   }
 
-  setHSL(i, j, h, s = this.ELEM_SAT, l = this.ELEM_LIGHT) {
-    this.setElemHSL(this.points.geometry.attributes.pointColor.array, this.data.addr(i, j), h, s, l)
+  setHSL(i, j, x) {
+    this.setElemHSL(this.points.geometry.attributes.pointColor.array, this.data.addr(i, j), x)
     this.points.geometry.attributes.pointColor.needsUpdate = true
   }
 
@@ -488,7 +484,6 @@ export class Mat {
     this.data.set(i, j, x)
     this.setSize(i, j, this.sizeFromData(x))
     this.setHSL(i, j, x)
-    this.container.setAbsmax()
   }
 
   bumpColor(i, j, up) {
@@ -578,7 +573,7 @@ export class Mat {
 // MatMul
 //
 export class MatMul {
-  constructor(params, getText) {
+  constructor(params, getText, container = undefined) {
     this.getText = getText
     this.params = { ...params }
     this.group = new THREE.Group()
@@ -587,18 +582,16 @@ export class MatMul {
     this.D = params.J
     this.W = params.K
 
-    this.init_base = params['init min']
-    this.init_range = Math.max(0, params['init max'] - params['init min'])
-
-    this.initData()
-    this.initVis()
-  }
-
-  initData() {
+    this.init_base = this.params['init min']
+    this.init_range = Math.max(0, this.params['init max'] - this.params['init min'])
     this.initLeftData()
     this.initRightData()
     this.initResultData()
+    this.initAbsmax()
 
+    this.getGlobalAbsmax = container ? () => container.getGlobalAbsmax() : () => this.getAbsmax()
+
+    this.initVis()
   }
 
   initLeftData() {
@@ -651,9 +644,6 @@ export class MatMul {
       this.params = { ...params }
     }
     this.group.clear()
-
-    this._setAbsmax(this.left_data, this.right_data, this.result_data)
-    // console.log(`HEY MatMul this.global_absmax ${this.global_absmax}`)
 
     this.initLeftVis()
     this.initRightVis()
@@ -747,6 +737,25 @@ export class MatMul {
     this.group.add(this.result.group)
   }
 
+  initAbsmax() {
+    this.absmax = Math.max(this.left_data.absmax, this.right_data.absmax, this.result_data.absmax)
+  }
+
+  getAbsmax() {
+    return this.absmax
+  }
+
+  // setAbsmax(x) {
+  //   if (this.container) {
+  //     this.container.setAbsmax(x)
+  //   } else {
+  //     const absx = Math.abs(x)
+  //     if (absx > this.absmax)
+  //   }
+  //   this.global_absmax = Math.max(a.absmax, b.absmax, c.absmax)
+  //   this._setAbsmax(this.left.data, this.right.data, this.result.data)
+  // }
+
   setEpilog(epilog) {
     this.params.epilog = epilog
     this.initResultData()
@@ -764,7 +773,8 @@ export class MatMul {
     }
     this.initLeftData()
     this.initResultData()
-    this._setAbsmax(this.left_data, this.right_data, this.result_data)
+    this.initAbsmax()
+    // this._setAbsmax(this.left_data, this.right_data, this.result_data)
     this.initVis()
   }
 
@@ -779,7 +789,8 @@ export class MatMul {
     }
     this.initRightData()
     this.initResultData()
-    this._setAbsmax(this.left_data, this.right_data, this.result_data)
+    this.initAbsmax()
+    // this._setAbsmax(this.left_data, this.right_data, this.result_data)
     this.initVis()
   }
 
@@ -801,10 +812,13 @@ export class MatMul {
     } else if (this.animation == 'dotprod') {
       maybe_hide_things()
       this.initAnimDotprod()
+    } else if (this.animation == 'axpy') {
+      maybe_hide_things()
+      this.initAnimAXPY()
     } else if (this.animation == 'mvprod') {
       maybe_hide_things()
       this.result.hideAll()
-      const mvprod_init = (i, j, h, w) => this.dotprod_val(0, j, i)
+      const mvprod_init = (i, j, h, w) => this.dotprod_val(i, j, 0)
       this.mvprod = Mat.fromInit(this.H, this.D, mvprod_init, this)
       this.mvprod.points.rotation.y = Math.PI / 2
       this.mvprod.points.rotation.z = Math.PI
@@ -814,7 +828,7 @@ export class MatMul {
     } else if (this.animation == 'vmprod') {
       maybe_hide_things()
       this.result.hideAll()
-      const vmprod_init = (i, j, h, w) => this.dotprod_val(i, j, 0)
+      const vmprod_init = (i, j, h, w) => this.dotprod_val(0, i, j)
       this.vmprod = Mat.fromInit(this.D, this.W, vmprod_init, this)
       this.vmprod.points.rotation.x = Math.PI / 2
       this.group.add(this.vmprod.points)
@@ -869,24 +883,120 @@ export class MatMul {
     return this._result_val(this.left.data, this.right.data, i, k, minj, maxj)
   }
 
-  _setAbsmax(a, b, c) {
-    this.global_absmax = Math.max(a.absmax, b.absmax, c.absmax)
-  }
-
-  setAbsmax() {
-    this._setAbsmax(this.left.data, this.right.data, this.result.data)
-  }
-
-  initAnimDotprod() {
-    this.dotprods = []
-    this.dpgroup = new THREE.Group()
-    this.dpresults = []
+  getThreadInfo() {
     const nh = this.params.horizontal
     const hp = Math.floor(this.H / nh)
     const nd = this.params.depthwise
     const dp = Math.floor(this.D / nd)
     const nv = this.params.vertical
     const vp = Math.floor(this.W / nv)
+    return { nh, hp, nd, dp, nv, vp }
+  }
+
+  initAnimDotprod() {
+    this.dotprods = []
+    this.dpgroup = new THREE.Group()
+    this.dpresults = []
+    const { nh, hp, nd, dp, nv, vp } = this.getThreadInfo()
+
+    if (nd > 1) {
+      for (let di = 0; di < nd; di++) {
+        const dpresult_init = (y, x, h, w) => this.result_val(y, x, di * dp, (di + 1) * dp)
+        const dpresult = Mat.fromInit(this.H, this.W, dpresult_init, this)
+        dpresult.group.position.z = di * dp + dp - 1
+        dpresult.group.rotation.x = Math.PI
+        if (this.params.result_rot) {
+          Object.keys(this.params.result_rot).map(k => dpresult.group.rotation[k] += this.params.result_rot[k])
+        }
+        if (this.params.result_pos) {
+          Object.keys(this.params.result_pos).map(k => dpresult.group.position[k] += this.params.result_pos[k])
+        }
+        this.dpresults.push(dpresult)
+        this.group.add(dpresult.group)
+        dpresult.hideAll()
+      }
+    }
+
+    for (let hi = 0; hi < nh; hi++) {
+      for (let vi = 0; vi < nv; vi++) {
+        const dotprod_init = (i, j, h, w) => this.dotprod_val(hi * hp, j, vi * vp)
+        const dotprod = Mat.fromInit(1, this.D, dotprod_init, this)
+        dotprod.points.rotation.y = -Math.PI / 2
+        dotprod.points.position.y -= hi * hp
+        dotprod.points.position.x += vi * vp
+        this.dotprods.push(dotprod)
+        this.dpgroup.add(dotprod.points)
+      }
+    }
+    this.group.add(this.dpgroup)
+
+    let curi = hp - 1
+    let curk = vp - 1
+
+    this.bump = () => {
+      const oldi = curi
+      const oldk = curk
+
+      if (oldk < vp - 1) {
+        curk += 1
+      } else {
+        curk = 0
+        curi = oldi < hp - 1 ? curi + 1 : 0
+      }
+
+      // update result faces
+      if (curi == 0 && curk == 0) {
+        this.result.hideAll()
+        this.dpresults.forEach(dpresult => dpresult.hideAll())
+      }
+      for (let hi = 0; hi < nh; hi++) {
+        for (let vi = 0; vi < nv; vi++) {
+          if (!this.params['hide result']) {
+            this.result.show(hi * hp + curi, vi * vp + curk)
+          }
+          this.dpresults.forEach(dpresult => {
+            dpresult.show(hi * hp + curi, vi * vp + curk)
+          })
+        }
+      }
+
+      // hilight operand row/cols
+      if (oldk != curk) {
+        for (let vi = 0; vi < nv; vi++) {
+          this.right.bumpColumnColor(oldk + vi * vp, false)
+          this.right.bumpColumnColor(curk + vi * vp, true)
+        }
+      }
+      if (oldi != curi) {
+        for (let hi = 0; hi < nh; hi++) {
+          this.left.bumpRowColor(oldi + hi * hp, false)
+          this.left.bumpRowColor(curi + hi * hp, true)
+        }
+      }
+
+      // move and recolor dot product vectors
+      this.dpgroup.position.x = curk
+      this.dpgroup.position.y = -curi
+      for (let hi = 0; hi < nh; hi++) {
+        for (let vi = 0; vi < nv; vi++) {
+          const dotprod = this.dotprods[hi * nh + vi]
+          for (let j = 0; j < this.D; j++) {
+            dotprod.setData(0, j, this.dotprod_val(hi * hp + curi, j, vi * vp + curk))
+          }
+          // temp
+          for (let j = 0; j < this.D; j++) {
+            dotprod.setData(0, j, this.dotprod_val(hi * hp + curi, j, vi * vp + curk))
+          }
+        }
+      }
+    }
+  }
+
+  initAnimAXPY() {
+    this.dotprods = []
+    this.dpgroup = new THREE.Group()
+    this.dpresults = []
+    const { nh, hp, nd, dp, nv, vp } = this.getThreadInfo()
 
     if (nd > 1) {
       for (let di = 0; di < nd; di++) {
@@ -981,12 +1091,7 @@ export class MatMul {
     this.dotprods = []
     this.dpgroup = new THREE.Group()
     this.dpresults = []
-    const nh = this.params.horizontal
-    const hp = Math.floor(this.H / nh)
-    const nd = this.params.depthwise
-    const dp = Math.floor(this.D / nd)
-    const nv = this.params.vertical
-    const vp = Math.floor(this.W / nv)
+    const { nh, hp, nd, dp, nv, vp } = this.getThreadInfo()
 
     if (nd > 1) {
       for (let di = 0; di < nd; di++) {
@@ -1049,14 +1154,18 @@ export class MatMul {
         this.dpresults.forEach(dpresult => dpresult.hideAll())
       }
       for (let hi = 0; hi < nh; hi++) {
+        const i = hi * hp + curi
         for (let vi = 0; vi < nv; vi++) {
-          if (curj == dp - 1 && !this.params['hide result']) {
-            this.result.show(hi * hp + curi, vi * vp + curk)
+          const k = vi * vp + curk
+          if (!this.params['hide result'] && (curi != oldi || curk != oldk)) {
+            this.result.show(i, k)
           }
-          for (let di = 0; di < nd; di++) {
-            const i = hi * hp + curi
-            const k = vi * vp + curk
-            this.dpresults[di].setData(i, k, this.result_val(i, k, di * dp, di * dp + curj))
+          this.result.setData(i, k, this.result_val(i, k, 0, curj + 1))
+          if (nd > 1) {
+            for (let di = 0; di < nd; di++) {
+              const basej = di * dp
+              this.dpresults[di].setData(i, k, this.result_val(i, k, basej, basej + curj + 1))
+            }
           }
         }
       }
@@ -1083,9 +1192,9 @@ export class MatMul {
         for (let vi = 0; vi < nv; vi++) {
           for (let di = 0; di < nd; di++, ptr++) {
             const dotprod = this.dotprods[ptr]
-            for (let j = 0; j < this.D; j++) {
-              dotprod.setData(0, 0, this.dotprod_val(hi * hp + curi, j, vi * vp + curk))
-            }
+            // for (let j = 0; j < this.D; j++) {
+            dotprod.setData(0, 0, this.dotprod_val(hi * hp + curi, di * dp + curj, vi * vp + curk))
+            // }
           }
         }
       }
@@ -1116,8 +1225,8 @@ export class MatMul {
 
     // move and recolor dot product vector
     this.vmprod.points.position.y = -this.left.points.geometry.attributes.position.array[i * this.D * 3 + 1]
-    for (let k = 0; k < this.W; k++) {
-      for (let j = 0; j < this.D; j++) {
+    for (let j = 0; j < this.D; j++) {
+      for (let k = 0; k < this.W; k++) {
         this.vmprod.setData(j, k, this.dotprod_val(i, j, k))
       }
     }
@@ -1259,6 +1368,7 @@ export class Attn {
 
     this.initmm1()
     this.initmm2()
+    this.initAbsmax()
 
     // this.animation = 'none'
     // this.setAnimation(this.params.animation)
@@ -1326,6 +1436,14 @@ export class Attn {
     }
     this.mm2 = new MatMul(mm2_params, this.getText)
     this.group.add(this.mm2.group)
+  }
+
+  initAbsmax() {
+    this.absmax = Math.max(this.mm1.getAbsmax(), this.mm2.getAbsmax())
+  }
+
+  getGlobalAbsmax() {
+    return this.absmax
   }
 
   initQ(params = undefined) {
@@ -1674,9 +1792,6 @@ export class Attn2 {
     }
     this.mm1 = new MatMul(mm1_params, this.getText)
     this.group.add(this.mm1.group)
-
-    // console.log(`HEY result data absmax ${this.mm1.result.data.absmax} absmin ${this.mm1.result.data.absmin} ${this.mm1.result.data}`)
-
   }
 
   initvmm() {
@@ -1775,7 +1890,7 @@ export class Attn3 {
     const num_heads = this.params.num_heads
     const show_heads = !this.params['hide attn heads']
 
-    const zspace = 5 * Math.sqrt(this.D) * this.params['head spacing']
+    const zspace = 4 * Math.sqrt(this.D) * this.params['head spacing']
 
     // shared input
     const input_params = {
@@ -1788,7 +1903,7 @@ export class Attn3 {
     input.group.rotation.x = Math.PI
     input.group.position.x = -this.params.d_model / 2
     input.group.position.y = this.params.n_q / 2
-    input.group.position.z = -(2 * this.D) - zspace
+    input.group.position.z = -zspace
     this.group.add(input.group)
     this.params.input_data = input.data
 
@@ -1817,7 +1932,7 @@ export class Attn3 {
     output.group.rotation.x = Math.PI
     output.group.position.x = -this.params.d_model / 2
     output.group.position.y = this.params.n_q / 2
-    output.group.position.z = (this.D + zspace) * (show_heads ? num_heads : 1) + zspace
+    output.group.position.z = (this.D + zspace) * num_heads
     this.group.add(output.group)
 
     //

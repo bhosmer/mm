@@ -40,7 +40,7 @@
     const init_funcs = ['rows', 'cols', 'row major', 'col major', 'pt linear', 'pt linear+', 'uniform', 'gaussian', 'tril', 'triu', 'eye', 'diff', 'ones', 'zeros']
     const epilog_funcs = ['none', 'x/J', 'x/sqrt(J)', 'softmax(x/sqrt(J))', 'tanh(x)', 'relu(x)', 'layernorm']
     const sensitivity = ['local', 'global']
-    const animation = ['itemwise', 'dotprod', 'mvprod', 'vmprod', 'vvprod', 'none']
+    const animation = ['itemwise', 'dotprod', 'axpy', 'mvprod', 'vmprod', 'vvprod', 'none']
 
     const params = {
       I: init_dims.i,
