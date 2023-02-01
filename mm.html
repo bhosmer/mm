@@ -53,9 +53,9 @@
       'init min': -1,
       'init max': 1,
       epilog: 'none',
-      horizontal: 1,
-      vertical: 1,
-      depthwise: 1,
+      'i threads': 1,
+      'j threads': 1,
+      'k threads': 1,
       sensitivity: 'global',
       animation: 'none',
       'hide inputs': false,
@@ -300,20 +300,20 @@
         initAxes(val)
       })
 
-      const gui_par = gui.addFolder('threads')
+      const gui_par = gui.addFolder('parallelism')
 
-      gui_par.add(params, 'horizontal', 1, 8).onChange(function (val) {
-        setParams({ horizontal: Math.floor(val) })
+      gui_par.add(params, 'i threads', 1, 8).onChange(function (val) {
+        setParams({ 'i threads': Math.floor(val) })
         initObj() // getObj().setPartitions(params)
       })
 
-      gui_par.add(params, 'vertical', 1, 8).onChange(function (val) {
-        setParams({ vertical: Math.floor(val) })
+      gui_par.add(params, 'j threads', 1, 8).onChange(function (val) {
+        setParams({ 'j threads': Math.floor(val) })
         initObj() // getObj().setPartitions(params)
       })
 
-      gui_par.add(params, 'depthwise', 1, 8).onChange(function (val) {
-        setParams({ depthwise: Math.floor(val) })
+      gui_par.add(params, 'k threads', 1, 8).onChange(function (val) {
+        setParams({ 'k threads': Math.floor(val) })
         initObj() // getObj().setPartitions(params)
       })
 

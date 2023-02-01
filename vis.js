@@ -233,7 +233,9 @@ const ELEM_SIZE = 1792
 //
 // Mat
 //
+
 export class Mat {
+
   static fromInit(h, w, init, container) {
     return new Mat(h, w, Array.fromInit(h, w, init), container)
   }
@@ -527,7 +529,9 @@ export class Mat {
 //
 // MatMul
 //
+
 export class MatMul {
+
   constructor(params, getText, container = undefined) {
     this.getText = getText
     this.params = { ...params }
@@ -604,7 +608,6 @@ export class MatMul {
     this.initRightVis()
     this.initResultVis()
 
-    this.animation = 'none'
     this.setAnimation(this.params.animation)
 
     this.setPosition()
@@ -700,17 +703,6 @@ export class MatMul {
     return this.absmax
   }
 
-  // setAbsmax(x) {
-  //   if (this.container) {
-  //     this.container.setAbsmax(x)
-  //   } else {
-  //     const absx = Math.abs(x)
-  //     if (absx > this.absmax)
-  //   }
-  //   this.global_absmax = Math.max(a.absmax, b.absmax, c.absmax)
-  //   this._setAbsmax(this.left.data, this.right.data, this.result.data)
-  // }
-
   setEpilog(epilog) {
     this.params.epilog = epilog
     this.initResultData()
@@ -729,7 +721,7 @@ export class MatMul {
     this.initLeftData()
     this.initResultData()
     this.initAbsmax()
-    // this._setAbsmax(this.left_data, this.right_data, this.result_data)
+
     this.initVis()
   }
 
@@ -745,7 +737,7 @@ export class MatMul {
     this.initRightData()
     this.initResultData()
     this.initAbsmax()
-    // this._setAbsmax(this.left_data, this.right_data, this.result_data)
+
     this.initVis()
   }
 
@@ -760,17 +752,16 @@ export class MatMul {
       }
     }
 
-    this.animation = animation
-    if (this.animation == 'itemwise') {
+    if (animation == 'itemwise') {
       maybe_hide_things()
       this.initAnimItemwise()
-    } else if (this.animation == 'dotprod') {
+    } else if (animation == 'dotprod') {
       maybe_hide_things()
       this.initAnimDotprod()
-    } else if (this.animation == 'axpy') {
+    } else if (animation == 'axpy') {
       maybe_hide_things()
       this.initAnimAXPY()
-    } else if (this.animation == 'mvprod') {
+    } else if (animation == 'mvprod') {
       maybe_hide_things()
       this.result.hideAll()
       const mvprod_init = (i, j, h, w) => this.dotprod_val(i, j, 0)
@@ -780,7 +771,7 @@ export class MatMul {
       this.group.add(this.mvprod.points)
       this.bump = this.bump_mvprod
       this.curk = this.W - 1
-    } else if (this.animation == 'vmprod') {
+    } else if (animation == 'vmprod') {
       maybe_hide_things()
       this.result.hideAll()
       const vmprod_init = (i, j, h, w) => this.dotprod_val(0, i, j)
@@ -789,7 +780,7 @@ export class MatMul {
       this.group.add(this.vmprod.points)
       this.bump = this.bump_vmprod
       this.curi = this.H - 1
-    } else if (this.animation == 'vvprod') {
+    } else if (animation == 'vvprod') {
       maybe_hide_things()
       this.result.hideAll()
       const vvprod_init = (i, j, h, w) => this.dotprod_val(i, 0, j)
@@ -798,13 +789,13 @@ export class MatMul {
       this.group.add(this.vvprod.points)
       this.bump = this.bump_vvprod
       this.curj = this.D - 1
-    } else if (this.animation == 'none') {
+    } else if (animation == 'none') {
       this.left.showAll()
       this.right.showAll()
       // this.result.showAll()
       this.initResultData() // vvprod and friends animate the result
       this.initResultVis()
-    } else if (this.animation == 'none (inputs only)' && !this.params.result) {
+    } else if (animation == 'none (inputs only)' && !this.params.result) {
       this.left.showAll()
       this.right.showAll()
       this.result.hideAll()
@@ -839,11 +830,11 @@ export class MatMul {
   }
 
   getThreadInfo() {
-    const nh = this.params.horizontal
+    const nh = this.params['i threads']
     const hp = Math.floor(this.H / nh)
-    const nd = this.params.depthwise
+    const nd = this.params['j threads']
     const dp = Math.floor(this.D / nd)
-    const nv = this.params.vertical
+    const nv = this.params['k threads']
     const vp = Math.floor(this.W / nv)
     return { nh, hp, nd, dp, nv, vp }
   }
@@ -860,12 +851,6 @@ export class MatMul {
         const dpresult = Mat.fromInit(this.H, this.W, dpresult_init, this)
         dpresult.group.position.z = di * dp + dp - 1
         dpresult.group.rotation.x = Math.PI
-        if (this.params.result_rot) {
-          Object.keys(this.params.result_rot).map(k => dpresult.group.rotation[k] += this.params.result_rot[k])
-        }
-        if (this.params.result_pos) {
-          Object.keys(this.params.result_pos).map(k => dpresult.group.position[k] += this.params.result_pos[k])
-        }
         this.dpresults.push(dpresult)
         this.group.add(dpresult.group)
         dpresult.hideAll()
@@ -889,9 +874,7 @@ export class MatMul {
     let curk = vp - 1
 
     this.bump = () => {
-      const oldi = curi
-      const oldk = curk
-
+      const [oldi, oldk] = [curi, curk]
       if (oldk < vp - 1) {
         curk += 1
       } else {
@@ -932,9 +915,9 @@ export class MatMul {
       // move and recolor dot product vectors
       this.dpgroup.position.x = curk
       this.dpgroup.position.y = -curi
-      for (let hi = 0; hi < nh; hi++) {
-        for (let vi = 0; vi < nv; vi++) {
-          const dotprod = this.dotprods[hi * nh + vi]
+      for (let hi = 0, ptr = 0; hi < nh; hi++) {
+        for (let vi = 0; vi < nv; vi++, ptr++) {
+          const dotprod = this.dotprods[ptr]
           for (let j = 0; j < this.D; j++) {
             dotprod.setData(0, j, this.dotprod_val(hi * hp + curi, j, vi * vp + curk))
           }
@@ -948,98 +931,7 @@ export class MatMul {
   }
 
   initAnimAXPY() {
-    this.dotprods = []
-    this.dpgroup = new THREE.Group()
-    this.dpresults = []
-    const { nh, hp, nd, dp, nv, vp } = this.getThreadInfo()
-
-    if (nd > 1) {
-      for (let di = 0; di < nd; di++) {
-        const dpresult_init = (y, x, h, w) => this.result_val(y, x, di * dp, (di + 1) * dp)
-        const dpresult = Mat.fromInit(this.H, this.W, dpresult_init, this)
-        dpresult.group.position.z = di * dp + dp - 1
-        dpresult.group.rotation.x = Math.PI
-        if (this.params.result_rot) {
-          Object.keys(this.params.result_rot).map(k => dpresult.group.rotation[k] += this.params.result_rot[k])
-        }
-        if (this.params.result_pos) {
-          Object.keys(this.params.result_pos).map(k => dpresult.group.position[k] += this.params.result_pos[k])
-        }
-        this.dpresults.push(dpresult)
-        this.group.add(dpresult.group)
-        dpresult.hideAll()
-      }
-    }
-
-    for (let hi = 0; hi < nh; hi++) {
-      for (let vi = 0; vi < nv; vi++) {
-        const dotprod_init = (i, j, h, w) => this.dotprod_val(hi * hp, j, vi * vp)
-        const dotprod = Mat.fromInit(1, this.D, dotprod_init, this)
-        dotprod.points.rotation.y = -Math.PI / 2
-        dotprod.points.position.y -= hi * hp
-        dotprod.points.position.x += vi * vp
-        this.dotprods.push(dotprod)
-        this.dpgroup.add(dotprod.points)
-      }
-    }
-    this.group.add(this.dpgroup)
-
-    let curi = hp - 1
-    let curk = vp - 1
-
-    this.bump = () => {
-      const oldi = curi
-      const oldk = curk
-
-      if (oldk < vp - 1) {
-        curk += 1
-      } else {
-        curk = 0
-        curi = oldi < hp - 1 ? curi + 1 : 0
-      }
-
-      // update result faces
-      if (curi == 0 && curk == 0) {
-        this.result.hideAll()
-        this.dpresults.forEach(dpresult => dpresult.hideAll())
-      }
-      for (let hi = 0; hi < nh; hi++) {
-        for (let vi = 0; vi < nv; vi++) {
-          if (!this.params['hide result']) {
-            this.result.show(hi * hp + curi, vi * vp + curk)
-          }
-          this.dpresults.forEach(dpresult => {
-            dpresult.show(hi * hp + curi, vi * vp + curk)
-          })
-        }
-      }
-
-      // hilight operand row/cols
-      if (oldk != curk) {
-        for (let vi = 0; vi < nv; vi++) {
-          this.right.bumpColumnColor(oldk + vi * vp, false)
-          this.right.bumpColumnColor(curk + vi * vp, true)
-        }
-      }
-      if (oldi != curi) {
-        for (let hi = 0; hi < nh; hi++) {
-          this.left.bumpRowColor(oldi + hi * hp, false)
-          this.left.bumpRowColor(curi + hi * hp, true)
-        }
-      }
-
-      // move and recolor dot product vectors
-      this.dpgroup.position.x = curk
-      this.dpgroup.position.y = -curi
-      for (let hi = 0; hi < nh; hi++) {
-        for (let vi = 0; vi < nv; vi++) {
-          const dotprod = this.dotprods[hi * nh + vi]
-          for (let j = 0; j < this.D; j++) {
-            dotprod.setData(0, j, this.dotprod_val(hi * hp + curi, j, vi * vp + curk))
-          }
-        }
-      }
-    }
+    // TODO
   }
 
   initAnimItemwise() {
@@ -1325,7 +1217,6 @@ export class Attn {
     this.initmm2()
     this.initAbsmax()
 
-    // this.animation = 'none'
     // this.setAnimation(this.params.animation)
 
     this.setPosition()
