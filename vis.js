@@ -155,17 +155,6 @@ class Array {
     this.h = h
     this.w = w
     this.data = data
-    this.absmax = 0
-    this.absmin = Infinity
-    for (let ptr = 0; ptr < this.data.length; ptr++) {
-      const absx = Math.abs(this.data[ptr])
-      if (absx > this.absmax) {
-        this.absmax = absx
-      }
-      if (absx < this.absmin) {
-        this.absmin = absx
-      }
-    }
   }
 
   get(i, j) {
@@ -176,26 +165,19 @@ class Array {
     if (isNaN(x)) {
       throw Error(`HEY set(${i}, ${j}, ${x})`)
     }
-
-    const ptr = this.addr(i, j)
-    const oldabsx = Math.abs(this.data[ptr])
-    this.data[ptr] = x
-
-    const absx = Math.abs(x)
-    if (absx > this.absmax) {
-      this.absmax = absx
-    } else if (absx < oldabsx && oldabsx == this.absmax) {
-      this.absmax = Math.max(...this.data.map(Math.abs))
-    }
-    if (absx <= this.absmin) {
-      this.absmin = absx
-    } else if (absx > oldabsx && oldabsx == this.absmin) {
-      this.absmin = Math.min(...this.data.map(Math.abs))
-    }
+    this.data[this.addr(i, j)] = x
   }
 
   addr(i, j) {
     return i * this.w + j
+  }
+
+  absmax() {
+    return Math.max(...this.data.map(Math.abs))
+  }
+
+  absmin() {
+    return Math.min(...this.data.map(Math.abs))
   }
 
   transpose() {
@@ -286,7 +268,7 @@ export class Mat {
         throw Error('passed neither container nor params to Mat')
       }
       this.params = { ...params }
-      this.getGlobalAbsmax = () => data.absmax
+      this.getGlobalAbsmax = () => this.absmax
     }
     this.local_sens = this.params.sensitivity == 'local'
     this.zero_hue = this.params['zero hue']
@@ -295,9 +277,12 @@ export class Mat {
     this.max_light = this.params['max light']
     this.hue_gap = this.params['hue gap']
     this.hue_spread = this.params['hue spread']
-    this.h = h
-    this.w = w
     this.data = data
+    this.h = data.h
+    this.w = data.w
+    this.absmax = this.data.absmax()
+    this.absmin = this.data.absmin()
+    // console.log(`HEY absmax ${this.absmax} absmin ${this.absmin} data ${this.data.data}`)
     let sizes = new Float32Array(this.numel())
     let colors = new Float32Array(this.numel() * 3)
     let points = []
@@ -323,7 +308,7 @@ export class Mat {
   }
 
   getAbsmax() {
-    return this.data.absmax
+    return this.absmax
   }
 
   numel() {
@@ -336,13 +321,13 @@ export class Mat {
     }
 
     const absx = Math.abs(x)
-    const [min, max] = this.local_sens ? [this.data.absmin, this.data.absmax] : [0, this.getGlobalAbsmax()]
+    const [min, max] = this.local_sens ? [this.absmin, this.absmax] : [0, this.getGlobalAbsmax()]
     const vol = min == max ? 1 : (absx - min) / (max - min)
 
     const zsize = this.zero_size * ELEM_SIZE
     const size = zsize + (ELEM_SIZE - zsize) * Math.cbrt(vol)
 
-    if (size < 0 || size > ELEM_SIZE * 2) {
+    if (size < 0 || size > ELEM_SIZE * 1.1 || isNaN(size)) {
       throw Error(`HEY size ${size} absx ${absx} max ${max} min ${min} zsize ${zsize} sens ${this.local_sens}`)
     }
 
@@ -355,7 +340,7 @@ export class Mat {
     }
 
     const absx = Math.abs(x)
-    const [min, max] = this.local_sens ? [this.data.absmin, this.data.absmax] : [0, this.getGlobalAbsmax()]
+    const [min, max] = this.local_sens ? [this.absmin, this.absmax] : [0, this.getGlobalAbsmax()]
     const hvol = min == max ? x : x / (max - min)
 
     const gap = this.hue_gap * Math.sign(x)
@@ -365,8 +350,8 @@ export class Mat {
 
     // note: hue is always local?
     const lvol = this.local_sens ?
-      this.data.absmax == this.data.absmin ? 1 : (absx - this.data.absmin) / (this.data.absmax - this.data.absmin) :
-      this.data.absmax == 0 ? 0 : absx / this.data.absmax
+      this.absmax == this.absmin ? 1 : (absx - this.absmin) / (this.absmax - this.absmin) :
+      this.absmax == 0 ? 0 : absx / this.absmax
 
     const l = this.zero_light + range * Math.cbrt(lvol)
 
@@ -402,6 +387,13 @@ export class Mat {
   }
 
   setData(i, j, x) {
+    if (isNaN(x)) {
+      throw Error(`HEY setData(${i}, ${j}, ${x})`)
+    }
+    const absx = Math.abs(x)
+    if (absx > this.absmax || absx < this.absmin) {
+      throw Error(`HEY setData(${i}, ${j}, ${x}) this.absmax ${this.absmax} this.absmin ${this.absmin}`)
+    }
     this.data.set(i, j, x)
     this.setSize(i, j, this.sizeFromData(x))
     this.setHSL(i, j, x)
@@ -535,6 +527,7 @@ export class MatMul {
     this.getText = getText
     this.params = { ...params }
     this.group = new THREE.Group()
+    this.getGlobalAbsmax = container ? () => container.getGlobalAbsmax() : () => this.getAbsmax()
 
     this.H = params.I
     this.D = params.J
@@ -545,9 +538,6 @@ export class MatMul {
     this.initLeftData()
     this.initRightData()
     this.initResultData()
-    this.initAbsmax()
-
-    this.getGlobalAbsmax = container ? () => container.getGlobalAbsmax() : () => this.getAbsmax()
 
     this.initVis()
   }
@@ -603,6 +593,7 @@ export class MatMul {
     }
     this.group.clear()
 
+    this.initAbsmax()
     this.initLeftVis()
     this.initRightVis()
     this.initResultVis()
@@ -695,7 +686,7 @@ export class MatMul {
   }
 
   initAbsmax() {
-    this.absmax = Math.max(this.left_data.absmax, this.right_data.absmax, this.result_data.absmax)
+    this.absmax = Math.max(this.left_data.absmax(), this.right_data.absmax(), this.result_data.absmax())
   }
 
   getAbsmax() {
@@ -719,7 +710,6 @@ export class MatMul {
     }
     this.initLeftData()
     this.initResultData()
-    this.initAbsmax()
 
     this.initVis()
   }
@@ -735,7 +725,6 @@ export class MatMul {
     }
     this.initRightData()
     this.initResultData()
-    this.initAbsmax()
 
     this.initVis()
   }
