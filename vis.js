@@ -228,65 +228,26 @@ class Array {
   }
 }
 
+const ELEM_SIZE = 1792
+
 //
 // Mat
 //
 export class Mat {
-  ELEM_SIZE = 1792
-  ELEM_SAT = 1.0
-  ELEM_LIGHT = 0.6
-
-  sizeFromData(x) {
-    if (isNaN(x)) {
-      return 0
-    }
-
-    const absx = Math.abs(x)
-    const [min, max] = this.local_sens ? [this.data.absmin, this.data.absmax] : [0, this.getGlobalAbsmax()]
-    const vol = min == max ? 1 : (absx - min) / (max - min)
-
-    const zsize = this.zero_size * this.ELEM_SIZE
-    const size = zsize + (this.ELEM_SIZE - zsize) * Math.cbrt(vol)
-
-    if (size < 0 || size > this.ELEM_SIZE * 2) {
-      throw Error(`HEY size ${size} absx ${absx} max ${max} min ${min} zsize ${zsize} sens ${this.local_sens}`)
-    }
-
-    return size
-  }
-
-  colorFromData(x) {
-    if (isNaN(x)) {
-      return new THREE.Color().setHSL(0, 0, 0)
-    }
-
-    const absx = Math.abs(x)
-    const [min, max] = this.local_sens ? [this.data.absmin, this.data.absmax] : [0, this.getGlobalAbsmax()]
-    const hvol = min == max ? x : x / (max - min)
-
-    const gap = this.hue_gap * Math.sign(x)
-    const h = (this.zero_hue + gap + (Math.cbrt(hvol) * this.hue_spread)) % 1
-
-    const range = this.max_light - this.zero_light
-
-    // note: hue is always local?
-    const lvol = this.local_sens ?
-      this.data.absmax == this.data.absmin ? 1 : (absx - this.data.absmin) / (this.data.absmax - this.data.absmin) :
-      this.data.absmax == 0 ? 0 : absx / this.data.absmax
-
-    const l = this.zero_light + range * Math.cbrt(lvol)
-
-    return new THREE.Color().setHSL(h, 1.0, l)
-  }
-
-  setElemHSL(a, i, x) {
-    this.colorFromData(x).toArray(a, i * 3)
-  }
-
-  // --------
-
   static fromInit(h, w, init, container) {
     return new Mat(h, w, Array.fromInit(h, w, init), container)
+  }
+
+  static dataFromParams(h, w, params) {
+    const init_base = params['init min']
+    const init_range = Math.max(0, params['init max'] - params['init min'])
+    const init_name = params['left init']
+    if (!init_name) {
+      throw Error(`no initializer specified at params['left_init']`)
+    }
+    const sparsity = params['left sparsity']
+    const init = getInitFunc(init_name, sparsity, init_base, init_range)
+    return Array.fromInit(h, w, init)
   }
 
   static fromParams(h, w, params, getText) {
@@ -304,42 +265,13 @@ export class Mat {
 
     m.setGuides(params.guides)
 
-    // this.setLeftLegends(params.legends)
     const custom = params.legend ? params.legend : {}
     const defaults = { name: "X", height: "i", width: "j", hleft: true, wtop: false }
-    // const props = { ...m.getLegendProps(h, w, params), ...defaults, ...custom }
     const props = { ...m.getLegendProps(), ...defaults, ...custom }
     m.setLegends(params.legends, props, getText)
 
     return m
   }
-
-  static dataFromParams(h, w, params) {
-    const init_base = params['init min']
-    const init_range = Math.max(0, params['init max'] - params['init min'])
-    const init_name = params['left init']
-    if (!init_name) {
-      throw Error(`no initializer specified at params['left_init']`)
-    }
-    const sparsity = params['left sparsity']
-    const init = getInitFunc(init_name, sparsity, init_base, init_range)
-    return Array.fromInit(h, w, init)
-  }
-
-  getLegendProps() {
-    const custom = this.params.legend_props ? this.params.legend_props : {}
-    const sa_geo = Math.cbrt(Math.max(5, this.h) * Math.max(this.w, 5))
-    const defaults = {
-      name_color: 0xccccff,
-      name_size: sa_geo / 3,
-      dim_color: 0x00aaff,
-      dim_size: sa_geo / 6,
-    }
-    const res = { ...defaults, ...custom }
-    return res
-  }
-
-  // --------
 
   constructor(h, w, data, container, params) {
     if (container) {
@@ -397,26 +329,51 @@ export class Mat {
     return this.h * this.w
   }
 
-  hideAll() {
-    for (let i = 0; i < this.h; i++) {
-      for (let j = 0; j < this.w; j++) {
-        this.setSize(i, j, this.sizeFromData(NaN))
-        this.setHSL(i, j, NaN)
-      }
+  sizeFromData(x) {
+    if (isNaN(x)) {
+      return 0
     }
+
+    const absx = Math.abs(x)
+    const [min, max] = this.local_sens ? [this.data.absmin, this.data.absmax] : [0, this.getGlobalAbsmax()]
+    const vol = min == max ? 1 : (absx - min) / (max - min)
+
+    const zsize = this.zero_size * ELEM_SIZE
+    const size = zsize + (ELEM_SIZE - zsize) * Math.cbrt(vol)
+
+    if (size < 0 || size > ELEM_SIZE * 2) {
+      throw Error(`HEY size ${size} absx ${absx} max ${max} min ${min} zsize ${zsize} sens ${this.local_sens}`)
+    }
+
+    return size
   }
 
-  showAll() {
-    for (let i = 0; i < this.h; i++) {
-      for (let j = 0; j < this.w; j++) {
-        this.show(i, j)
-      }
+  colorFromData(x) {
+    if (isNaN(x)) {
+      return new THREE.Color().setHSL(0, 0, 0)
     }
+
+    const absx = Math.abs(x)
+    const [min, max] = this.local_sens ? [this.data.absmin, this.data.absmax] : [0, this.getGlobalAbsmax()]
+    const hvol = min == max ? x : x / (max - min)
+
+    const gap = this.hue_gap * Math.sign(x)
+    const h = (this.zero_hue + gap + (Math.cbrt(hvol) * this.hue_spread)) % 1
+
+    const range = this.max_light - this.zero_light
+
+    // note: hue is always local?
+    const lvol = this.local_sens ?
+      this.data.absmax == this.data.absmin ? 1 : (absx - this.data.absmin) / (this.data.absmax - this.data.absmin) :
+      this.data.absmax == 0 ? 0 : absx / this.data.absmax
+
+    const l = this.zero_light + range * Math.cbrt(lvol)
+
+    return new THREE.Color().setHSL(h, 1.0, l)
   }
 
-  show(i, j) {
-    this.setSize(i, j, this.sizeFromData(this.getData(i, j)))
-    this.setHSL(i, j, this.getData(i, j))
+  setElemHSL(a, i, x) {
+    this.colorFromData(x).toArray(a, i * 3)
   }
 
   setSize(i, j, x) {
@@ -449,6 +406,23 @@ export class Mat {
     this.setHSL(i, j, x)
   }
 
+  hideAll() {
+    for (let i = 0; i < this.h; i++) {
+      for (let j = 0; j < this.w; j++) {
+        this.setSize(i, j, this.sizeFromData(NaN))
+        this.setHSL(i, j, NaN)
+      }
+    }
+  }
+
+  showAll() {
+    for (let i = 0; i < this.h; i++) {
+      for (let j = 0; j < this.w; j++) {
+        this.show(i, j)
+      }
+    }
+  }
+
   bumpColor(i, j, up) {
     if (up) {
       let c = this.getColor(i, j)
@@ -472,6 +446,11 @@ export class Mat {
     }
   }
 
+  show(i, j) {
+    this.setSize(i, j, this.sizeFromData(this.getData(i, j)))
+    this.setHSL(i, j, this.getData(i, j))
+  }
+
   setGuides(enabled) {
     if (enabled) {
       if (!this.guide) {
@@ -485,6 +464,19 @@ export class Mat {
         this.guide = undefined
       }
     }
+  }
+
+  getLegendProps() {
+    const custom = this.params.legend_props ? this.params.legend_props : {}
+    const sa_geo = Math.cbrt(Math.max(5, this.h) * Math.max(this.w, 5))
+    const defaults = {
+      name_color: 0xccccff,
+      name_size: sa_geo / 3,
+      dim_color: 0x00aaff,
+      dim_size: sa_geo / 6,
+    }
+    const res = { ...defaults, ...custom }
+    return res
   }
 
   setLegends(enabled, props, getText) {
