@@ -291,22 +291,27 @@ export class Mat {
     this.w = data.w
     this.data = data
 
+
+
     this.absmax = this.data.absmax()
     this.absmin = this.data.absmin()
     let sizes = new Float32Array(this.data.numel())
     let colors = new Float32Array(this.data.numel() * 3)
-    let points = new Array(this.data.numel())
+    let points = new Float32Array(this.data.numel() * 3)
+
     let ptr = 0
     for (let i = 0; i < this.h; i++) {
       for (let j = 0; j < this.w; j++, ptr++) {
-        points[ptr] = new THREE.Vector3(j, i, 0)
+        const p = new THREE.Vector3(j, i, 0)
+        p.toArray(points, ptr * 3)
         const x = data.data[ptr]
         sizes[ptr] = this.sizeFromData(x)
         this.setElemHSL(colors, ptr, x)
       }
     }
 
-    const g = new THREE.BufferGeometry().setFromPoints(points)
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(points, 3));
     g.setAttribute('pointSize', new THREE.Float32BufferAttribute(sizes, 1))
     g.setAttribute('pointColor', new THREE.Float32BufferAttribute(colors, 3))
     this.points = new THREE.Points(g, MATERIAL)
@@ -756,8 +761,13 @@ export class MatMul {
   }
 
   setAnimation(animation) {
+    const prev_anim = this.animation
+    if (prev_anim == animation) {
+      return
+    }
+    this.animation = animation
 
-    function maybe_hide_things() {
+    const maybe_hide_things = () => {
       if (this.params['hide inputs']) {
         this.left.hideAll()
         this.right.hideAll()
@@ -766,9 +776,6 @@ export class MatMul {
         this.result.hideAll()
       }
     }
-
-    const prev_anim = this.animation
-    this.animation = animation
 
     if (animation == 'itemwise') {
       maybe_hide_things()
