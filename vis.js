@@ -130,24 +130,27 @@ function getInPlaceEpilog(name) {
 // Array2D
 //
 
+function arrayInit(a, h, w, f, epi = undefined) {
+  for (let i = 0, ptr = 0; i < h; i++) {
+    for (let j = 0; j < w; j++, ptr++) {
+      const x = f(i, j, h, w)
+      if (isNaN(x)) {
+        throw Error(`HEY init f(${i}, ${j}, ${h}, ${w}) is NaN`)
+      }
+      a[ptr] = x
+    }
+  }
+  const epi_ = epi && getInPlaceEpilog(epi)
+  if (epi_) {
+    epi_(h, w, a)
+  }
+}
+
 class Array2D {
 
   static fromInit(h, w, f, epi = undefined) {
     const data = new Float32Array(h * w)
-    let ptr = 0
-    for (let i = 0; i < h; i++) {
-      for (let j = 0; j < w; j++, ptr++) {
-        const x = f(i, j, h, w)
-        if (isNaN(x)) {
-          throw Error(`HEY fromInit f(${i}, ${j}, ${h}, ${w}) is NaN`)
-        }
-        data[ptr] = x
-      }
-    }
-    const epi_ = epi && getInPlaceEpilog(epi)
-    if (epi_) {
-      epi_(h, w, data)
-    }
+    arrayInit(data, h, w, f, epi)
     return new Array2D(h, w, data, epi)
   }
 
@@ -155,6 +158,10 @@ class Array2D {
     this.h = h
     this.w = w
     this.data = data
+  }
+
+  reinit(f, epi = undefined) {
+    arrayInit(this.data, this.h, this.w, f, epi)
   }
 
   numel() {
@@ -233,6 +240,23 @@ const ELEM_SIZE = 1792
 // Mat
 //
 
+function emptyPoints(h, w) {
+  const n = h * w
+  const geom = new THREE.BufferGeometry();
+  const points = new Float32Array(n * 3)
+  for (let i = 0, ptr3 = 0; i < h; i++) {
+    for (let j = 0; j < w; j++, ptr3 += 3) {
+      points[ptr3] = j
+      points[ptr3 + 1] = i
+      points[ptr3 + 2] = 0
+    }
+  }
+  geom.setAttribute('position', new THREE.BufferAttribute(points, 3));
+  geom.setAttribute('pointSize', new THREE.Float32BufferAttribute(new Float32Array(n), 1))
+  geom.setAttribute('pointColor', new THREE.Float32BufferAttribute(new Float32Array(n * 3), 3))
+  return new THREE.Points(geom, MATERIAL)
+}
+
 export class Mat {
 
   static fromInit(h, w, init, container) {
@@ -287,44 +311,45 @@ export class Mat {
       this.params = { ...params }
       this.getGlobalAbsmax = () => this.absmax
     }
+
     this.h = data.h
     this.w = data.w
+    this.points = emptyPoints(this.h, this.w)
+
     this.data = data
+    this.initVis()
 
+    this.group = new THREE.Group()
+    this.group.add(this.points)
+  }
 
-
+  initVis() {
     this.absmax = this.data.absmax()
     this.absmin = this.data.absmin()
-    let sizes = new Float32Array(this.data.numel())
-    let colors = new Float32Array(this.data.numel() * 3)
-    let points = new Float32Array(this.data.numel() * 3)
-
-    let ptr = 0
-    for (let i = 0; i < this.h; i++) {
+    const sizes = this.getPointSizes()
+    const colors = this.getPointColors()
+    for (let i = 0, ptr = 0; i < this.h; i++) {
       for (let j = 0; j < this.w; j++, ptr++) {
-        const p = new THREE.Vector3(j, i, 0)
-        p.toArray(points, ptr * 3)
-        const x = data.data[ptr]
+        const x = this.data.data[ptr]
         sizes[ptr] = this.sizeFromData(x)
         this.setElemHSL(colors, ptr, x)
       }
     }
+    this.points.geometry.attributes.pointSize.needsUpdate = true
+    this.points.geometry.attributes.pointColor.needsUpdate = true
+  }
 
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(points, 3));
-    g.setAttribute('pointSize', new THREE.Float32BufferAttribute(sizes, 1))
-    g.setAttribute('pointColor', new THREE.Float32BufferAttribute(colors, 3))
-    this.points = new THREE.Points(g, MATERIAL)
+  reinit(f, epi = undefined) {
+    this.data.reinit(f, epi)
+    this.initVis()
+  }
 
-    // const self = this // oh js
-    // this.points.onRollover = function (intersect) {
-    //   console.log(`HEY onRollover h ${self.h} w ${self.w} point x ${intersect.point.x} y ${intersect.point.y} z ${intersect.point.z}`)
-    // }
+  getPointSizes() {
+    return this.points.geometry.attributes.pointSize.array
+  }
 
-    this.group = new THREE.Group()
-    this.group.add(this.points)
-
-    this.shown = 'all'
+  getPointColors() {
+    return this.points.geometry.attributes.pointColor.array
   }
 
   getAbsmax() {
@@ -419,37 +444,25 @@ export class Mat {
   }
 
   show(i, j) {
-    if (this.shown == 'all') {
-      return
-    }
     this.setSize(i, j, this.sizeFromData(this.getData(i, j)))
     this.setHSL(i, j, this.getData(i, j))
-    this.shown == 'mixed'
   }
 
   showAll() {
-    if (this.shown == 'all') {
-      return
-    }
     for (let i = 0; i < this.h; i++) {
       for (let j = 0; j < this.w; j++) {
         this.show(i, j)
       }
     }
-    this.shown = 'all'
   }
 
   hideAll() {
-    if (this.shown == 'none') {
-      return
-    }
     for (let i = 0; i < this.h; i++) {
       for (let j = 0; j < this.w; j++) {
         this.setSize(i, j, this.sizeFromData(NaN))
         this.setHSL(i, j, NaN)
       }
     }
-    this.shown = 'none'
   }
 
   bumpColor(i, j, up) {
@@ -762,32 +775,14 @@ export class MatMul {
 
   setAnimation(animation) {
     const prev_anim = this.animation
-    if (prev_anim == animation) {
-      return
-    }
     this.animation = animation
-
-    const maybe_hide_things = () => {
-      if (this.params['hide inputs']) {
-        this.left.hideAll()
-        this.right.hideAll()
-      }
-      if (this.params['hide result']) {
-        this.result.hideAll()
-      }
-    }
-
     if (animation == 'itemwise') {
-      maybe_hide_things()
       this.initAnimItemwise()
     } else if (animation == 'dotprod') {
-      maybe_hide_things()
       this.initAnimDotprod()
     } else if (animation == 'axpy') {
-      maybe_hide_things()
       this.initAnimAXPY()
     } else if (animation == 'mvprod') {
-      maybe_hide_things()
       this.result.hideAll()
       const mvprod_init = (i, j, h, w) => this.dotprod_val(i, j, 0)
       this.mvprod = Mat.fromInit(this.H, this.D, mvprod_init, this)
@@ -797,7 +792,6 @@ export class MatMul {
       this.bump = this.bump_mvprod
       this.curk = this.W - 1
     } else if (animation == 'vmprod') {
-      maybe_hide_things()
       this.result.hideAll()
       const vmprod_init = (i, j, h, w) => this.dotprod_val(0, i, j)
       this.vmprod = Mat.fromInit(this.D, this.W, vmprod_init, this)
@@ -806,7 +800,6 @@ export class MatMul {
       this.bump = this.bump_vmprod
       this.curi = this.H - 1
     } else if (animation == 'vvprod') {
-      maybe_hide_things()
       this.result.hideAll()
       const vvprod_init = (i, j, h, w) => this.dotprod_val(i, 0, j)
       this.vvprod = Mat.fromInit(this.H, this.W, vvprod_init, this)
@@ -815,18 +808,13 @@ export class MatMul {
       this.bump = this.bump_vvprod
       this.curj = this.D - 1
     } else if (animation == 'none') {
-      this.left.showAll()
-      this.right.showAll()
+      this.setVisibility()
       if (prev_anim == 'vv_prod' || prev_anim == 'itemwise') {
         this.initResultData() // vvprod and friends animate the result
         this.initResultVis()
       } else {
         this.result.showAll()
       }
-    } else if (animation == 'none (inputs only)' && !this.params.result) {
-      this.left.showAll()
-      this.right.showAll()
-      this.result.hideAll()
     }
   }
 
@@ -947,10 +935,6 @@ export class MatMul {
         for (let vi = 0; vi < nv; vi++, ptr++) {
           const dotprod = this.dotprods[ptr]
           dotprod.reinit((i, j, h, w) => this.dotprod_val(hi * hp + curi, j, vi * vp + curk))
-          // temp
-          // for (let j = 0; j < this.D; j++) {
-          //   dotprod.setData(0, j, this.dotprod_val(hi * hp + curi, j, vi * vp + curk))
-          // }
         }
       }
     }
@@ -1214,6 +1198,10 @@ export class MatMul {
     if (!this.params.result) {
       this.setResultLegends(enabled)
     }
+  }
+
+  getGuiCallback(name) {
+    throw Error(`HEY unknown callback ${name}`)
   }
 }
 

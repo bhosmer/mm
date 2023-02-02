@@ -349,7 +349,7 @@
         initAxes(val)
       })
 
-      gui_vis.add(params, 'animation', ['dotprod', 'mvprod', 'vmprod', 'none', 'none (inputs only)']).onChange(function (val) {
+      gui_vis.add(params, 'animation', ['dotprod', 'mvprod', 'vmprod', 'none']).onChange(function (val) {
         setParams({ animation: val })
         initObj()
       })

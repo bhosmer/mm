@@ -58,8 +58,6 @@
       'k threads': 1,
       sensitivity: 'global',
       animation: 'none',
-      'hide inputs': false,
-      'hide result': false,
       speed: 8,
       pause: false,
       'zero hue': 0.25,
@@ -264,16 +262,6 @@
 
       gui_vis.add(params, 'animation', animation).onChange(function (val) {
         setParams({ animation: val })
-        getObj().initVis(params)
-      })
-
-      gui_vis.add(params, 'hide inputs').onChange(function (val) {
-        setParams({ 'hide inputs': val })
-        getObj().initVis(params)
-      })
-
-      gui_vis.add(params, 'hide result').onChange(function (val) {
-        setParams({ 'hide result': val })
         getObj().initVis(params)
       })
 
