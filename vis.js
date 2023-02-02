@@ -173,11 +173,25 @@ class Array {
   }
 
   absmax() {
-    return Math.max(...this.data.map(Math.abs))
+    let x = 0
+    const data = this.data
+    for (let i = 0, y = data[0]; i < data.length; y = data[++i]) {
+      if (x < y) {
+        x = y
+      }
+    }
+    return x
   }
 
   absmin() {
-    return Math.min(...this.data.map(Math.abs))
+    let x = Infinity
+    const data = this.data
+    for (let i = 0, y = data[0]; i < data.length; y = data[++i]) {
+      if (x > y) {
+        x = y
+      }
+    }
+    return x
   }
 
   transpose() {
@@ -277,22 +291,26 @@ export class Mat {
     this.max_light = this.params['max light']
     this.hue_gap = this.params['hue gap']
     this.hue_spread = this.params['hue spread']
-    this.data = data
     this.h = data.h
     this.w = data.w
+
+    this.data = data
     this.absmax = this.data.absmax()
     this.absmin = this.data.absmin()
     // console.log(`HEY absmax ${this.absmax} absmin ${this.absmin} data ${this.data.data}`)
     let sizes = new Float32Array(this.numel())
     let colors = new Float32Array(this.numel() * 3)
     let points = []
+    let ptr = 0
     for (let i = 0; i < this.h; i++) {
-      for (let j = 0; j < this.w; j++) {
+      for (let j = 0; j < this.w; j++, ptr++) {
         points.push(new THREE.Vector3(j, i, 0))
-        sizes[this.data.addr(i, j)] = this.sizeFromData(this.getData(i, j))
-        this.setElemHSL(colors, this.data.addr(i, j), this.getData(i, j))
+        const x = data[ptr]
+        sizes[ptr] = this.sizeFromData(x)
+        this.setElemHSL(colors, ptr, x)
       }
     }
+
     const g = new THREE.BufferGeometry().setFromPoints(points)
     g.setAttribute('pointSize', new THREE.Float32BufferAttribute(sizes, 1))
     g.setAttribute('pointColor', new THREE.Float32BufferAttribute(colors, 3))
@@ -906,17 +924,18 @@ export class MatMul {
       for (let hi = 0, ptr = 0; hi < nh; hi++) {
         for (let vi = 0; vi < nv; vi++, ptr++) {
           const dotprod = this.dotprods[ptr]
-          for (let j = 0; j < this.D; j++) {
-            dotprod.setData(0, j, this.dotprod_val(hi * hp + curi, j, vi * vp + curk))
-          }
+          dotprod.reinit((i, j, h, w) => this.dotprod_val(hi * hp + curi, j, vi * vp + curk))
           // temp
-          for (let j = 0; j < this.D; j++) {
-            dotprod.setData(0, j, this.dotprod_val(hi * hp + curi, j, vi * vp + curk))
-          }
+          // for (let j = 0; j < this.D; j++) {
+          //   dotprod.setData(0, j, this.dotprod_val(hi * hp + curi, j, vi * vp + curk))
+          // }
         }
       }
     }
   }
+
+  // const dotprod_init = (i, j, h, w) => this.dotprod_val(hi * hp, j, vi * vp)
+  // const dotprod = Mat.fromInit(1, this.D, dotprod_init, this)
 
   initAnimAXPY() {
     // TODO
