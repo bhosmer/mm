@@ -287,17 +287,10 @@ export class Mat {
       this.params = { ...params }
       this.getGlobalAbsmax = () => this.absmax
     }
-    this.local_sens = this.params.sensitivity == 'local'
-    this.zero_hue = this.params['zero hue']
-    this.zero_size = this.params['zero size']
-    this.zero_light = this.params['zero light']
-    this.max_light = this.params['max light']
-    this.hue_gap = this.params['hue gap']
-    this.hue_spread = this.params['hue spread']
     this.h = data.h
     this.w = data.w
-
     this.data = data
+
     this.absmax = this.data.absmax()
     this.absmin = this.data.absmin()
     // console.log(`HEY absmax ${this.absmax} absmin ${this.absmin} data ${this.data.data}`)
@@ -342,15 +335,16 @@ export class Mat {
       return 0
     }
 
+    const local_sens = this.params.sensitivity == 'local'
     const absx = Math.abs(x)
-    const [min, max] = this.local_sens ? [this.absmin, this.absmax] : [0, this.getGlobalAbsmax()]
+    const [min, max] = local_sens ? [this.absmin, this.absmax] : [0, this.getGlobalAbsmax()]
     const vol = min == max ? 1 : (absx - min) / (max - min)
 
-    const zsize = this.zero_size * ELEM_SIZE
+    const zsize = this.params['zero size'] * ELEM_SIZE
     const size = zsize + (ELEM_SIZE - zsize) * Math.cbrt(vol)
 
     if (size < 0 || size > ELEM_SIZE * 1.1 || isNaN(size)) {
-      throw Error(`HEY size ${size} absx ${absx} max ${max} min ${min} zsize ${zsize} sens ${this.local_sens}`)
+      throw Error(`HEY size ${size} absx ${absx} max ${max} min ${min} zsize ${zsize} sens ${local_sens}`)
     }
 
     return size
@@ -364,21 +358,22 @@ export class Mat {
       return new THREE.Color().setHSL(0, 0, 0)
     }
 
+    const local_sens = this.params.sensitivity == 'local'
     const absx = Math.abs(x)
-    const [min, max] = this.local_sens ? [this.absmin, this.absmax] : [0, this.getGlobalAbsmax()]
+    const [min, max] = local_sens ? [this.absmin, this.absmax] : [0, this.getGlobalAbsmax()]
     const hvol = min == max ? x : x / (max - min)
 
-    const gap = this.hue_gap * Math.sign(x)
-    const h = (this.zero_hue + gap + (Math.cbrt(hvol) * this.hue_spread)) % 1
+    const gap = this.params['hue gap'] * Math.sign(x)
+    const h = (this.params['zero hue'] + gap + (Math.cbrt(hvol) * this.params['hue spread'])) % 1
 
-    const range = this.max_light - this.zero_light
+    const range = this.params['max light'] - this.params['zero light']
 
     // note: hue is always local?
-    const lvol = this.local_sens ?
+    const lvol = local_sens ?
       this.absmax == this.absmin ? 1 : (absx - this.absmin) / (this.absmax - this.absmin) :
       this.absmax == 0 ? 0 : absx / this.absmax
 
-    const l = this.zero_light + range * Math.cbrt(lvol)
+    const l = this.params['zero light'] + range * Math.cbrt(lvol)
 
     return new THREE.Color().setHSL(h, 1.0, l)
   }
