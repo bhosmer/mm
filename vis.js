@@ -127,10 +127,10 @@ function getInPlaceEpilog(name) {
 }
 
 //
-// Array
+// Array2D
 //
 
-class Array {
+class Array2D {
 
   static fromInit(h, w, f, epi = undefined) {
     const data = new Float32Array(h * w)
@@ -148,7 +148,7 @@ class Array {
     if (epi_) {
       epi_(h, w, data)
     }
-    return new Array(h, w, data, epi)
+    return new Array2D(h, w, data, epi)
   }
 
   constructor(h, w, data) {
@@ -199,7 +199,7 @@ class Array {
   }
 
   transpose() {
-    return Array.fromInit(this.w, this.h, (i, j, h, w) => this.get(j, i))
+    return Array2D.fromInit(this.w, this.h, (i, j, h, w) => this.get(j, i))
   }
 
   map(f) {
@@ -207,7 +207,7 @@ class Array {
     for (let ptr = 0; ptr < n; ptr++) {
       data[ptr] = f(this.data[ptr])
     }
-    return new Array(this.h, this.w, data)
+    return new Array2D(this.h, this.w, data)
   }
 
   map2(f, a) {
@@ -219,7 +219,7 @@ class Array {
     for (let ptr = 0; ptr < n; ptr++) {
       data[ptr] = f(this.data[ptr], a.data[ptr])
     }
-    return new Array(this.h, this.w, data)
+    return new Array2D(this.h, this.w, data)
   }
 
   add(a) {
@@ -236,7 +236,7 @@ const ELEM_SIZE = 1792
 export class Mat {
 
   static fromInit(h, w, init, container) {
-    return new Mat(Array.fromInit(h, w, init), container)
+    return new Mat(Array2D.fromInit(h, w, init), container)
   }
 
   static dataFromParams(h, w, params) {
@@ -248,7 +248,7 @@ export class Mat {
     }
     const sparsity = params['left sparsity']
     const init = getInitFunc(init_name, sparsity, init_base, init_range)
-    return Array.fromInit(h, w, init)
+    return Array2D.fromInit(h, w, init)
   }
 
   static fromParams(h, w, params, getText) {
@@ -293,14 +293,13 @@ export class Mat {
 
     this.absmax = this.data.absmax()
     this.absmin = this.data.absmin()
-    // console.log(`HEY absmax ${this.absmax} absmin ${this.absmin} data ${this.data.data}`)
     let sizes = new Float32Array(this.data.numel())
     let colors = new Float32Array(this.data.numel() * 3)
-    let points = []
+    let points = new Array(this.data.numel())
     let ptr = 0
     for (let i = 0; i < this.h; i++) {
       for (let j = 0; j < this.w; j++, ptr++) {
-        points.push(new THREE.Vector3(j, i, 0))
+        points[ptr] = new THREE.Vector3(j, i, 0)
         const x = data.data[ptr]
         sizes[ptr] = this.sizeFromData(x)
         this.setElemHSL(colors, ptr, x)
@@ -581,7 +580,7 @@ export class MatMul {
     const init = this.params['left init']
     const sparsity = this.params['left sparsity']
     const left_init = getInitFunc(init, sparsity, this.init_base, this.init_range)
-    this.left_data = Array.fromInit(this.H, this.D, left_init)
+    this.left_data = Array2D.fromInit(this.H, this.D, left_init)
   }
 
   initRightData() {
@@ -596,7 +595,7 @@ export class MatMul {
     const init = this.params['right init']
     const sparsity = this.params['right sparsity']
     const right_init = getInitFunc(init, sparsity, this.init_base, this.init_range)
-    this.right_data = Array.fromInit(this.D, this.W, right_init)
+    this.right_data = Array2D.fromInit(this.D, this.W, right_init)
   }
 
   initResultData() {
@@ -611,7 +610,7 @@ export class MatMul {
       return
     }
     const result_init = (y, x, h, w) => this._result_val(this.left_data, this.right_data, y, x)
-    this.result_data = Array.fromInit(this.H, this.W, result_init, this.params.epilog)
+    this.result_data = Array2D.fromInit(this.H, this.W, result_init, this.params.epilog)
   }
 
   initVis(params = undefined) {
@@ -757,7 +756,8 @@ export class MatMul {
   }
 
   setAnimation(animation) {
-    const maybe_hide_things = () => {
+
+    function maybe_hide_things() {
       if (this.params['hide inputs']) {
         this.left.hideAll()
         this.right.hideAll()
@@ -766,6 +766,9 @@ export class MatMul {
         this.result.hideAll()
       }
     }
+
+    const prev_anim = this.animation
+    this.animation = animation
 
     if (animation == 'itemwise') {
       maybe_hide_things()
@@ -807,9 +810,12 @@ export class MatMul {
     } else if (animation == 'none') {
       this.left.showAll()
       this.right.showAll()
-      // this.result.showAll()
-      this.initResultData() // vvprod and friends animate the result
-      this.initResultVis()
+      if (prev_anim == 'vv_prod' || prev_anim == 'itemwise') {
+        this.initResultData() // vvprod and friends animate the result
+        this.initResultVis()
+      } else {
+        this.result.showAll()
+      }
     } else if (animation == 'none (inputs only)' && !this.params.result) {
       this.left.showAll()
       this.right.showAll()
