@@ -338,8 +338,8 @@ export class Mat {
     const local_sens = this.params.sensitivity == 'local'
     const absx = Math.abs(x)
     const [min, max] = local_sens ? [this.absmin, this.absmax] : [0, this.getGlobalAbsmax()]
-    const vol = min == max ? 1 : (absx - min) / (max - min)
 
+    const vol = min == max ? 1 : (absx - min) / (max - min)
     const zsize = this.params['zero size'] * ELEM_SIZE
     const size = zsize + (ELEM_SIZE - zsize) * Math.cbrt(vol)
 
@@ -361,21 +361,16 @@ export class Mat {
     const local_sens = this.params.sensitivity == 'local'
     const absx = Math.abs(x)
     const [min, max] = local_sens ? [this.absmin, this.absmax] : [0, this.getGlobalAbsmax()]
-    const hvol = min == max ? x : x / (max - min)
 
+    const hue_vol = min == max ? x : x / (max - min)
     const gap = this.params['hue gap'] * Math.sign(x)
-    const h = (this.params['zero hue'] + gap + (Math.cbrt(hvol) * this.params['hue spread'])) % 1
+    const hue = (this.params['zero hue'] + gap + (Math.cbrt(hue_vol) * this.params['hue spread'])) % 1
 
+    const light_vol = min == max ? 1 : (absx - min) / (max - min)
     const range = this.params['max light'] - this.params['zero light']
+    const light = this.params['zero light'] + range * Math.cbrt(light_vol)
 
-    // note: hue is always local?
-    const lvol = local_sens ?
-      this.absmax == this.absmin ? 1 : (absx - this.absmin) / (this.absmax - this.absmin) :
-      this.absmax == 0 ? 0 : absx / this.absmax
-
-    const l = this.params['zero light'] + range * Math.cbrt(lvol)
-
-    return new THREE.Color().setHSL(h, 1.0, l)
+    return new THREE.Color().setHSL(hue, 1.0, light)
   }
 
   setElemHSL(a, i, x) {
