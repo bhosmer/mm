@@ -157,6 +157,10 @@ class Array {
     this.data = data
   }
 
+  numel() {
+    return this.h * this.w
+  }
+
   get(i, j) {
     return this.data[this.addr(i, j)]
   }
@@ -175,7 +179,7 @@ class Array {
   absmax() {
     let x = 0
     const data = this.data
-    for (let i = 0, y = data[0]; i < data.length; y = data[++i]) {
+    for (let i = 0, y = Math.abs(data[0]); i < data.length; y = Math.abs(data[++i])) {
       if (x < y) {
         x = y
       }
@@ -186,7 +190,7 @@ class Array {
   absmin() {
     let x = Infinity
     const data = this.data
-    for (let i = 0, y = data[0]; i < data.length; y = data[++i]) {
+    for (let i = 0, y = Math.abs(data[0]); i < data.length; y = Math.abs(data[++i])) {
       if (x > y) {
         x = y
       }
@@ -232,7 +236,7 @@ const ELEM_SIZE = 1792
 export class Mat {
 
   static fromInit(h, w, init, container) {
-    return new Mat(h, w, Array.fromInit(h, w, init), container)
+    return new Mat(Array.fromInit(h, w, init), container)
   }
 
   static dataFromParams(h, w, params) {
@@ -258,8 +262,7 @@ export class Mat {
       data = Mat.dataFromParams(h, w, params)
     }
 
-    const m = new Mat(h, w, data, undefined, params)
-
+    const m = new Mat(data, undefined, params)
     m.setGuides(params.guides)
 
     const custom = params.legend ? params.legend : {}
@@ -270,7 +273,7 @@ export class Mat {
     return m
   }
 
-  constructor(h, w, data, container, params) {
+  constructor(data, container, params) {
     if (container) {
       if (params) {
         throw Error('passed both container and params to Mat')
@@ -298,14 +301,14 @@ export class Mat {
     this.absmax = this.data.absmax()
     this.absmin = this.data.absmin()
     // console.log(`HEY absmax ${this.absmax} absmin ${this.absmin} data ${this.data.data}`)
-    let sizes = new Float32Array(this.numel())
-    let colors = new Float32Array(this.numel() * 3)
+    let sizes = new Float32Array(this.data.numel())
+    let colors = new Float32Array(this.data.numel() * 3)
     let points = []
     let ptr = 0
     for (let i = 0; i < this.h; i++) {
       for (let j = 0; j < this.w; j++, ptr++) {
         points.push(new THREE.Vector3(j, i, 0))
-        const x = data[ptr]
+        const x = data.data[ptr]
         sizes[ptr] = this.sizeFromData(x)
         this.setElemHSL(colors, ptr, x)
       }
@@ -323,17 +326,18 @@ export class Mat {
 
     this.group = new THREE.Group()
     this.group.add(this.points)
+
+    this.shown = 'all'
   }
 
   getAbsmax() {
     return this.absmax
   }
 
-  numel() {
-    return this.h * this.w
-  }
-
   sizeFromData(x) {
+    if (x == undefined) {
+      throw Error(`HEY sizeFromData(${x})`)
+    }
     if (isNaN(x)) {
       return 0
     }
@@ -353,6 +357,9 @@ export class Mat {
   }
 
   colorFromData(x) {
+    if (x == undefined) {
+      throw Error(`HEY colorFromData(${x})`)
+    }
     if (isNaN(x)) {
       return new THREE.Color().setHSL(0, 0, 0)
     }
@@ -417,21 +424,38 @@ export class Mat {
     this.setHSL(i, j, x)
   }
 
+  show(i, j) {
+    if (this.shown == 'all') {
+      return
+    }
+    this.setSize(i, j, this.sizeFromData(this.getData(i, j)))
+    this.setHSL(i, j, this.getData(i, j))
+    this.shown == 'mixed'
+  }
+
+  showAll() {
+    if (this.shown == 'all') {
+      return
+    }
+    for (let i = 0; i < this.h; i++) {
+      for (let j = 0; j < this.w; j++) {
+        this.show(i, j)
+      }
+    }
+    this.shown = 'all'
+  }
+
   hideAll() {
+    if (this.shown == 'none') {
+      return
+    }
     for (let i = 0; i < this.h; i++) {
       for (let j = 0; j < this.w; j++) {
         this.setSize(i, j, this.sizeFromData(NaN))
         this.setHSL(i, j, NaN)
       }
     }
-  }
-
-  showAll() {
-    for (let i = 0; i < this.h; i++) {
-      for (let j = 0; j < this.w; j++) {
-        this.show(i, j)
-      }
-    }
+    this.shown = 'none'
   }
 
   bumpColor(i, j, up) {
@@ -455,11 +479,6 @@ export class Mat {
     for (let i = 0; i < this.h; i++) {
       this.bumpColor(i, j, up)
     }
-  }
-
-  show(i, j) {
-    this.setSize(i, j, this.sizeFromData(this.getData(i, j)))
-    this.setHSL(i, j, this.getData(i, j))
   }
 
   setGuides(enabled) {
@@ -643,7 +662,7 @@ export class MatMul {
     if (this.left) {
       this.group.remove(this.left.group)
     }
-    this.left = new Mat(this.H, this.D, this.left_data, this)
+    this.left = new Mat(this.left_data, this)
     this.left.group.rotation.y = Math.PI / 2
     this.left.group.rotation.z = Math.PI
     if (this.params.left_rot) {
@@ -666,7 +685,7 @@ export class MatMul {
     if (this.right) {
       this.group.remove(this.right.group)
     }
-    this.right = new Mat(this.D, this.W, this.right_data, this)
+    this.right = new Mat(this.right_data, this)
     this.right.group.rotation.x = Math.PI / 2
     if (this.params.right_rot) {
       Object.keys(this.params.right_rot).map(k => this.right.group.rotation[k] += this.params.right_rot[k])
@@ -689,7 +708,7 @@ export class MatMul {
     if (this.result) {
       this.group.remove(this.result.group)
     }
-    this.result = new Mat(this.H, this.W, this.result_data, this)
+    this.result = new Mat(this.result_data, this)
     this.result.group.rotation.x = Math.PI
     if (this.params.result_rot) {
       Object.keys(this.params.result_rot).map(k => this.result.group.rotation[k] += this.params.result_rot[k])
