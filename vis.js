@@ -763,41 +763,6 @@ export class MatMul {
     return this.absmax
   }
 
-  setEpilog(epilog) {
-    this.params.epilog = epilog
-    this.initResultData()
-    this.initVis()
-  }
-
-  setI(i) {
-    this.H = this.params.I = i
-    this.initLeft()
-  }
-
-  initLeft(params = undefined) {
-    if (params) {
-      this.params = { ...params }
-    }
-    this.initLeftData()
-    this.initResultData()
-    this.initVis()
-  }
-
-  setK(k) {
-    this.W = this.params.K = k
-    this.initRight()
-  }
-
-  initRight(params = undefined) {
-    if (params) {
-      this.params = { ...params }
-    }
-    this.initRightData()
-    this.initResultData()
-
-    this.initVis()
-  }
-
   setAnimation() {
     const prev_alg = this.alg
     this.alg = this.params.alg
@@ -860,11 +825,11 @@ export class MatMul {
   }
 
   getThreadInfo() {
-    const nh = this.params['i threads']
+    const nh = Math.min(this.params['i threads'], this.H)
     const hp = Math.floor(this.H / nh)
-    const nd = this.params['j threads']
+    const nd = Math.min(this.params['j threads'], this.D)
     const dp = Math.floor(this.D / nd)
-    const nv = this.params['k threads']
+    const nv = Math.min(this.params['k threads'], this.W)
     const vp = Math.floor(this.W / nv)
     return { nh, hp, nd, dp, nv, vp }
   }
@@ -1221,23 +1186,6 @@ export class Attn {
     }
     this.initmm1()
     this.initVis()
-  }
-
-  setNQ(n_q) {
-    this.H = this.params.n_q = n_q
-    this.mm1.setI(n_q)
-    this.mm2.params.left = this.mm1.result
-    this.mm2.params.right_pos = new THREE.Vector3(0, -this.H - 1, 0)
-    this.mm2.setI(n_q)
-    this.setPosition()
-  }
-
-  setNKV(n_kv) {
-    this.W = this.params.n_kv = n_kv
-    this.mm1.setK(n_kv)
-    this.mm2.params.left = this.mm1.result
-    this.initmm2()
-    this.setPosition()
   }
 
   setAttnEpilog(epilog) {

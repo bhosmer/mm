@@ -40,7 +40,7 @@
     const init_dims = { i: 32, j: 32, k: 32 }
     const init_funcs = ['rows', 'cols', 'row major', 'col major', 'pt linear', 'pt linear+', 'uniform', 'gaussian', 'tril', 'triu', 'eye', 'diff', 'ones', 'zeros']
     const epilog_funcs = ['none', 'x/J', 'x/sqrt(J)', 'softmax(x/sqrt(J))', 'tanh(x)', 'relu(x)', 'layernorm']
-    const sensitivity = ['local', 'global']
+    const sensitivities = ['local', 'global']
     const algs = ['dotprod', 'axpy', 'mvprod', 'vmprod', 'vvprod', 'none']
 
     const params = {
@@ -81,6 +81,8 @@
       zcam: init_dims.k * 2,
     };
 
+    // update URL with param changes
+
     let addressBarUpdatePending = false
     function setParams(obj) {
       for (const k in obj) {
@@ -100,6 +102,7 @@
     // note: everything is kicked off from this handler 
     // bc I'm too lazy to find out the right way to make
     // everything async/await
+
     let getText
     const loader = new FontLoader();
     loader.load('examples/fonts/droid/droid_sans_regular.typeface.json', function (font) {
@@ -118,6 +121,8 @@
       const animate = init()
       animate()
     })
+
+    // main
 
     function init() {
       const scene = new THREE.Scene()
@@ -187,7 +192,7 @@
       let last = 0
       function animate() {
         const t = performance.now()
-        if (params.alg != 'none' && params.speed > 0 && (t - last) > (10 / (params.speed ** 2))) {
+        if (params.alg != 'none' && params.speed > 0 && (t - last) > (1500 / params.speed)) {
           obj.bump()
           last = t
         }
@@ -197,160 +202,57 @@
       return animate
     }
 
+    //
+    // Gui
+    //
+
     function initGui(getObj, initObj, initAxes) {
+
+      function set(n, v, f = initObj, always = false) {
+        setParams({ [n]: v })
+        if (always || getObj().params[n] != v) {
+          f(v)
+        }
+      }
+
       const gui = new GUI();
 
-      gui.add(params, 'I', 1, 1024).onChange(function (val) {
-        val = Math.floor(val)
-        setParams({ I: val })
-        if (val != getObj().params.I) {
-          getObj().setI(val)
-        }
-      })
-
-      gui.add(params, 'J', 1, 1024).onChange(function (val) {
-        val = Math.floor(val)
-        setParams({ J: val })
-        if (val != getObj().params.J) {
-          initObj()
-        }
-      })
-
-      gui.add(params, 'K', 1, 1024).onChange(function (val) {
-        val = Math.floor(val)
-        setParams({ K: val })
-        if (val != getObj().params.K) {
-          getObj().setK(val)
-        }
-      })
+      const gui_shape = gui.addFolder('shape')
+      gui_shape.add(params, 'I', 1, 512).onChange(x => set('I', Math.floor(x)))
+      gui_shape.add(params, 'J', 1, 512).onChange(x => set('J', Math.floor(x)))
+      gui_shape.add(params, 'K', 1, 512).onChange(x => set('K', Math.floor(x)))
 
       const gui_data = gui.addFolder('data')
-
-      gui_data.add(params, 'left init', init_funcs).onChange(function (val) {
-        setParams({ 'left init': val })
-        getObj().initLeft(params)
-      })
-
-      gui_data.add(params, 'right init', init_funcs).onChange(function (val) {
-        setParams({ 'right init': val })
-        getObj().initRight(params)
-      })
-
-      gui_data.add(params, 'left sparsity', 0.0, 1.0).onChange(function (val) {
-        setParams({ 'left sparsity': val })
-        getObj().initLeft(params)
-      })
-
-      gui_data.add(params, 'right sparsity', 0.0, 1.0).onChange(function (val) {
-        setParams({ 'right sparsity': val })
-        getObj().initRight(params)
-      })
-
-      gui_data.add(params, 'init min', -1.0, 1.0).onChange(function (val) {
-        setParams({ 'init min': val })
-        if (val != getObj().params['init min']) {
-          initObj()
-        }
-      })
-
-      gui_data.add(params, 'init max', 0.0, 1.0).onChange(function (val) {
-        setParams({ 'init max': val })
-        if (val != getObj().params['init max']) {
-          initObj()
-        }
-      })
-
-      gui_data.add(params, 'epilog', epilog_funcs).onChange(function (val) {
-        setParams({ epilog: val })
-        getObj().setEpilog(val)
-      })
+      gui_data.add(params, 'left init', init_funcs).onChange(x => set('left init', x))
+      gui_data.add(params, 'right init', init_funcs).onChange(x => set('right init', x))
+      gui_data.add(params, 'left sparsity', 0.0, 1.0).onChange(x => set('left sparsity', x))
+      gui_data.add(params, 'right sparsity', 0.0, 1.0).onChange(x => set('right sparsity', x))
+      gui_data.add(params, 'init min', -1.0, 1.0).onChange(x => set('init min', x))
+      gui_data.add(params, 'init max', 0.0, 1.0).onChange(x => set('init max', x))
+      gui_data.add(params, 'epilog', epilog_funcs).onChange(x => set('epilog', x))
 
       const gui_anim = gui.addFolder('animation')
-
-      gui_anim.add(params, 'alg', algs).onChange(function (val) {
-        setParams({ alg: val })
-        getObj().initVis(params)
-      })
-
-      gui_anim.add(params, 'speed', 0, 100).onChange(function (val) {
-        setParams({ speed: val })
-      })
-
-      gui_anim.add(params, 'hide inputs').onChange(function (val) {
-        setParams({ 'hide inputs': val })
-        getObj().initVis(params)
-      })
-
-      gui_anim.add(params, 'i threads', 1, 8).onChange(function (val) {
-        setParams({ 'i threads': Math.floor(val) })
-        initObj() // getObj().setPartitions(params)
-      })
-
-      gui_anim.add(params, 'j threads', 1, 8).onChange(function (val) {
-        setParams({ 'j threads': Math.floor(val) })
-        initObj() // getObj().setPartitions(params)
-      })
-
-      gui_anim.add(params, 'k threads', 1, 8).onChange(function (val) {
-        setParams({ 'k threads': Math.floor(val) })
-        initObj() // getObj().setPartitions(params)
-      })
-
-      const gui_vis = gui.addFolder('vis')
-
-      gui_vis.add(params, 'guides', params.rowguides).onChange(function (val) {
-        setParams({ 'guides': val })
-        getObj().setGuides(val)
-      })
-
-      gui_vis.add(params, 'legends').onChange(function (val) {
-        setParams({ legends: val })
-        getObj().setLegends(val)
-      })
-
-      gui_vis.add(params, 'axes').onChange(function (val) {
-        setParams({ axes: val })
-        initAxes(val)
-      })
+      gui_anim.add(params, 'alg', algs).onChange(x => set('alg', x, x => getObj().initVis(params)))
+      gui_anim.add(params, 'speed', 0, 100).onChange(x => set('speed', x, x => { }))
+      gui_anim.add(params, 'hide inputs').onChange(x => set('hide inputs', x, x => getObj().initVis(params)))
+      gui_anim.add(params, 'i threads', 1, 8).onChange(x => set('i threads', Math.floor(x)))
+      gui_anim.add(params, 'j threads', 1, 8).onChange(x => set('j threads', Math.floor(x)))
+      gui_anim.add(params, 'k threads', 1, 8).onChange(x => set('k threads', Math.floor(x)))
 
       const gui_colors = gui.addFolder('colors and sizes')
+      gui_colors.add(params, 'sensitivity', sensitivities).onChange(x => set('sensitivity', x))
+      gui_colors.add(params, 'zero hue', 0.0, 1.0).onChange(x => set('zero hue', x))
+      gui_colors.add(params, 'zero size', 0.0, 1.0).onChange(x => set('zero size', x))
+      gui_colors.add(params, 'zero light', 0.0, 1.0).onChange(x => set('zero light', x))
+      gui_colors.add(params, 'max light', 0.0, 1.0).onChange(x => set('max light', x))
+      gui_colors.add(params, 'hue gap', 0.0, 1.0).onChange(x => set('hue gap', x))
+      gui_colors.add(params, 'hue spread', 0.0, 1.0).onChange(x => set('hue spread', x))
 
-      gui_colors.add(params, 'sensitivity', sensitivity).onChange(function (val) {
-        setParams({ sensitivity: val })
-        initObj() // TODO
-      })
-
-      gui_colors.add(params, 'zero hue', 0.0, 1.0).onChange(function (val) {
-        setParams({ 'zero hue': val })
-        getObj().initVis(params)
-      })
-
-      gui_colors.add(params, 'zero size', 0.0, 1.0).onChange(function (val) {
-        setParams({ 'zero size': val })
-        getObj().initVis(params)
-      })
-
-      gui_colors.add(params, 'zero light', 0.0, 1.0).onChange(function (val) {
-        setParams({ 'zero light': val })
-        getObj().initVis(params)
-      })
-
-      gui_colors.add(params, 'max light', 0.0, 1.0).onChange(function (val) {
-        setParams({ 'max light': val })
-        getObj().initVis(params)
-      })
-
-      gui_colors.add(params, 'hue gap', 0.0, 1.0).onChange(function (val) {
-        setParams({ 'hue gap': val })
-        getObj().initVis(params)
-      })
-
-      gui_colors.add(params, 'hue spread', 0.0, 1.0).onChange(function (val) {
-        setParams({ 'hue spread': val })
-        getObj().initVis(params)
-      })
+      const gui_vis = gui.addFolder('vis')
+      gui_vis.add(params, 'guides').onChange(x => set('guides', x, x => getObj().setGuides(x)))
+      gui_vis.add(params, 'legends').onChange(x => set('legends', x, x => getObj().setLegends(x)))
+      gui_vis.add(params, 'axes').onChange(x => set('axes', x, initAxes, true))
     }
-
 
 
   </script>
