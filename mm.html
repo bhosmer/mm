@@ -35,12 +35,13 @@
     import { ArcballControls } from 'https://threejs.org/examples/jsm/controls/ArcballControls.js';
     import { EffectComposer } from 'https://threejs.org/examples/jsm/postprocessing/EffectComposer.js'
     import { RenderPass } from 'https://threejs.org/examples/jsm/postprocessing/RenderPass.js'
+    import { AfterimagePass } from 'https://threejs.org/examples/jsm/postprocessing/AfterimagePass.js';
 
     const init_dims = { i: 32, j: 32, k: 32 }
     const init_funcs = ['rows', 'cols', 'row major', 'col major', 'pt linear', 'pt linear+', 'uniform', 'gaussian', 'tril', 'triu', 'eye', 'diff', 'ones', 'zeros']
     const epilog_funcs = ['none', 'x/J', 'x/sqrt(J)', 'softmax(x/sqrt(J))', 'tanh(x)', 'relu(x)', 'layernorm']
     const sensitivity = ['local', 'global']
-    const animation = ['itemwise', 'dotprod', 'axpy', 'mvprod', 'vmprod', 'vvprod', 'none']
+    const algs = ['dotprod', 'axpy', 'mvprod', 'vmprod', 'vvprod', 'none']
 
     const params = {
       I: init_dims.i,
@@ -57,9 +58,8 @@
       'j threads': 1,
       'k threads': 1,
       sensitivity: 'global',
-      animation: 'none',
+      alg: 'none',
       speed: 8,
-      pause: false,
       'zero hue': 0.25,
       'zero size': 0.25,
       'zero light': 0.15,
@@ -156,6 +156,7 @@
 
       const composer = new EffectComposer(renderer)
       composer.addPass(new RenderPass(scene, camera))
+      composer.addPass(new AfterimagePass(0.75));
 
       let orbit = new OrbitControls(camera, renderer.domElement)
       orbit.addEventListener('change', function () {
@@ -180,7 +181,7 @@
       let last = 0
       function animate() {
         const t = performance.now()
-        if (!params.pause && params.animation != 'none' && (t - last) > (1000 / (params.speed ** 2))) {
+        if (params.alg != 'none' && params.speed > 0 && (t - last) > (1000 / (params.speed ** 2))) {
           obj.bump()
           last = t
         }
@@ -258,20 +259,33 @@
         getObj().setEpilog(val)
       })
 
-      const gui_vis = gui.addFolder('vis')
+      const gui_anim = gui.addFolder('animation')
 
-      gui_vis.add(params, 'animation', animation).onChange(function (val) {
-        setParams({ animation: val })
+      gui_anim.add(params, 'alg', algs).onChange(function (val) {
+        setParams({ alg: val })
         getObj().initVis(params)
       })
 
-      gui_vis.add(params, 'speed', 1, 10).onChange(function (val) {
+      gui_anim.add(params, 'speed', 0, 10).onChange(function (val) {
         setParams({ speed: Math.floor(val) })
       })
 
-      gui_vis.add(params, 'pause').onChange(function (val) {
-        setParams({ pause: val })
+      gui_anim.add(params, 'i threads', 1, 8).onChange(function (val) {
+        setParams({ 'i threads': Math.floor(val) })
+        initObj() // getObj().setPartitions(params)
       })
+
+      gui_anim.add(params, 'j threads', 1, 8).onChange(function (val) {
+        setParams({ 'j threads': Math.floor(val) })
+        initObj() // getObj().setPartitions(params)
+      })
+
+      gui_anim.add(params, 'k threads', 1, 8).onChange(function (val) {
+        setParams({ 'k threads': Math.floor(val) })
+        initObj() // getObj().setPartitions(params)
+      })
+
+      const gui_vis = gui.addFolder('vis')
 
       gui_vis.add(params, 'guides', params.rowguides).onChange(function (val) {
         setParams({ 'guides': val })
@@ -286,23 +300,6 @@
       gui_vis.add(params, 'axes').onChange(function (val) {
         setParams({ axes: val })
         initAxes(val)
-      })
-
-      const gui_par = gui.addFolder('parallelism')
-
-      gui_par.add(params, 'i threads', 1, 8).onChange(function (val) {
-        setParams({ 'i threads': Math.floor(val) })
-        initObj() // getObj().setPartitions(params)
-      })
-
-      gui_par.add(params, 'j threads', 1, 8).onChange(function (val) {
-        setParams({ 'j threads': Math.floor(val) })
-        initObj() // getObj().setPartitions(params)
-      })
-
-      gui_par.add(params, 'k threads', 1, 8).onChange(function (val) {
-        setParams({ 'k threads': Math.floor(val) })
-        initObj() // getObj().setPartitions(params)
       })
 
       const gui_colors = gui.addFolder('colors and sizes')
