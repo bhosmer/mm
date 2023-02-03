@@ -668,7 +668,7 @@ export class MatMul {
     this.initRightVis()
     this.initResultVis()
 
-    this.setAnimation(this.params.alg)
+    this.setAnimation()
 
     this.setPosition()
   }
@@ -798,28 +798,29 @@ export class MatMul {
     this.initVis()
   }
 
-  setAnimation(alg) {
+  setAnimation() {
     const prev_alg = this.alg
-    this.alg = alg
+    this.alg = this.params.alg
 
-    // hide inputs when animating, result when j threads > 1
-    if (alg == 'none') {
+    if (this.params.alg == 'none') {
       this.left.showAll()
       this.right.showAll()
       this.result.showAll()
     } else {
-      this.left.hideAll()
-      this.right.hideAll()
+      if (this.params['hide inputs']) {
+        this.left.hideAll()
+        this.right.hideAll()
+      }
       if (this.params['j threads'] > 1) {
         this.result.hideAll()
       }
     }
 
-    if (alg == 'dotprod') {
+    if (this.alg == 'dotprod') {
       this.initAnimDotprod()
-    } else if (alg == 'axpy') {
+    } else if (this.alg == 'axpy') {
       this.initAnimAXPY()
-    } else if (alg == 'mvprod') {
+    } else if (this.alg == 'mvprod') {
       this.result.hideAll()
       const mvprod_init = (i, j, h, w) => this.dotprod_val(i, j, 0)
       this.mvprod = Mat.fromInit(this.H, this.D, mvprod_init, this)
@@ -828,7 +829,7 @@ export class MatMul {
       this.group.add(this.mvprod.points)
       this.bump = this.bump_mvprod
       this.curk = this.W - 1
-    } else if (alg == 'vmprod') {
+    } else if (this.alg == 'vmprod') {
       this.result.hideAll()
       const vmprod_init = (i, j, h, w) => this.dotprod_val(0, i, j)
       this.vmprod = Mat.fromInit(this.D, this.W, vmprod_init, this)
@@ -836,7 +837,7 @@ export class MatMul {
       this.group.add(this.vmprod.points)
       this.bump = this.bump_vmprod
       this.curi = this.H - 1
-    } else if (alg == 'vvprod') {
+    } else if (this.alg == 'vvprod') {
       this.result.hideAll()
       const vvprod_init = (i, j, h, w) => this.dotprod_val(i, 0, j)
       this.vvprod = Mat.fromInit(this.H, this.W, vvprod_init, this)
@@ -844,7 +845,7 @@ export class MatMul {
       this.group.add(this.vvprod.points)
       this.bump = this.bump_vvprod
       this.curj = this.D - 1
-    } else if (alg == 'none') {
+    } else if (this.alg == 'none') {
       if (prev_alg == 'vv_prod' || prev_alg == 'axpy') {
         this.initResultData() // depthwise animations accum into result
         this.initResultVis()
@@ -916,7 +917,6 @@ export class MatMul {
         if (curi == 0 && curk == 0) {
           this.result.hideAll()
         }
-
         for (let hi = 0; hi < nh; hi++) {
           for (let vi = 0; vi < nv; vi++) {
             this.result.show(hi * hp + curi, vi * vp + curk)
@@ -926,7 +926,6 @@ export class MatMul {
         if (curi == 0 && curk == 0) {
           this.dpresults.forEach(dpresult => dpresult.hideAll())
         }
-
         for (let hi = 0; hi < nh; hi++) {
           for (let vi = 0; vi < nv; vi++) {
             this.dpresults.forEach(dpresult => {
@@ -936,25 +935,23 @@ export class MatMul {
         }
       }
 
-
-      // hilight operand row/cols
-
-      if (oldk != curk) {
-        for (let vi = 0; vi < nv; vi++) {
-          this.right.bumpColumnColor(oldk + vi * vp, false)
-          this.right.bumpColumnColor(curk + vi * vp, true)
+      if (!this.params['hide inputs']) {
+        // hilight operand row/cols
+        if (oldk != curk) {
+          for (let vi = 0; vi < nv; vi++) {
+            this.right.bumpColumnColor(oldk + vi * vp, false)
+            this.right.bumpColumnColor(curk + vi * vp, true)
+          }
         }
-      }
-
-      if (oldi != curi) {
-        for (let hi = 0; hi < nh; hi++) {
-          this.left.bumpRowColor(oldi + hi * hp, false)
-          this.left.bumpRowColor(curi + hi * hp, true)
+        if (oldi != curi) {
+          for (let hi = 0; hi < nh; hi++) {
+            this.left.bumpRowColor(oldi + hi * hp, false)
+            this.left.bumpRowColor(curi + hi * hp, true)
+          }
         }
       }
 
       // move and recolor dot product vectors
-
       this.dpgroup.position.x = curk
       this.dpgroup.position.y = -curi
       for (let hi = 0, ptr = 0; hi < nh; hi++) {

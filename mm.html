@@ -47,6 +47,7 @@
       I: init_dims.i,
       J: init_dims.j,
       K: init_dims.k,
+
       'left init': 'rows',
       'left sparsity': 0,
       'right init': 'cols',
@@ -54,21 +55,26 @@
       'init min': -1,
       'init max': 1,
       epilog: 'none',
+
+      alg: 'none',
+      speed: 50,
+      'hide inputs': false,
       'i threads': 1,
       'j threads': 1,
       'k threads': 1,
+
       sensitivity: 'global',
-      alg: 'none',
-      speed: 8,
       'zero hue': 0.25,
       'zero size': 0.25,
       'zero light': 0.15,
       'max light': 0.65,
       'hue gap': 0.25,
       'hue spread': 0.01,
+
       guides: false,
       legends: true,
       axes: false,
+
       // set from orbit control
       xcam: -init_dims.i * 2,
       ycam: init_dims.j * 2,
@@ -181,7 +187,7 @@
       let last = 0
       function animate() {
         const t = performance.now()
-        if (params.alg != 'none' && params.speed > 0 && (t - last) > (1000 / (params.speed ** 2))) {
+        if (params.alg != 'none' && params.speed > 0 && (t - last) > (10 / (params.speed ** 2))) {
           obj.bump()
           last = t
         }
@@ -266,8 +272,13 @@
         getObj().initVis(params)
       })
 
-      gui_anim.add(params, 'speed', 0, 10).onChange(function (val) {
-        setParams({ speed: Math.floor(val) })
+      gui_anim.add(params, 'speed', 0, 100).onChange(function (val) {
+        setParams({ speed: val })
+      })
+
+      gui_anim.add(params, 'hide inputs').onChange(function (val) {
+        setParams({ 'hide inputs': val })
+        getObj().initVis(params)
       })
 
       gui_anim.add(params, 'i threads', 1, 8).onChange(function (val) {
