@@ -118,3 +118,11 @@ export function locate(y, x) {
   ['x', 'y', 'z'].map(d => y.position[d] = x.position[d])
 }
 
+//
+// misc object utils
+//
+
+export function updateProps(obj, props) {
+  Object.entries(props).map(([k, v]) => obj[k] = v)
+}
+

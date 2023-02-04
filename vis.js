@@ -53,20 +53,20 @@ function gaussianRandom(mean = 0, stdev = 1) {
 }
 
 const INIT_FUNCS = {
-  rows: (i, j, h, w) => h > 1 ? i / (h - 1) : 0,
+  rows: (i, j, h) => h > 1 ? i / (h - 1) : 0,
   cols: (i, j, h, w) => w > 1 ? j / (w - 1) : 0,
   'row major': (i, j, h, w) => h * w > 1 ? (i * w + j) / (h * w - 1) : 0,
   'col major': (i, j, h, w) => h * w > 1 ? (j * h + i) / (h * w) : 0,
   'pt linear': (i, j, h, w) => (2 * Math.random() - 1) / Math.sqrt(w),
   'pt linear+': (i, j, h, w) => Math.max((2 * Math.random() - 1) / Math.sqrt(w)),
-  uniform: (i, j, h, w) => Math.random(),
-  gaussian: (i, j, h, w) => gaussianRandom(0.5, 0.5),
-  tril: (i, j, h, w) => j <= i ? 1 : 0,
-  triu: (i, j, h, w) => j >= i ? 1 : 0,
-  eye: (i, j, h, w) => i == j ? 1 : 0,
-  diff: (i, j, h, w) => i == j ? 1 : i == j + 1 ? -1 : 0,
-  ones: (i, j, h, w) => 1,
-  zeros: (i, j, h, w) => 0,
+  uniform: () => Math.random(),
+  gaussian: () => gaussianRandom(0.5, 0.5),
+  tril: (i, j) => j <= i ? 1 : 0,
+  triu: (i, j) => j >= i ? 1 : 0,
+  eye: (i, j) => i == j ? 1 : 0,
+  diff: (i, j) => i == j ? 1 : i == j + 1 ? -1 : 0,
+  ones: () => 1,
+  zeros: () => 0,
 }
 
 const USE_RANGE = ['rows', 'cols', 'row major', 'col major', 'uniform', 'gaussian']
@@ -206,7 +206,7 @@ class Array2D {
   }
 
   transpose() {
-    return Array2D.fromInit(this.w, this.h, (i, j, h, w) => this.get(j, i))
+    return Array2D.fromInit(this.w, this.h, (i, j) => this.get(j, i))
   }
 
   map(f) {
@@ -630,7 +630,7 @@ export class MatMul {
       this.result_data = this.params.result_data
       return
     }
-    const result_init = (y, x, h, w) => this._result_val(this.left_data, this.right_data, y, x)
+    const result_init = (y, x) => this._result_val(this.left_data, this.right_data, y, x)
     this.result_data = Array2D.fromInit(this.H, this.W, result_init, this.params.epilog)
   }
 
@@ -787,7 +787,7 @@ export class MatMul {
       this.initAnimAXPY()
     } else if (this.alg == 'mvprod') {
       this.result.hideAll()
-      const mvprod_init = (i, j, h, w) => this.dotprod_val(i, j, 0)
+      const mvprod_init = (i, j) => this.dotprod_val(i, j, 0)
       this.mvprod = Mat.fromInit(this.H, this.D, mvprod_init, this)
       this.mvprod.points.rotation.y = Math.PI / 2
       this.mvprod.points.rotation.z = Math.PI
@@ -796,7 +796,7 @@ export class MatMul {
       this.curk = this.W - 1
     } else if (this.alg == 'vmprod') {
       this.result.hideAll()
-      const vmprod_init = (i, j, h, w) => this.dotprod_val(0, i, j)
+      const vmprod_init = (i, j) => this.dotprod_val(0, i, j)
       this.vmprod = Mat.fromInit(this.D, this.W, vmprod_init, this)
       this.vmprod.points.rotation.x = Math.PI / 2
       this.group.add(this.vmprod.points)
@@ -804,7 +804,7 @@ export class MatMul {
       this.curi = this.H - 1
     } else if (this.alg == 'vvprod') {
       this.result.hideAll()
-      const vvprod_init = (i, j, h, w) => this.dotprod_val(i, 0, j)
+      const vvprod_init = (i, j) => this.dotprod_val(i, 0, j)
       this.vvprod = Mat.fromInit(this.H, this.W, vvprod_init, this)
       this.vvprod.points.rotation.x = Math.PI
       this.group.add(this.vvprod.points)
@@ -820,111 +820,105 @@ export class MatMul {
     }
   }
 
+  getThreadInfo() {
+    const ni = Math.min(this.params['i threads'], this.H)
+    const nj = Math.min(this.params['j threads'], this.D)
+    const nk = Math.min(this.params['k threads'], this.W)
+    return {
+      i: { n: ni, p: Math.floor(this.H / ni) },
+      j: { n: nj, p: Math.floor(this.D / nj) },
+      k: { n: nk, p: Math.floor(this.W / nk) },
+    }
+  }
+
+  par(dims, f) {
+    const info = this.getThreadInfo()
+    const lims = dims.split('').map(d => info[d].n)
+    const loop = (ixs, lims, f) => lims.length == 0 ?
+      f(...ixs) :
+      [...Array(lims[0]).keys()].map(i => loop([...ixs, i], lims.slice(1), f))
+    loop([], lims, f)
+  }
+
   dotprod_val(i, j, k) {
     return this.left.getData(i, j) * this.right.getData(j, k)
   }
 
-  getThreadInfo() {
-    const nh = Math.min(this.params['i threads'], this.H)
-    const hp = Math.floor(this.H / nh)
-    const nd = Math.min(this.params['j threads'], this.D)
-    const dp = Math.floor(this.D / nd)
-    const nv = Math.min(this.params['k threads'], this.W)
-    const vp = Math.floor(this.W / nv)
-    return { nh, hp, nd, dp, nv, vp }
-  }
-
   initAnimDotprod() {
+    const { i: { p: ip }, j: { n: nj, p: jp }, k: { n: nk, p: kp } } = this.getThreadInfo()
+
     this.dotprods = []
     this.dpgroup = new THREE.Group()
-    this.dpresults = []
-    const { nh, hp, nd, dp, nv, vp } = this.getThreadInfo()
-
-    for (let hi = 0; hi < nh; hi++) {
-      for (let vi = 0; vi < nv; vi++) {
-        const dotprod_init = (i, j, h, w) => this.dotprod_val(hi * hp, j, vi * vp)
-        const dotprod = Mat.fromInit(1, this.D, dotprod_init, this)
-        dotprod.points.rotation.y = -Math.PI / 2
-        dotprod.points.position.y -= hi * hp
-        dotprod.points.position.x += vi * vp
-        this.dotprods.push(dotprod)
-        this.dpgroup.add(dotprod.points)
-      }
-    }
+    this.par('ik', (it, kt) => {
+      const dotprod_init = (i, j) => this.dotprod_val(it * ip, j, kt * kp)
+      const dotprod = Mat.fromInit(1, this.D, dotprod_init, this)
+      util.updateProps(dotprod.group.position, { x: kt * kp, y: -it * ip })
+      dotprod.group.rotation.y = -Math.PI / 2
+      this.dotprods.push(dotprod)
+      this.dpgroup.add(dotprod.group)
+    })
     this.group.add(this.dpgroup)
 
-    if (nd > 1) {
-      for (let di = 0; di < nd; di++) {
-        const dpresult_init = (y, x, h, w) => this.result_val(y, x, di * dp, (di + 1) * dp)
+    if (nj > 1) {
+      this.dpresults = []
+      this.par('j', j => {
+        const dpresult_init = (y, x) => this.result_val(y, x, j * jp, (j + 1) * jp)
         const dpresult = Mat.fromInit(this.H, this.W, dpresult_init, this)
-        dpresult.group.position.z = di * dp + dp - 1
+        dpresult.group.position.z = j * jp + jp - 1
         dpresult.group.rotation.x = Math.PI
         this.dpresults.push(dpresult)
         this.group.add(dpresult.group)
         dpresult.hideAll()
-      }
+      })
     }
 
-    let curi = hp - 1
-    let curk = vp - 1
+    let [curi, curk] = [ip - 1, kp - 1]
 
     this.bump = () => {
       const [oldi, oldk] = [curi, curk]
-      if (oldk < vp - 1) {
+      if (oldk < kp - 1) {
         curk += 1
       } else {
         curk = 0
-        curi = oldi < hp - 1 ? curi + 1 : 0
+        curi = oldi < ip - 1 ? curi + 1 : 0
       }
 
       // update result faces
-      if (nd == 1) {
-        if (curi == 0 && curk == 0) {
+      if (curi == 0 && curk == 0) {
+        if (nj == 1) {
           this.result.hideAll()
-        }
-        for (let hi = 0; hi < nh; hi++) {
-          for (let vi = 0; vi < nv; vi++) {
-            this.result.show(hi * hp + curi, vi * vp + curk)
-          }
-        }
-      } else {
-        if (curi == 0 && curk == 0) {
+        } else {
           this.dpresults.forEach(dpresult => dpresult.hideAll())
         }
-        for (let hi = 0; hi < nh; hi++) {
-          for (let vi = 0; vi < nv; vi++) {
-            this.dpresults.forEach(dpresult => {
-              dpresult.show(hi * hp + curi, vi * vp + curk)
-            })
-          }
-        }
+      }
+      if (nj == 1) {
+        this.par('ik', (i, k) => this.result.show(i * ip + curi, k * kp + curk))
+      } else {
+        this.par('ik', (i, k) => this.dpresults.forEach(r => r.show(i * ip + curi, k * kp + curk)))
       }
 
       if (!this.params['hide inputs']) {
         // hilight operand row/cols
         if (oldk != curk) {
-          for (let vi = 0; vi < nv; vi++) {
-            this.right.bumpColumnColor(oldk + vi * vp, false)
-            this.right.bumpColumnColor(curk + vi * vp, true)
-          }
+          this.par('k', k => {
+            this.right.bumpColumnColor(oldk + k * kp, false)
+            this.right.bumpColumnColor(curk + k * kp, true)
+          })
         }
         if (oldi != curi) {
-          for (let hi = 0; hi < nh; hi++) {
-            this.left.bumpRowColor(oldi + hi * hp, false)
-            this.left.bumpRowColor(curi + hi * hp, true)
-          }
+          this.par('i', i => {
+            this.left.bumpRowColor(oldi + i * ip, false)
+            this.left.bumpRowColor(curi + i * ip, true)
+          })
         }
       }
 
       // move and recolor dot product vectors
-      this.dpgroup.position.x = curk
-      this.dpgroup.position.y = -curi
-      for (let hi = 0, ptr = 0; hi < nh; hi++) {
-        for (let vi = 0; vi < nv; vi++, ptr++) {
-          const dotprod = this.dotprods[ptr]
-          dotprod.reinit((i, j, h, w) => this.dotprod_val(hi * hp + curi, j, vi * vp + curk))
-        }
-      }
+      util.updateProps(this.dpgroup.position, { x: curk, y: -curi })
+      this.par('ik', (it, kt) => {
+        const dotprod = this.dotprods[it * nk + kt]
+        dotprod.reinit((i, j) => this.dotprod_val(it * ip + curi, j, kt * kp + curk))
+      })
     }
   }
 
