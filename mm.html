@@ -35,7 +35,6 @@
     import { ArcballControls } from 'https://threejs.org/examples/jsm/controls/ArcballControls.js';
     import { EffectComposer } from 'https://threejs.org/examples/jsm/postprocessing/EffectComposer.js'
     import { RenderPass } from 'https://threejs.org/examples/jsm/postprocessing/RenderPass.js'
-    import { AfterimagePass } from 'https://threejs.org/examples/jsm/postprocessing/AfterimagePass.js';
 
     const init_dims = { i: 32, j: 32, k: 32 }
     const init_funcs = ['rows', 'cols', 'row major', 'col major', 'pt linear', 'pt linear+', 'uniform', 'gaussian', 'tril', 'triu', 'eye', 'diff', 'ones', 'zeros']
@@ -167,7 +166,6 @@
 
       const composer = new EffectComposer(renderer)
       composer.addPass(new RenderPass(scene, camera))
-      composer.addPass(new AfterimagePass(0.75));
 
       let orbit = new OrbitControls(camera, renderer.domElement)
       orbit.addEventListener('change', function () {
