@@ -784,18 +784,20 @@ export class MatMul {
       this.result.hide()
     }
 
-    if (this.alg == 'dotprod') {
-      this.initAnimDotprod(true)
+    if (this.alg == 'dotprod (row major)') {
+      this.initAnimVmprod(true)
+    } else if (this.alg == 'dotprod (col major)') {
+      this.initAnimMvprod(true)
     } else if (this.alg == 'axpy') {
       this.initAnimAXPY()
     } else if (this.alg == 'mvprod') {
-      this.initAnimMvprod()
+      this.initAnimMvprod(false)
     } else if (this.alg == 'vmprod') {
-      this.initAnimDotprod(false)
+      this.initAnimVmprod(false)
     } else if (this.alg == 'vvprod') {
       this.initAnimVvprod()
     } else if (this.alg == 'none') {
-      if (prev_alg == 'vv_prod' || prev_alg == 'axpy') {
+      if (prev_alg == 'vvprod' || prev_alg == 'axpy') {
         this.initResultData() // depthwise animations accum into result
         this.initResultVis()
       } else {
@@ -842,20 +844,20 @@ export class MatMul {
     return results
   }
 
-  initAnimDotprod(sweep = true) {
+  initAnimVmprod(sweep) {
     const { i: { p: ip }, k: { n: nk, p: kp } } = this.getThreadInfo()
 
-    const dps = []
-    const dpgroup = new THREE.Group()
+    const vmps = []
+    const vmpgroup = new THREE.Group()
     this.par('ik', (i, k) => {
-      const dpinit = (j, kx) => this.ijkmul(i * ip, j, k * kp + kx)
-      const dp = Mat.fromInit(this.D, sweep ? 1 : kp, dpinit, this)
-      util.updateProps(dp.group.position, { x: k * kp, y: -i * ip })
-      dp.group.rotation.x = Math.PI / 2
-      dps.push(dp)
-      dpgroup.add(dp.group)
+      const vmpinit = (j, kx) => this.ijkmul(i * ip, j, k * kp + kx)
+      const vmp = Mat.fromInit(this.D, sweep ? 1 : kp, vmpinit, this)
+      util.updateProps(vmp.group.position, { x: k * kp, y: -i * ip })
+      vmp.group.rotation.x = Math.PI / 2
+      vmps.push(vmp)
+      vmpgroup.add(vmp.group)
     })
-    this.group.add(dpgroup)
+    this.group.add(vmpgroup)
 
     const results = this.anim_results()
 
@@ -893,50 +895,68 @@ export class MatMul {
         }
       }
 
-      util.updateProps(dpgroup.position, { x: curk, y: -curi })
+      util.updateProps(vmpgroup.position, { x: curk, y: -curi })
       this.par('ik', (i, k) => {
-        dps[i * nk + k].reinit((j, kx) => this.ijkmul(i * ip + curi, j, k * kp + kx + curk))
+        vmps[i * nk + k].reinit((j, kx) => this.ijkmul(i * ip + curi, j, k * kp + kx + curk))
       })
     }
   }
 
-  initAnimMvprod() {
-    const { k: { p: kp } } = this.getThreadInfo()
+  initAnimMvprod(sweep) {
+    const { i: { p: ip }, k: { n: nk, p: kp } } = this.getThreadInfo()
 
     const mvps = []
     const mvpgroup = new THREE.Group()
-    this.par('k', kt => {
-      const mvprod_init = (i, j) => this.ijkmul(i, j, kt * kp)
-      const mvprod = Mat.fromInit(this.H, this.D, mvprod_init, this)
-      mvprod.group.position.x = kt * kp
-      util.updateProps(mvprod.group.rotation, { y: Math.PI / 2, z: Math.PI })
-      mvps.push(mvprod)
-      mvpgroup.add(mvprod.group)
+    this.par('ik', (i, k) => {
+      const mvpinit = (ix, j) => this.ijkmul(i * ip + ix, j, k * kp)
+      const mvp = Mat.fromInit(sweep ? 1 : ip, this.D, mvpinit, this)
+      util.updateProps(mvp.group.position, { x: k * kp, y: -i * ip })
+      util.updateProps(mvp.group.rotation, { y: Math.PI / 2, z: Math.PI })
+      mvps.push(mvp)
+      mvpgroup.add(mvp.group)
     })
     this.group.add(mvpgroup)
 
     const results = this.anim_results()
 
+    let curi = sweep ? ip - 1 : 0
     let curk = kp - 1
 
     this.bump = () => {
-      const oldk = curk
-      curk = (curk + 1) % kp
+      const [oldi, oldk] = [curi, curk]
+      if (sweep) {
+        curi = (curi + 1) % ip
+      }
+      if (curi == 0) {
+        curk = (curk + 1) % kp
+      }
 
-      if (curk == 0) {
+      if (curi == 0 && curk == 0) {
         results.forEach(r => r.hide())
       }
-      this.par('k', k => results.forEach(r => r.show(undefined, k * kp + curk)))
+      this.par('ik', (i, k) =>
+        results.forEach(r => r.show(sweep ? i * ip + curi : undefined, k * kp + curk))
+      )
 
       if (!this.params['hide inputs']) {
-        this.par('k', k => {
-          this.right.bumpColumnColor(k * kp + oldk, false)
-          this.right.bumpColumnColor(k * kp + curk, true)
-        })
+        if (sweep) {
+          this.par('i', i => {
+            this.left.bumpRowColor(i * ip + oldi, false)
+            this.left.bumpRowColor(i * ip + curi, true)
+          })
+        }
+        if (oldk != curk) {
+          this.par('k', k => {
+            this.right.bumpColumnColor(k * kp + oldk, false)
+            this.right.bumpColumnColor(k * kp + curk, true)
+          })
+        }
       }
 
-      mvpgroup.position.x = curk
-      this.par('k', k => mvps[k].reinit((i, j) => this.ijkmul(i, j, k)))
+      util.updateProps(mvpgroup.position, { x: curk, y: -curi })
+      this.par('ik', (i, k) => {
+        mvps[i * nk + k].reinit((ix, j) => this.ijkmul(i * ip + ix + curi, j, k * kp + curk))
+      })
     }
   }
 

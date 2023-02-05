@@ -40,7 +40,7 @@
     const init_funcs = ['rows', 'cols', 'row major', 'col major', 'pt linear', 'pt linear+', 'uniform', 'gaussian', 'tril', 'triu', 'eye', 'diff', 'ones', 'zeros']
     const epilog_funcs = ['none', 'x/J', 'x/sqrt(J)', 'softmax(x/sqrt(J))', 'tanh(x)', 'relu(x)', 'layernorm']
     const sensitivities = ['local', 'global']
-    const algs = ['dotprod', 'axpy', 'mvprod', 'vmprod', 'vvprod', 'none']
+    const algs = ['dotprod (row major)', 'dotprod (col major)', 'axpy', 'mvprod', 'vmprod', 'vvprod', 'none']
 
     const params = {
       I: init_dims.i,
@@ -231,7 +231,7 @@
 
       const gui_anim = gui.addFolder('animation')
       gui_anim.add(params, 'alg', algs).onChange(x => set('alg', x, _ => getObj().initVis(params)))
-      gui_anim.add(params, 'speed', 0, 100).onChange(x => set('speed', x, _ => { }))
+      gui_anim.add(params, 'speed', 0, 100).onChange(x => set('speed', Math.floor(x), _ => { }))
       gui_anim.add(params, 'hide inputs').onChange(x => set('hide inputs', x, _ => getObj().initVis(params)))
       gui_anim.add(params, 'i threads', 1, 8).onChange(x => set('i threads', Math.floor(x)))
       gui_anim.add(params, 'j threads', 1, 8).onChange(x => set('j threads', Math.floor(x)))
