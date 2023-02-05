@@ -771,6 +771,7 @@ export class MatMul {
     const prev_alg = this.alg
     this.alg = this.params.alg || 'none'
 
+    // TODO clean this shit up
     if (this.alg == 'none') {
       this.left.show()
       this.right.show()
@@ -788,22 +789,11 @@ export class MatMul {
     } else if (this.alg == 'axpy') {
       this.initAnimAXPY()
     } else if (this.alg == 'mvprod') {
-      const mvprod_init = (i, j) => this.dotprod_val(i, j, 0)
-      this.mvprod = Mat.fromInit(this.H, this.D, mvprod_init, this)
-      this.mvprod.points.rotation.y = Math.PI / 2
-      this.mvprod.points.rotation.z = Math.PI
-      this.group.add(this.mvprod.points)
-      this.bump = this.bump_mvprod
-      this.curk = this.W - 1
+      this.initAnimMvprod()
     } else if (this.alg == 'vmprod') {
       this.initAnimVmprod()
     } else if (this.alg == 'vvprod') {
-      const vvprod_init = (i, j) => this.dotprod_val(i, 0, j)
-      this.vvprod = Mat.fromInit(this.H, this.W, vvprod_init, this)
-      this.vvprod.points.rotation.x = Math.PI
-      this.group.add(this.vvprod.points)
-      this.bump = this.bump_vvprod
-      this.curj = this.D - 1
+      this.initAnimVvprod()
     } else if (this.alg == 'none') {
       if (prev_alg == 'vv_prod' || prev_alg == 'axpy') {
         this.initResultData() // depthwise animations accum into result
@@ -878,13 +868,11 @@ export class MatMul {
         curi = (curi + 1) % ip
       }
 
-      // update result faces
       if (curi == 0 && curk == 0) {
         results.forEach(r => r.hide())
       }
       this.par('ik', (i, k) => results.forEach(r => r.show(i * ip + curi, k * kp + curk)))
 
-      // hilight operand row/cols
       if (!this.params['hide inputs']) {
         if (oldi != curi) {
           this.par('i', i => {
@@ -898,12 +886,15 @@ export class MatMul {
         })
       }
 
-      // move and update dot product vectors
       util.updateProps(dpgroup.position, { x: curk, y: -curi })
       this.par('ik', (it, kt) => {
         dps[it * nk + kt].reinit((i, j) => this.dotprod_val(it * ip + curi, j, kt * kp + curk))
       })
     }
+  }
+
+  initAnimAXPY() {
+    // TODO
   }
 
   initAnimVmprod() {
@@ -929,13 +920,11 @@ export class MatMul {
       const oldi = curi
       curi = (curi + 1) % ip
 
-      // update result faces
       if (curi == 0) {
         results.forEach(r => r.hide())
       }
       this.par('i', i => results.forEach(r => r.show(i * ip + curi)))
 
-      // hilight left rows
       if (!this.params['hide inputs']) {
         this.par('i', i => {
           this.left.bumpRowColor(i * ip + oldi, false)
@@ -943,76 +932,89 @@ export class MatMul {
         })
       }
 
-      // move and update vmprod matrixes
       vmpgroup.position.y = -curi
       this.par('i', i => vmps[i].reinit((j, k) => this.dotprod_val(i * ip + curi, j, k)))
     }
   }
 
-  initAnimAXPY() {
-    // TODO
+  initAnimMvprod() {
+    const { k: { p: kp } } = this.getThreadInfo()
+
+    const mvps = []
+    const mvpgroup = new THREE.Group()
+    this.par('k', kt => {
+      const mvprod_init = (i, j) => this.dotprod_val(i, j, kt * kp)
+      const mvprod = Mat.fromInit(this.H, this.D, mvprod_init, this)
+      mvprod.group.position.x = kt * kp
+      util.updateProps(mvprod.group.rotation, { y: Math.PI / 2, z: Math.PI })
+      mvps.push(mvprod)
+      mvpgroup.add(mvprod.group)
+    })
+    this.group.add(mvpgroup)
+
+    const results = this.anim_results()
+
+    let curk = kp - 1
+
+    this.bump = () => {
+      const oldk = curk
+      curk = (curk + 1) % kp
+
+      if (curk == 0) {
+        results.forEach(r => r.hide())
+      }
+      this.par('k', k => results.forEach(r => r.show(undefined, k * kp + curk)))
+
+      if (!this.params['hide inputs']) {
+        this.par('k', k => {
+          this.right.bumpColumnColor(k * kp + oldk, false)
+          this.right.bumpColumnColor(k * kp + curk, true)
+        })
+      }
+
+      mvpgroup.position.x = curk
+      this.par('k', k => mvps[k].reinit((i, j) => this.dotprod_val(i, j, k)))
+    }
   }
 
-  bump_mvprod() {
-    const oldk = this.curk
+  initAnimVvprod() {
+    const { j: { p: jp } } = this.getThreadInfo()
 
-    if (oldk < this.W - 1) {
-      this.curk += 1
-    } else {
-      this.curk = 0
-    }
+    const vvps = []
+    const vvpgroup = new THREE.Group()
+    this.par('j', jt => {
+      const vvprod_init = (i, k) => this.dotprod_val(i, jt * jp, k)
+      const vvprod = Mat.fromInit(this.H, this.W, vvprod_init, this)
+      vvprod.group.position.z = jt * jp
+      vvprod.group.rotation.x = Math.PI
+      vvps.push(vvprod)
+      vvpgroup.add(vvprod.group)
+    })
+    this.group.add(vvpgroup)
 
-    const k = this.curk
+    const results = this.anim_results()
 
-    // update result face
-    if (this.curk == 0) {
-      this.result.hide()
-    }
-    for (let i = 0; i < this.H; i++) {
-      this.result.show(i, k)
-    }
+    let curj = jp - 1
 
-    this.right.bumpColumnColor(oldk, false)
-    this.right.bumpColumnColor(k, true)
+    this.bump = () => {
+      const oldj = curj
+      curj = (curj + 1) % jp
 
-    // move and recolor dot product vector
-    this.mvprod.points.position.x = this.right.points.geometry.attributes.position.array[k * 3]
-    for (let i = 0; i < this.H; i++) {
-      for (let j = 0; j < this.D; j++) {
-        this.mvprod.setData(i, j, this.dotprod_val(i, j, k))
+      this.par('j', j => {
+        results[j].reinit((i, k) => this.result_val(i, k, j * jp, j * jp + curj + 1))
+      })
+
+      if (!this.params['hide inputs']) {
+        this.par('j', j => {
+          this.left.bumpColumnColor(j * jp + oldj, false)
+          this.left.bumpColumnColor(j * jp + curj, true)
+          this.right.bumpRowColor(j * jp + oldj, false)
+          this.right.bumpRowColor(j * jp + curj, true)
+        })
       }
-    }
-  }
 
-  bump_vvprod() {
-    const oldj = this.curj
-
-    if (oldj < this.D - 1) {
-      this.curj += 1
-    } else {
-      this.curj = 0
-    }
-
-    const j = this.curj
-
-    // update result face
-    for (let i = 0; i < this.H; i++) {
-      for (let k = 0; k < this.W; k++) {
-        this.result.setData(i, k, this.result_val(i, k, 0, j + 1))
-      }
-    }
-
-    this.left.bumpColumnColor(oldj, false)
-    this.left.bumpColumnColor(j, true)
-    this.right.bumpRowColor(oldj, false)
-    this.right.bumpRowColor(j, true)
-
-    // move and recolor dot product vector
-    this.vvprod.points.position.z = this.left.points.geometry.attributes.position.array[j * 3]
-    for (let i = 0; i < this.H; i++) {
-      for (let k = 0; k < this.W; k++) {
-        this.vvprod.setData(i, k, this.dotprod_val(i, j, k))
-      }
+      vvpgroup.position.z = curj
+      this.par('j', j => vvps[j].reinit((i, k) => this.dotprod_val(i, j * jp + curj, k)))
     }
   }
 
