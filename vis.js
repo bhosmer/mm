@@ -184,25 +184,27 @@ class Array2D {
   }
 
   absmax() {
-    let x = 0
     const data = this.data
-    for (let i = 0, y = Math.abs(data[0]); i < data.length; y = Math.abs(data[++i])) {
-      if (x < y) {
-        x = y
+    let absmax = 0
+    for (let i = 0; i < data.length; i++) {
+      const absx = Math.abs(data[i])
+      if (absmax < absx) {
+        absmax = absx
       }
     }
-    return x
+    return absmax
   }
 
   absmin() {
-    let x = Infinity
     const data = this.data
-    for (let i = 0, y = Math.abs(data[0]); i < data.length; y = Math.abs(data[++i])) {
-      if (x > y) {
-        x = y
+    let absmin = Infinity
+    for (let i = 0; i < data.length; i++) {
+      const absx = Math.abs(data[i])
+      if (absmin > absx) {
+        absmin = absx
       }
     }
-    return x
+    return absmin
   }
 
   transpose() {
@@ -259,8 +261,8 @@ function emptyPoints(h, w) {
 
 export class Mat {
 
-  static fromInit(h, w, init, container) {
-    return new Mat(Array2D.fromInit(h, w, init), container)
+  static fromInit(h, w, init, container, params = undefined) {
+    return new Mat(Array2D.fromInit(h, w, init), container, params)
   }
 
   static dataFromParams(h, w, params) {
@@ -299,17 +301,14 @@ export class Mat {
 
   constructor(data, container, params) {
     if (container) {
-      if (params) {
-        throw Error('passed both container and params to Mat')
-      }
-      this.params = { ...container.params }
-      this.getGlobalAbsmax = () => container.getGlobalAbsmax()
+      params = params || {}
+      this.params = { ...container.params, ...params }
+      this.container = container
     } else {
       if (!params) {
         throw Error('passed neither container nor params to Mat')
       }
       this.params = { ...params }
-      this.getGlobalAbsmax = () => this.absmax
     }
 
     this.h = data.h
@@ -317,6 +316,10 @@ export class Mat {
     this.points = emptyPoints(this.h, this.w)
 
     this.data = data
+    this.absmax = this.data.absmax()
+    this.absmin = this.data.absmin()
+
+    // TODO deferred in 2 pass setup for correct global sizes
     this.initVis()
 
     this.group = new THREE.Group()
@@ -324,8 +327,6 @@ export class Mat {
   }
 
   initVis() {
-    this.absmax = this.data.absmax()
-    this.absmin = this.data.absmin()
     const sizes = this.getPointSizes()
     const colors = this.getPointColors()
     for (let i = 0, ptr = 0; i < this.h; i++) {
@@ -339,8 +340,16 @@ export class Mat {
     this.points.geometry.attributes.pointColor.needsUpdate = true
   }
 
+  getGlobalAbsmax() {
+    return this.container ? this.container.getGlobalAbsmax() : this.absmax
+  }
+
   reinit(f, epi = undefined) {
     this.data.reinit(f, epi)
+    if (this.params.stretch_limits) {
+      this.absmax = this.data.absmax()
+      this.absmin = this.data.absmin()
+    }
     this.initVis()
   }
 
@@ -372,7 +381,7 @@ export class Mat {
     const zsize = this.params['zero size'] * ELEM_SIZE
     const size = zsize + (ELEM_SIZE - zsize) * Math.cbrt(vol)
 
-    if (size < 0 || size > ELEM_SIZE * 1.1 || isNaN(size)) {
+    if (absx < min || absx > max || size < 0 || size > ELEM_SIZE || isNaN(size)) {
       throw Error(`HEY size ${size} absx ${absx} max ${max} min ${min} zsize ${zsize} sens ${local_sens}`)
     }
 
@@ -428,22 +437,6 @@ export class Mat {
 
   getData(i, j) {
     return this.data.get(i, j)
-  }
-
-  setData(i, j, x, adjust_minmax = false) {
-    if (isNaN(x)) {
-      throw Error(`HEY setData(${i}, ${j}, ${x})`)
-    }
-    this.data.set(i, j, x)
-    const absx = Math.abs(x)
-    if (absx >= this.absmin && absx <= this.absmax) {
-      this.setSize(i, j, this.sizeFromData(x))
-      this.setHSL(i, j, x)
-    } else if (adjust_minmax) {
-      this.initVis()
-    } else {
-      throw Error(`HEY setData(${i}, ${j}, ${x}) this.absmax ${this.absmax} this.absmin ${this.absmin}`)
-    }
   }
 
   show(y = undefined, x = undefined) {
@@ -799,6 +792,7 @@ export class MatMul {
     } else if (this.alg == 'none') {
       if (prev_alg == 'vvprod' || prev_alg == 'axpy') {
         this.initResultData() // depthwise animations accum into result
+        this.result.params.stretch_limits = false
         this.initResultVis()
       } else {
         this.result.show()
@@ -829,12 +823,14 @@ export class MatMul {
   anim_results() {
     const { j: { n: nj, p: jp } } = this.getThreadInfo()
     if (nj == 1) {
+      this.result.params.stretch_limits = true
       return [this.result]
     }
     const results = []
     this.par('j', j => {
       const result_init = (y, x) => this.dotprod_val(y, x, j * jp, (j + 1) * jp)
-      const result = Mat.fromInit(this.H, this.W, result_init, this)
+      const params = { stretch_limits: true }
+      const result = Mat.fromInit(this.H, this.W, result_init, this, params)
       result.group.position.z = j * jp + jp - 1
       result.group.rotation.x = Math.PI
       result.hide()
@@ -845,21 +841,22 @@ export class MatMul {
   }
 
   initAnimVmprod(sweep) {
-    const { i: { p: ip }, k: { n: nk, p: kp } } = this.getThreadInfo()
+    const { i: { p: ip }, j: { n: nj, p: jp }, k: { n: nk, p: kp } } = this.getThreadInfo()
+
+    const results = this.anim_results()
 
     const vmps = []
     const vmpgroup = new THREE.Group()
-    this.par('ik', (i, k) => {
-      const vmpinit = (j, kx) => this.ijkmul(i * ip, j, k * kp + kx)
-      const vmp = Mat.fromInit(this.D, sweep ? 1 : kp, vmpinit, this)
-      util.updateProps(vmp.group.position, { x: k * kp, y: -i * ip })
+    this.par('ijk', (i, j, k) => {
+      const vmpinit = (jx, kx) => this.ijkmul(i * ip, j * jp + jx, k * kp + kx)
+      const params = { stretch_limits: true }
+      const vmp = Mat.fromInit(jp, sweep ? 1 : kp, vmpinit, this, params)
+      util.updateProps(vmp.group.position, { x: k * kp, y: -i * ip, z: j * jp })
       vmp.group.rotation.x = Math.PI / 2
       vmps.push(vmp)
       vmpgroup.add(vmp.group)
     })
     this.group.add(vmpgroup)
-
-    const results = this.anim_results()
 
     let curi = ip - 1
     let curk = sweep ? kp - 1 : 0
@@ -896,28 +893,30 @@ export class MatMul {
       }
 
       util.updateProps(vmpgroup.position, { x: curk, y: -curi })
-      this.par('ik', (i, k) => {
-        vmps[i * nk + k].reinit((j, kx) => this.ijkmul(i * ip + curi, j, k * kp + kx + curk))
+      this.par('ijk', (i, j, k) => {
+        const vmp = vmps[i * nj * nk + j * nk + k]
+        vmp.reinit((jx, kx) => this.ijkmul(i * ip + curi, j * jp + jx, k * kp + kx + curk))
       })
     }
   }
 
   initAnimMvprod(sweep) {
-    const { i: { p: ip }, k: { n: nk, p: kp } } = this.getThreadInfo()
+    const { i: { p: ip }, j: { n: nj, p: jp }, k: { n: nk, p: kp } } = this.getThreadInfo()
+
+    const results = this.anim_results()
 
     const mvps = []
     const mvpgroup = new THREE.Group()
-    this.par('ik', (i, k) => {
-      const mvpinit = (ix, j) => this.ijkmul(i * ip + ix, j, k * kp)
-      const mvp = Mat.fromInit(sweep ? 1 : ip, this.D, mvpinit, this)
-      util.updateProps(mvp.group.position, { x: k * kp, y: -i * ip })
+    this.par('ijk', (i, j, k) => {
+      const mvpinit = (ix, jx) => this.ijkmul(i * ip + ix, j * jp + jx, k * kp)
+      const params = { stretch_limits: true }
+      const mvp = Mat.fromInit(sweep ? 1 : ip, jp, mvpinit, this, params)
+      util.updateProps(mvp.group.position, { x: k * kp, y: -i * ip, z: j * jp })
       util.updateProps(mvp.group.rotation, { y: Math.PI / 2, z: Math.PI })
       mvps.push(mvp)
       mvpgroup.add(mvp.group)
     })
     this.group.add(mvpgroup)
-
-    const results = this.anim_results()
 
     let curi = sweep ? ip - 1 : 0
     let curk = kp - 1
@@ -954,21 +953,23 @@ export class MatMul {
       }
 
       util.updateProps(mvpgroup.position, { x: curk, y: -curi })
-      this.par('ik', (i, k) => {
-        mvps[i * nk + k].reinit((ix, j) => this.ijkmul(i * ip + ix + curi, j, k * kp + curk))
+      this.par('ijk', (i, j, k) => {
+        const mvp = mvps[i * nj * nk + j * nk + k]
+        mvp.reinit((ix, jx) => this.ijkmul(i * ip + ix + curi, j * jp + jx, k * kp + curk))
       })
     }
   }
 
-  initAnimVvprod() {
+  initAnimVvprod(sweep = false) {
     const { j: { p: jp } } = this.getThreadInfo()
 
     const vvps = []
     const vvpgroup = new THREE.Group()
-    this.par('j', jt => {
-      const vvprod_init = (i, k) => this.ijkmul(i, jt * jp, k)
-      const vvprod = Mat.fromInit(this.H, this.W, vvprod_init, this)
-      vvprod.group.position.z = jt * jp
+    this.par('j', j => {
+      const vvpinit = (i, k) => this.ijkmul(i, j * jp, k)
+      const params = { stretch_limits: true }
+      const vvprod = Mat.fromInit(this.H, sweep ? 1 : this.W, vvpinit, this, params)
+      vvprod.group.position.z = j * jp
       vvprod.group.rotation.x = Math.PI
       vvps.push(vvprod)
       vvpgroup.add(vvprod.group)
