@@ -575,6 +575,7 @@ export class MatMul {
     this.initLeftData()
     this.initRightData()
     this.initResultData()
+    this.initAbsmax()
 
     this.initVis()
   }
@@ -660,7 +661,6 @@ export class MatMul {
     }
     this.group.clear()
 
-    this.initAbsmax()
     this.initLeftVis()
     this.initRightVis()
     this.initResultVis()
