@@ -37,31 +37,34 @@
     import { RenderPass } from 'https://threejs.org/examples/jsm/postprocessing/RenderPass.js'
 
     const init_dims = { i: 32, j: 32, k: 32 }
-    const init_funcs = ['rows', 'cols', 'row major', 'col major', 'pt linear', 'pt linear+', 'uniform', 'gaussian', 'tril', 'triu', 'eye', 'diff', 'ones', 'zeros']
+    const init_funcs = ['rows', 'cols', 'row major', 'col major', 'pt linear', 'pt linear+', 'uniform', 'gaussian', 'tril', 'triu', 'eye', 'diff']
     const epilog_funcs = ['none', 'x/J', 'x/sqrt(J)', 'softmax(x/sqrt(J))', 'tanh(x)', 'relu(x)', 'layernorm']
     const sensitivities = ['local', 'global']
-    const algs = ['dotprod (row major)', 'dotprod (col major)', 'axpy', 'mvprod', 'vmprod', 'vvprod', 'none']
+    const anim_algs = ['dotprod (row major)', 'dotprod (col major)', 'axpy', 'mvprod', 'vmprod', 'vvprod', 'none']
 
     const params = {
+      // shape
       I: init_dims.i,
       J: init_dims.j,
       K: init_dims.k,
-
+      //data
       'left init': 'rows',
+      'left min': -1,
+      'left max': 1,
       'left sparsity': 0,
       'right init': 'cols',
+      'right min': -1,
+      'right max': 1,
       'right sparsity': 0,
-      'init min': -1,
-      'init max': 1,
       epilog: 'none',
-
+      // animation
       alg: 'none',
       speed: 50,
       'hide inputs': false,
       'i threads': 1,
       'j threads': 1,
       'k threads': 1,
-
+      // sizes and colors
       sensitivity: 'global',
       'zero hue': 0.25,
       'zero size': 0.25,
@@ -69,11 +72,10 @@
       'max light': 0.65,
       'hue gap': 0.25,
       'hue spread': 0.01,
-
+      // viz
       guides: false,
       legends: true,
       axes: false,
-
       // set from orbit control
       xcam: -init_dims.i * 2,
       ycam: init_dims.j * 2,
@@ -221,16 +223,21 @@
       gui_shape.add(params, 'K', 1, 512).onChange(x => set('K', Math.floor(x)))
 
       const gui_data = gui.addFolder('data')
-      gui_data.add(params, 'left init', init_funcs).onChange(x => set('left init', x))
-      gui_data.add(params, 'right init', init_funcs).onChange(x => set('right init', x))
-      gui_data.add(params, 'left sparsity', 0.0, 1.0).onChange(x => set('left sparsity', x))
-      gui_data.add(params, 'right sparsity', 0.0, 1.0).onChange(x => set('right sparsity', x))
-      gui_data.add(params, 'init min', -1.0, 1.0).onChange(x => set('init min', x))
-      gui_data.add(params, 'init max', 0.0, 1.0).onChange(x => set('init max', x))
-      gui_data.add(params, 'epilog', epilog_funcs).onChange(x => set('epilog', x))
+      const gui_left = gui_data.addFolder('left')
+      gui_left.add(params, 'left init', init_funcs).onChange(x => set('left init', x))
+      gui_left.add(params, 'left min', -1.0, 1.0).onChange(x => set('left min', x))
+      gui_left.add(params, 'left max', 0.0, 1.0).onChange(x => set('left max', x))
+      gui_left.add(params, 'left sparsity', 0.0, 1.0).onChange(x => set('left sparsity', x))
+      const gui_right = gui_data.addFolder('right')
+      gui_right.add(params, 'right init', init_funcs).onChange(x => set('right init', x))
+      gui_right.add(params, 'right min', -1.0, 1.0).onChange(x => set('right min', x))
+      gui_right.add(params, 'right max', 0.0, 1.0).onChange(x => set('right max', x))
+      gui_right.add(params, 'right sparsity', 0.0, 1.0).onChange(x => set('right sparsity', x))
+      const gui_result = gui_data.addFolder('result')
+      gui_result.add(params, 'epilog', epilog_funcs).onChange(x => set('epilog', x))
 
       const gui_anim = gui.addFolder('animation')
-      gui_anim.add(params, 'alg', algs).onChange(x => set('alg', x, _ => getObj().initVis(params)))
+      gui_anim.add(params, 'alg', anim_algs).onChange(x => set('alg', x, _ => getObj().initVis(params)))
       gui_anim.add(params, 'speed', 0, 100).onChange(x => set('speed', Math.floor(x), _ => { }))
       gui_anim.add(params, 'hide inputs').onChange(x => set('hide inputs', x, _ => getObj().initVis(params)))
       gui_anim.add(params, 'i threads', 1, 8).onChange(x => set('i threads', Math.floor(x)))
@@ -251,7 +258,6 @@
       gui_vis.add(params, 'legends').onChange(x => set('legends', x, x => getObj().setLegends(x)))
       gui_vis.add(params, 'axes').onChange(x => set('axes', x, initAxes, true))
     }
-
 
   </script>
 </body>

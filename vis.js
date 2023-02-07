@@ -65,8 +65,6 @@ const INIT_FUNCS = {
   triu: (i, j) => j >= i ? 1 : 0,
   eye: (i, j) => i == j ? 1 : 0,
   diff: (i, j) => i == j ? 1 : i == j + 1 ? -1 : 0,
-  ones: () => 1,
-  zeros: () => 0,
 }
 
 const USE_RANGE = ['rows', 'cols', 'row major', 'col major', 'uniform', 'gaussian']
@@ -75,18 +73,23 @@ function useRange(name) {
   return USE_RANGE.indexOf(name) >= 0
 }
 
-function getInitFunc(name, sparsity, base = 0, range = 1) {
+function getInitFunc(name, min = 0, max = 1, sparsity = 0) {
   const f = INIT_FUNCS[name]
   if (!f) {
     throw Error(`unrecognized initializer ${name}`)
   }
-  const scaled = useRange(name) && (base != 0 || range != 1) ?
-    (i, j, h, w) => base + range * f(i, j, h, w) :
+  const scaled = useRange(name) && (min != 0 || max != 1) ?
+    (i, j, h, w) => min + Math.max(0, max - min) * f(i, j, h, w) :
     f
   const sparse = sparsity > 0 ?
     (i, j, h, w) => Math.random() > sparsity ? scaled(i, j, h, w) : 0 :
     scaled
   return sparse
+}
+
+function initFuncFromParams(init_params) {
+  const { name, min, max, sparsity } = init_params
+  return getInitFunc(name, min, max, sparsity)
 }
 
 function softmax_(h, w, data) {
@@ -260,30 +263,10 @@ export class Mat {
     return new Mat(Array2D.fromInit(h, w, init), container, params)
   }
 
-  static dataFromParams(h, w, params) {
-    const init_base = params['init min']
-    const init_range = Math.max(0, params['init max'] - params['init min'])
-    const init_name = params['left init']
-    if (!init_name) {
-      throw Error(`no initializer specified at params['left_init']`)
-    }
-    const sparsity = params['left sparsity']
-    const init = getInitFunc(init_name, sparsity, init_base, init_range)
-    return Array2D.fromInit(h, w, init)
-  }
-
   static fromParams(h, w, params, getText) {
-    let data
-    if (params.data) {
-      if (params.data.h != h || params.data.w != w) {
-        throw Error(`shape mismatch: h ${h} w ${w} params.data.h ${params.data.h} w ${params.data.w}`)
-      }
-      data = params.data
-    } else {
-      data = Mat.dataFromParams(h, w, params)
-    }
-
+    const data = params.data || Array2D.fromInit(h, w, initFuncFromParams(params.init))
     const m = new Mat(data, undefined, params)
+
     m.setGuides(params.guides)
 
     const custom = params.legend ? params.legend : {}
@@ -570,8 +553,6 @@ export class MatMul {
     this.D = params.J
     this.W = params.K
 
-    this.init_base = this.params['init min']
-    this.init_range = Math.max(0, this.params['init max'] - this.params['init min'])
     this.initLeftData()
     this.initRightData()
     this.initResultData()
@@ -589,10 +570,12 @@ export class MatMul {
       this.left_data = this.params.left_data
       return
     }
-    const init = this.params['left init']
+    const name = this.params['left init']
+    const min = this.params['left min']
+    const max = this.params['left max']
     const sparsity = this.params['left sparsity']
-    const left_init = getInitFunc(init, sparsity, this.init_base, this.init_range)
-    this.left_data = Array2D.fromInit(this.H, this.D, left_init)
+    const f = getInitFunc(name, min, max, sparsity)
+    this.left_data = Array2D.fromInit(this.H, this.D, f)
   }
 
   initRightData() {
@@ -604,10 +587,12 @@ export class MatMul {
       this.right_data = this.params.right_data
       return
     }
-    const init = this.params['right init']
+    const name = this.params['right init']
+    const min = this.params['right min']
+    const max = this.params['right max']
     const sparsity = this.params['right sparsity']
-    const right_init = getInitFunc(init, sparsity, this.init_base, this.init_range)
-    this.right_data = Array2D.fromInit(this.D, this.W, right_init)
+    const f = getInitFunc(name, min, max, sparsity)
+    this.right_data = Array2D.fromInit(this.D, this.W, f)
   }
 
   initResultData() {
