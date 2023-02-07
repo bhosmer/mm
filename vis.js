@@ -796,7 +796,7 @@ export class MatMul {
     }
   }
 
-  par(dims, f) {
+  grid(dims, f) {
     const info = this.getThreadInfo()
     const lims = dims.split('').map(d => info[d].n)
     const loop = (ixs, lims, f) => lims.length == 0 ?
@@ -812,7 +812,7 @@ export class MatMul {
       return [this.result]
     }
     const results = []
-    this.par('j', j => {
+    this.grid('j', j => {
       const result_init = (y, x) => this.dotprod_val(y, x, j * jp, (j + 1) * jp)
       const params = { stretch_limits: true }
       const result = Mat.fromInit(this.H, this.W, result_init, this, params)
@@ -832,7 +832,7 @@ export class MatMul {
 
     const vmps = []
     const vmpgroup = new THREE.Group()
-    this.par('ijk', (i, j, k) => {
+    this.grid('ijk', (i, j, k) => {
       const vmpinit = (jx, kx) => this.ijkmul(i * ip, j * jp + jx, k * kp + kx)
       const params = { stretch_limits: true }
       const vmp = Mat.fromInit(jp, sweep ? 1 : kp, vmpinit, this, params)
@@ -858,19 +858,19 @@ export class MatMul {
       if (curi == 0 && curk == 0) {
         results.forEach(r => r.hide())
       }
-      this.par('ik', (i, k) =>
+      this.grid('ik', (i, k) =>
         results.forEach(r => r.show(i * ip + curi, sweep ? k * kp + curk : undefined))
       )
 
       if (!this.params['hide inputs']) {
         if (oldi != curi) {
-          this.par('i', i => {
+          this.grid('i', i => {
             this.left.bumpRowColor(i * ip + oldi, false)
             this.left.bumpRowColor(i * ip + curi, true)
           })
         }
         if (sweep) {
-          this.par('k', k => {
+          this.grid('k', k => {
             this.right.bumpColumnColor(oldk + k * kp, false)
             this.right.bumpColumnColor(curk + k * kp, true)
           })
@@ -878,7 +878,7 @@ export class MatMul {
       }
 
       util.updateProps(vmpgroup.position, { x: curk, y: -curi })
-      this.par('ijk', (i, j, k) => {
+      this.grid('ijk', (i, j, k) => {
         const vmp = vmps[i * nj * nk + j * nk + k]
         vmp.reinit((jx, kx) => this.ijkmul(i * ip + curi, j * jp + jx, k * kp + kx + curk))
       })
@@ -892,7 +892,7 @@ export class MatMul {
 
     const mvps = []
     const mvpgroup = new THREE.Group()
-    this.par('ijk', (i, j, k) => {
+    this.grid('ijk', (i, j, k) => {
       const mvpinit = (ix, jx) => this.ijkmul(i * ip + ix, j * jp + jx, k * kp)
       const params = { stretch_limits: true }
       const mvp = Mat.fromInit(sweep ? 1 : ip, jp, mvpinit, this, params)
@@ -918,19 +918,19 @@ export class MatMul {
       if (curi == 0 && curk == 0) {
         results.forEach(r => r.hide())
       }
-      this.par('ik', (i, k) =>
+      this.grid('ik', (i, k) =>
         results.forEach(r => r.show(sweep ? i * ip + curi : undefined, k * kp + curk))
       )
 
       if (!this.params['hide inputs']) {
         if (sweep) {
-          this.par('i', i => {
+          this.grid('i', i => {
             this.left.bumpRowColor(i * ip + oldi, false)
             this.left.bumpRowColor(i * ip + curi, true)
           })
         }
         if (oldk != curk) {
-          this.par('k', k => {
+          this.grid('k', k => {
             this.right.bumpColumnColor(k * kp + oldk, false)
             this.right.bumpColumnColor(k * kp + curk, true)
           })
@@ -938,7 +938,7 @@ export class MatMul {
       }
 
       util.updateProps(mvpgroup.position, { x: curk, y: -curi })
-      this.par('ijk', (i, j, k) => {
+      this.grid('ijk', (i, j, k) => {
         const mvp = mvps[i * nj * nk + j * nk + k]
         mvp.reinit((ix, jx) => this.ijkmul(i * ip + ix + curi, j * jp + jx, k * kp + curk))
       })
@@ -952,7 +952,7 @@ export class MatMul {
 
     const vvps = []
     const vvpgroup = new THREE.Group()
-    this.par('ijk', (i, j, k) => {
+    this.grid('ijk', (i, j, k) => {
       const vvpinit = (ix, kx) => this.ijkmul(i * ip + ix, j * jp, k * kp + kx)
       const params = { stretch_limits: true }
       const vvprod = Mat.fromInit(ip, sweep ? 1 : kp, vvpinit, this, params)
@@ -976,23 +976,23 @@ export class MatMul {
       if (curj == 0 && curk == 0) {
         results.forEach(r => r.hide())
       }
-      this.par('jk', (j, k) => {
+      this.grid('jk', (j, k) => {
         const f = (i, kx) => this.dotprod_val(i, kx, j * jp, j * jp + curj + 1)
         results[j].reinit(f, undefined, undefined, sweep ? k * kp + curk : undefined)
       })
 
       if (!this.params['hide inputs']) {
-        this.par('j', j => {
+        this.grid('j', j => {
           this.left.bumpColumnColor(j * jp + oldj, false)
           this.left.bumpColumnColor(j * jp + curj, true)
         })
         if (sweep) {
-          this.par('jk', (j, k) => {
+          this.grid('jk', (j, k) => {
             this.right.bumpColor(j * jp + oldj, k * kp + oldk, false)
             this.right.bumpColor(j * jp + curj, k * kp + curk, true)
           })
         } else {
-          this.par('j', j => {
+          this.grid('j', j => {
             this.right.bumpRowColor(j * jp + oldj, false)
             this.right.bumpRowColor(j * jp + curj, true)
           })
@@ -1000,7 +1000,7 @@ export class MatMul {
       }
 
       util.updateProps(vvpgroup.position, { x: curk, z: curj })
-      this.par('ijk', (i, j, k) => {
+      this.grid('ijk', (i, j, k) => {
         const vvp = vvps[i * nj * nk + j * nk + k]
         vvp.reinit((ix, kx) => this.ijkmul(i * ip + ix, j * jp + curj, k * kp + kx + curk))
       })
