@@ -467,7 +467,7 @@ export class Mat {
   setGuides(enabled) {
     if (enabled) {
       if (!this.guide) {
-        const guide = util.rowguide(this.h, 0.5, this.w)
+        const guide = util.rowguide(this.h, this.w)
         this.group.add(guide)
         this.guide = guide
       }
