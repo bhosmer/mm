@@ -130,9 +130,11 @@ function getInPlaceEpilog(name) {
 // Array2D
 //
 
-function arrayInit(a, h, w, f, epi = undefined) {
-  for (let i = 0, ptr = 0; i < h; i++) {
-    for (let j = 0; j < w; j++, ptr++) {
+function arrayInit(a, h, w, f, epi = undefined, r = undefined, c = undefined) {
+  const [rstart, rend] = r == undefined ? [0, h] : [r, r + 1]
+  const [cstart, cend] = c == undefined ? [0, w] : [c, c + 1]
+  for (let i = rstart; i < rend; i++) {
+    for (let j = cstart, ptr = i * w + cstart; j < cend; j++, ptr++) {
       const x = f(i, j, h, w)
       if (isNaN(x)) {
         throw Error(`HEY init f(${i}, ${j}, ${h}, ${w}) is NaN`)
@@ -160,8 +162,8 @@ class Array2D {
     this.data = data
   }
 
-  reinit(f, epi = undefined) {
-    arrayInit(this.data, this.h, this.w, f, epi)
+  reinit(f, epi = undefined, r = undefined, c = undefined) {
+    arrayInit(this.data, this.h, this.w, f, epi, r, c)
   }
 
   numel() {
@@ -170,13 +172,6 @@ class Array2D {
 
   get(i, j) {
     return this.data[this.addr(i, j)]
-  }
-
-  set(i, j, x) {
-    if (isNaN(x)) {
-      throw Error(`HEY set(${i}, ${j}, ${x})`)
-    }
-    this.data[this.addr(i, j)] = x
   }
 
   addr(i, j) {
@@ -326,11 +321,13 @@ export class Mat {
     this.group.add(this.points)
   }
 
-  initVis() {
+  initVis(r = undefined, c = undefined) {
+    const [rstart, rend] = r == undefined ? [0, this.h] : [r, r + 1]
+    const [cstart, cend] = c == undefined ? [0, this.w] : [c, c + 1]
     const sizes = this.getPointSizes()
     const colors = this.getPointColors()
-    for (let i = 0, ptr = 0; i < this.h; i++) {
-      for (let j = 0; j < this.w; j++, ptr++) {
+    for (let i = rstart; i < rend; i++) {
+      for (let j = cstart, ptr = i * this.w + cstart; j < cend; j++, ptr++) {
         const x = this.data.data[ptr]
         sizes[ptr] = this.sizeFromData(x)
         this.setElemHSL(colors, ptr, x)
@@ -344,13 +341,13 @@ export class Mat {
     return this.container ? this.container.getGlobalAbsmax() : this.absmax
   }
 
-  reinit(f, epi = undefined) {
-    this.data.reinit(f, epi)
+  reinit(f, epi = undefined, r = undefined, c = undefined) {
+    this.data.reinit(f, epi, r, c)
     if (this.params.stretch_limits) {
-      this.absmax = this.data.absmax()
       this.absmin = this.data.absmin()
+      this.absmax = this.data.absmax()
     }
-    this.initVis()
+    this.initVis(r, c)
   }
 
   getPointSizes() {
@@ -439,22 +436,22 @@ export class Mat {
     return this.data.get(i, j)
   }
 
-  show(y = undefined, x = undefined) {
-    const [ystart, yend] = y == undefined ? [0, this.h] : [y, y + 1]
-    const [xstart, xend] = x == undefined ? [0, this.w] : [x, x + 1]
-    for (let i = ystart; i < yend; i++) {
-      for (let j = xstart; j < xend; j++) {
+  show(r = undefined, c = undefined) {
+    const [rstart, rend] = r == undefined ? [0, this.h] : [r, r + 1]
+    const [cstart, cend] = c == undefined ? [0, this.w] : [c, c + 1]
+    for (let i = rstart; i < rend; i++) {
+      for (let j = cstart; j < cend; j++) {
         this.setSize(i, j, this.sizeFromData(this.getData(i, j)))
         this.setHSL(i, j, this.getData(i, j))
       }
     }
   }
 
-  hide(y = undefined, x = undefined) {
-    const [ystart, yend] = y == undefined ? [0, this.h] : [y, y + 1]
-    const [xstart, xend] = x == undefined ? [0, this.w] : [x, x + 1]
-    for (let i = ystart; i < yend; i++) {
-      for (let j = xstart; j < xend; j++) {
+  hide(r = undefined, c = undefined) {
+    const [rstart, rend] = r == undefined ? [0, this.h] : [r, r + 1]
+    const [cstart, cend] = c == undefined ? [0, this.w] : [c, c + 1]
+    for (let i = rstart; i < rend; i++) {
+      for (let j = cstart; j < cend; j++) {
         this.setSize(i, j, this.sizeFromData(NaN))
         this.setHSL(i, j, NaN)
       }
@@ -623,11 +620,11 @@ export class MatMul {
       this.result_data = this.params.result_data
       return
     }
-    const result_init = (y, x) => this._dotprot_val(this.left_data, this.right_data, y, x)
+    const result_init = (y, x) => this._dotprod_val(this.left_data, this.right_data, y, x)
     this.result_data = Array2D.fromInit(this.H, this.W, result_init, this.params.epilog)
   }
 
-  _dotprot_val(a, b, i, k, minj = undefined, maxj = undefined) {
+  _dotprod_val(a, b, i, k, minj = undefined, maxj = undefined) {
     let x = 0.0
     if (minj == undefined) {
       minj = 0
@@ -638,6 +635,9 @@ export class MatMul {
     for (let j = minj; j < maxj; j++) {
       x += a.get(i, j) * b.get(j, k)
     }
+    if (isNaN(x)) {
+      console.log(`HEY`)
+    }
     const epi = this.params.epilog
     return epi == 'x/J' ? x / this.D :
       epi == 'x/sqrt(J)' || epi == 'softmax(x/sqrt(J))' ? x / Math.sqrt(this.D) :
@@ -647,7 +647,7 @@ export class MatMul {
   }
 
   dotprod_val(i, k, minj = undefined, maxj = undefined) {
-    return this._dotprot_val(this.left.data, this.right.data, i, k, minj, maxj)
+    return this._dotprod_val(this.left.data, this.right.data, i, k, minj, maxj)
   }
 
   ijkmul(i, j, k) {
@@ -782,13 +782,13 @@ export class MatMul {
     } else if (this.alg == 'dotprod (col major)') {
       this.initAnimMvprod(true)
     } else if (this.alg == 'axpy') {
-      this.initAnimAXPY()
+      this.initAnimVvprod(true)
     } else if (this.alg == 'mvprod') {
       this.initAnimMvprod(false)
     } else if (this.alg == 'vmprod') {
       this.initAnimVmprod(false)
     } else if (this.alg == 'vvprod') {
-      this.initAnimVvprod()
+      this.initAnimVvprod(false)
     } else if (this.alg == 'none') {
       if (prev_alg == 'vvprod' || prev_alg == 'axpy') {
         this.initResultData() // depthwise animations accum into result
@@ -961,44 +961,64 @@ export class MatMul {
   }
 
   initAnimVvprod(sweep = false) {
-    const { j: { p: jp } } = this.getThreadInfo()
+    const { i: { p: ip }, j: { n: nj, p: jp }, k: { n: nk, p: kp } } = this.getThreadInfo()
+
+    const results = this.anim_results()
 
     const vvps = []
     const vvpgroup = new THREE.Group()
-    this.par('j', j => {
-      const vvpinit = (i, k) => this.ijkmul(i, j * jp, k)
+    this.par('ijk', (i, j, k) => {
+      const vvpinit = (ix, kx) => this.ijkmul(i * ip + ix, j * jp, k * kp + kx)
       const params = { stretch_limits: true }
-      const vvprod = Mat.fromInit(this.H, sweep ? 1 : this.W, vvpinit, this, params)
-      vvprod.group.position.z = j * jp
+      const vvprod = Mat.fromInit(ip, sweep ? 1 : kp, vvpinit, this, params)
+      util.updateProps(vvprod.group.position, { x: k * kp, y: -i * ip, z: j * jp })
       vvprod.group.rotation.x = Math.PI
       vvps.push(vvprod)
       vvpgroup.add(vvprod.group)
     })
     this.group.add(vvpgroup)
 
-    const results = this.anim_results()
-
     let curj = jp - 1
+    let curk = sweep ? kp - 1 : 0
 
     this.bump = () => {
-      const oldj = curj
+      const [oldj, oldk] = [curj, curk]
       curj = (curj + 1) % jp
+      if (curj == 0 && sweep) {
+        curk = (curk + 1) % kp
+      }
 
-      this.par('j', j => {
-        results[j].reinit((i, k) => this.dotprod_val(i, k, j * jp, j * jp + curj + 1))
+      if (curj == 0 && curk == 0) {
+        results.forEach(r => r.hide())
+      }
+      this.par('jk', (j, k) => {
+        const f = (i, kx) => this.dotprod_val(i, kx, j * jp, j * jp + curj + 1)
+        results[j].reinit(f, undefined, undefined, sweep ? k * kp + curk : undefined)
       })
 
       if (!this.params['hide inputs']) {
         this.par('j', j => {
           this.left.bumpColumnColor(j * jp + oldj, false)
           this.left.bumpColumnColor(j * jp + curj, true)
-          this.right.bumpRowColor(j * jp + oldj, false)
-          this.right.bumpRowColor(j * jp + curj, true)
         })
+        if (sweep) {
+          this.par('jk', (j, k) => {
+            this.right.bumpColor(j * jp + oldj, k * kp + oldk, false)
+            this.right.bumpColor(j * jp + curj, k * kp + curk, true)
+          })
+        } else {
+          this.par('j', j => {
+            this.right.bumpRowColor(j * jp + oldj, false)
+            this.right.bumpRowColor(j * jp + curj, true)
+          })
+        }
       }
 
-      vvpgroup.position.z = curj
-      this.par('j', j => vvps[j].reinit((i, k) => this.ijkmul(i, j * jp + curj, k)))
+      util.updateProps(vvpgroup.position, { x: curk, z: curj })
+      this.par('ijk', (i, j, k) => {
+        const vvp = vvps[i * nj * nk + j * nk + k]
+        vvp.reinit((ix, kx) => this.ijkmul(i * ip + ix, j * jp + curj, k * kp + kx + curk))
+      })
     }
   }
 
