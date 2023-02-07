@@ -847,6 +847,7 @@ export class MatMul {
     let curk = sweep ? kp - 1 : 0
 
     this.bump = () => {
+      // update indexes
       const [oldi, oldk] = [curi, curk]
       if (sweep) {
         curk = (curk + 1) % kp
@@ -855,6 +856,7 @@ export class MatMul {
         curi = (curi + 1) % ip
       }
 
+      // update result mats
       if (curi == 0 && curk == 0) {
         results.forEach(r => r.hide())
       }
@@ -862,6 +864,7 @@ export class MatMul {
         results.forEach(r => r.show(i * ip + curi, sweep ? k * kp + curk : undefined))
       )
 
+      // update input hilights
       if (!this.params['hide inputs']) {
         if (oldi != curi) {
           this.grid('i', i => {
@@ -877,6 +880,7 @@ export class MatMul {
         }
       }
 
+      // update intermediates
       util.updateProps(vmpgroup.position, { x: curk, y: -curi })
       this.grid('ijk', (i, j, k) => {
         const vmp = vmps[i * nj * nk + j * nk + k]
@@ -907,6 +911,7 @@ export class MatMul {
     let curk = kp - 1
 
     this.bump = () => {
+      // update indexes
       const [oldi, oldk] = [curi, curk]
       if (sweep) {
         curi = (curi + 1) % ip
@@ -915,6 +920,7 @@ export class MatMul {
         curk = (curk + 1) % kp
       }
 
+      // update result mats
       if (curi == 0 && curk == 0) {
         results.forEach(r => r.hide())
       }
@@ -922,6 +928,7 @@ export class MatMul {
         results.forEach(r => r.show(sweep ? i * ip + curi : undefined, k * kp + curk))
       )
 
+      // update input hilights
       if (!this.params['hide inputs']) {
         if (sweep) {
           this.grid('i', i => {
@@ -937,6 +944,7 @@ export class MatMul {
         }
       }
 
+      // update intermediates
       util.updateProps(mvpgroup.position, { x: curk, y: -curi })
       this.grid('ijk', (i, j, k) => {
         const mvp = mvps[i * nj * nk + j * nk + k]
@@ -967,12 +975,14 @@ export class MatMul {
     let curk = sweep ? kp - 1 : 0
 
     this.bump = () => {
+      // update indexes
       const [oldj, oldk] = [curj, curk]
       curj = (curj + 1) % jp
       if (curj == 0 && sweep) {
         curk = (curk + 1) % kp
       }
 
+      // update result mats
       if (curj == 0 && curk == 0) {
         results.forEach(r => r.hide())
       }
@@ -981,6 +991,7 @@ export class MatMul {
         results[j].reinit(f, undefined, undefined, sweep ? k * kp + curk : undefined)
       })
 
+      // update input highlights
       if (!this.params['hide inputs']) {
         this.grid('j', j => {
           this.left.bumpColumnColor(j * jp + oldj, false)
@@ -999,6 +1010,7 @@ export class MatMul {
         }
       }
 
+      // udpate intermediates
       util.updateProps(vvpgroup.position, { x: curk, z: curj })
       this.grid('ijk', (i, j, k) => {
         const vvp = vvps[i * nj * nk + j * nk + k]
