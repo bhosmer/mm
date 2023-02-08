@@ -83,7 +83,7 @@ export function axes() {
 }
 
 // make group with row guide lines
-export function rowguide(h, w) {
+export function rowGuide(h, w) {
   const group = new THREE.Group()
   const color = new THREE.Color()
   const rstride = Math.max(1, Math.floor(h / 16))

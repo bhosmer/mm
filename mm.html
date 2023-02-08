@@ -144,6 +144,9 @@
         initAxes(true)
       }
 
+      const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 5, 10000);
+      camera.position.set(params.xcam, params.ycam, params.zcam)
+
       let obj
       function getObj() {
         return obj
@@ -153,7 +156,7 @@
         if (obj) {
           scene.remove(obj.group)
         }
-        obj = new vis.MatMul(params, getText)
+        obj = new vis.MatMul({ ...params, getText: getText, camera: camera })
         scene.add(obj.group)
       }
       initObj()
@@ -163,15 +166,18 @@
       renderer.setSize(window.innerWidth, window.innerHeight)
       document.getElementById('container').appendChild(renderer.domElement)
 
-      const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 5, 10000);
-      camera.position.set(params.xcam, params.ycam, params.zcam)
-
       const composer = new EffectComposer(renderer)
       composer.addPass(new RenderPass(scene, camera))
 
+      let cam_change = 0
       let orbit = new OrbitControls(camera, renderer.domElement)
       orbit.addEventListener('change', function () {
-        setParams({ xcam: camera.position.x, ycam: camera.position.y, zcam: camera.position.z })
+        if (camera.position.x != params.xcam ||
+          camera.position.y != params.ycam ||
+          camera.position.z != params.zcam) {
+          cam_change = performance.now()
+          setParams({ xcam: camera.position.x, ycam: camera.position.y, zcam: camera.position.z })
+        }
       }, false)
 
       // let arcball = new ArcballControls(camera, renderer.domElement, scene);
@@ -189,6 +195,37 @@
 
       initGui(getObj, initObj, initAxes)
 
+
+      function render() {
+        // const raycaster = new THREE.Raycaster()
+        // const pointer = new THREE.Vector2(0, 0)
+        // raycaster.setFromCamera(pointer, camera)
+
+        // const intersects = raycaster.intersectObject(obj.group)
+        // if (intersects.length > 0) {
+        //   const closest = intersects[0]
+        //   if (closest.object.onRollover) {
+        //     closest.object.onRollover(closest)
+        //   }
+        // }
+
+        // const frustum = new THREE.Frustum().setFromProjectionMatrix(
+        //   new THREE.Matrix4().multiplyMatrices(
+        //     camera.projectionMatrix,
+        //     camera.matrixWorldInverse
+        //   )
+        // )
+
+        // console.log(camera.position.distanceTo(obj.group.position))
+
+        if (cam_change != 0 && performance.now() - cam_change > 250) {
+          getObj().updateValues()
+          cam_change = 0
+        }
+
+        composer.render(scene, camera)
+      }
+
       let last = 0
       function animate() {
         const t = performance.now()
@@ -196,7 +233,9 @@
           obj.bump()
           last = t
         }
-        composer.render(scene, camera)
+
+        render()
+
         requestAnimationFrame(animate)
       }
       return animate

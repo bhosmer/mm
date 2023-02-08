@@ -263,7 +263,7 @@ export class Mat {
     return new Mat(Array2D.fromInit(h, w, init), container, params)
   }
 
-  static fromParams(h, w, params, getText) {
+  static fromParams(h, w, params) {
     const data = params.data || Array2D.fromInit(h, w, initFuncFromParams(params.init))
     const m = new Mat(data, undefined, params)
 
@@ -272,7 +272,7 @@ export class Mat {
     const custom = params.legend ? params.legend : {}
     const defaults = { name: "X", height: "i", width: "j", hleft: true, wtop: false }
     const props = { ...m.getLegendProps(), ...defaults, ...custom }
-    m.setLegends(params.legends, props, getText)
+    m.setLegends(params.legends, props)
 
     return m
   }
@@ -466,15 +466,15 @@ export class Mat {
 
   setGuides(enabled) {
     if (enabled) {
-      if (!this.guide) {
-        const guide = util.rowguide(this.h, this.w)
+      if (!this.guide_group) {
+        const guide = util.rowGuide(this.h, this.w)
         this.group.add(guide)
-        this.guide = guide
+        this.guide_group = guide
       }
     } else {
-      if (this.guide) {
-        this.group.remove(this.guide)
-        this.guide = undefined
+      if (this.guide_group) {
+        this.group.remove(this.guide_group)
+        this.guide_group = undefined
       }
     }
   }
@@ -492,12 +492,12 @@ export class Mat {
     return res
   }
 
-  setLegends(enabled, props, getText) {
+  setLegends(enabled, props) {
     if (enabled) {
       if (!this.legends) {
         this.legends = new THREE.Group()
         if (props.name) {
-          const name = getText(props.name, props.name_color, props.name_size)
+          const name = this.params.getText(props.name, props.name_color, props.name_size)
           const { h, w } = util.bbhw(name.geometry)
           name.geometry.rotateZ(Math.PI)
           name.geometry.rotateY(Math.PI)
@@ -505,7 +505,7 @@ export class Mat {
           this.legends.add(name)
         }
         if (props.height) {
-          const height = getText(`${props.height} = ${this.h}`, props.dim_color, props.dim_size)
+          const height = this.params.getText(`${props.height} = ${this.h}`, props.dim_color, props.dim_size)
           const { h, w } = util.bbhw(height.geometry)
           height.geometry.rotateX(Math.PI)
           const zrot = (props.hleft ? -1 : 1) * Math.PI / 2
@@ -517,7 +517,7 @@ export class Mat {
           this.legends.add(height)
         }
         if (props.width) {
-          const width = getText(`${props.width} = ${this.w}`, props.dim_color, props.dim_size)
+          const width = this.params.getText(`${props.width} = ${this.w}`, props.dim_color, props.dim_size)
           const { h, w } = util.bbhw(width.geometry)
           width.geometry.rotateX(Math.PI)
           const spacer = 0.5
@@ -535,6 +535,56 @@ export class Mat {
       }
     }
   }
+
+  updateValues() {
+    if (this.values) {
+      this.group.remove(this.values)
+    }
+
+    const points = []
+    for (let i = 0; i < this.h; i++) {
+      for (let j = 0; j < this.w; j++) {
+        const local = new THREE.Vector3().fromArray(this.points.geometry.attributes.position.array, this.data.addr(i, j) * 3)
+        const world = this.group.localToWorld(local)
+        const dist = world.distanceTo(this.params.camera.position)
+
+        if (dist < 50) {
+          points.push({ i, j, dist })
+        }
+      }
+    }
+
+    points.sort((a, b) => a.dist - b.dist)
+    points.length = 64
+
+    this.values = new THREE.Group()
+    points.forEach(p => {
+      const { i, j } = p
+      const v = this.params.getText(`${this.getData(i, j).toFixed(5)}`, 0xaabbff, 0.125)
+      const { h, w } = util.bbhw(v.geometry)
+      v.geometry.rotateX(Math.PI)
+      v.geometry.translate(util.center(j * 2, w), h + util.center(i * 2, h), -0.25)
+      this.values.add(v)
+    })
+    // for (let i = 0; i < this.h; i++) {
+    //   for (let j = 0; j < this.w; j++) {
+    //     const local = new THREE.Vector3().fromArray(this.points.geometry.attributes.position.array, this.data.addr(i, j) * 3)
+    //     const world = this.group.localToWorld(local)
+    //     const dist = world.distanceTo(this.params.camera.position)
+
+    //     // console.log(`HEY i ${i} j ${j} local ${[...local]} world ${[...world]} this.params.camera.position ${[...this.params.camera.position]} this.params.camera.position.distanceTo(world) ${this.params.camera.position.distanceTo(world)}`)
+    //     // if (frustum.containsPoint(world) && dist < 100) {
+    //     if (dist < 20) {
+    //       const v = this.params.getText(`${this.getData(i, j).toFixed(5)}`, 0xaabbff, 0.125)
+    //       const { h, w } = util.bbhw(v.geometry)
+    //       v.geometry.rotateX(Math.PI)
+    //       v.geometry.translate(util.center(j * 2, w), h + util.center(i * 2, h), -0.25)
+    //       this.values.add(v)
+    //     }
+    //   }
+    // }
+    this.group.add(this.values)
+  }
 }
 
 //
@@ -543,8 +593,7 @@ export class Mat {
 
 export class MatMul {
 
-  constructor(params, getText, container = undefined) {
-    this.getText = getText
+  constructor(params, container = undefined) {
     this.params = { ...params }
     this.group = new THREE.Group()
     this.getGlobalAbsmax = container ? () => container.getGlobalAbsmax() : () => this.getAbsmax()
@@ -653,6 +702,14 @@ export class MatMul {
     this.setAnimation()
 
     this.setPosition()
+
+    this.updateValues()
+  }
+
+  updateValues() {
+    this.left.updateValues()
+    this.right.updateValues()
+    this.result.updateValues()
   }
 
   setPosition() {
@@ -689,6 +746,7 @@ export class MatMul {
     }
     this.left.setGuides(this.params.guides)
     this.setLeftLegends(this.params.legends)
+
     this.group.add(this.left.group)
   }
 
@@ -805,7 +863,7 @@ export class MatMul {
     loop([], lims, f)
   }
 
-  anim_results() {
+  getAnimResultMats() {
     const { j: { n: nj, p: jp } } = this.getThreadInfo()
     if (nj == 1) {
       this.result.params.stretch_limits = true
@@ -828,7 +886,7 @@ export class MatMul {
   initAnimVmprod(sweep) {
     const { i: { p: ip }, j: { n: nj, p: jp }, k: { n: nk, p: kp } } = this.getThreadInfo()
 
-    const results = this.anim_results()
+    const results = this.getAnimResultMats()
 
     const vmps = []
     const vmpgroup = new THREE.Group()
@@ -892,7 +950,7 @@ export class MatMul {
   initAnimMvprod(sweep) {
     const { i: { p: ip }, j: { n: nj, p: jp }, k: { n: nk, p: kp } } = this.getThreadInfo()
 
-    const results = this.anim_results()
+    const results = this.getAnimResultMats()
 
     const mvps = []
     const mvpgroup = new THREE.Group()
@@ -956,7 +1014,7 @@ export class MatMul {
   initAnimVvprod(sweep = false) {
     const { i: { p: ip }, j: { n: nj, p: jp }, k: { n: nk, p: kp } } = this.getThreadInfo()
 
-    const results = this.anim_results()
+    const results = this.getAnimResultMats()
 
     const vvps = []
     const vvpgroup = new THREE.Group()
@@ -1028,27 +1086,41 @@ export class MatMul {
       this.right.setGuides(enabled)
     }
     this.result.setGuides(enabled)
+    // 
+    // not 
+    if (enabled) {
+      if (!this.guide_group) {
+        const guide = util.resultGuide(this.h, this.w)
+        this.group.add(guide)
+        this.guide_group = guide
+      }
+    } else {
+      if (this.guide_group) {
+        this.group.remove(this.guide_group)
+        this.guide_group = undefined
+      }
+    }
   }
 
   setLeftLegends(enabled) {
     const custom = this.params.left_legend ? this.params.left_legend : {}
     const defaults = { name: "X", height: "i", width: "j", hleft: true, wtop: false }
     const props = { ...this.left.getLegendProps(), ...defaults, ...custom }
-    this.left.setLegends(enabled, props, this.getText)
+    this.left.setLegends(enabled, props)
   }
 
   setRightLegends(enabled) {
     const custom = this.params.right_legend ? this.params.right_legend : {}
     const defaults = { name: "Y", height: "j", width: "k", hleft: false, wtop: true }
     const props = { ...this.right.getLegendProps(), ...defaults, ...custom }
-    this.right.setLegends(enabled, props, this.getText)
+    this.right.setLegends(enabled, props)
   }
 
   setResultLegends(enabled) {
     const custom = this.params.result_legend ? this.params.result_legend : {}
     const defaults = { name: "XY", height: "i", width: "k", hleft: false, wtop: false }
     const props = { ...this.result.getLegendProps(), ...defaults, ...custom }
-    this.result.setLegends(enabled, props, this.getText)
+    this.result.setLegends(enabled, props)
   }
 
   setLegends(enabled) {
@@ -1074,8 +1146,7 @@ export class MatMul {
 //
 
 export class Attn {
-  constructor(params, getText) {
-    this.getText = getText
+  constructor(params) {
     this.params = { ...params }
     this.group = new THREE.Group()
 
@@ -1132,7 +1203,7 @@ export class Attn {
       epilog: this.params['attn epilog'],
       pos: new THREE.Vector3(0, 0, 0),
     }
-    this.mm1 = new MatMul(mm1_params, this.getText)
+    this.mm1 = new MatMul(mm1_params)
     this.group.add(this.mm1.group)
   }
 
@@ -1161,7 +1232,7 @@ export class Attn {
       pos: new THREE.Vector3(0, 0, this.mm1.D + 1),
 
     }
-    this.mm2 = new MatMul(mm2_params, this.getText)
+    this.mm2 = new MatMul(mm2_params)
     this.group.add(this.mm2.group)
   }
 
@@ -1214,8 +1285,7 @@ export class Attn {
 //
 
 export class MLP {
-  constructor(params, getText) {
-    this.getText = getText
+  constructor(params) {
     this.params = { ...params }
     this.group = new THREE.Group()
 
@@ -1258,7 +1328,7 @@ export class MLP {
         })
       }
 
-      const mm = new MatMul(mm_params, getText)
+      const mm = new MatMul(mm_params)
       this.mms.push(mm)
       this.group.add(mm.group)
     }
@@ -1300,8 +1370,7 @@ export class MLP {
 //
 
 export class MLPT {
-  constructor(params, getText) {
-    this.getText = getText
+  constructor(params) {
     this.params = { ...params }
     this.group = new THREE.Group()
 
@@ -1345,7 +1414,7 @@ export class MLPT {
           result_rot: new THREE.Vector3(0, Math.PI / 2, 0),
         })
       }
-      const mm = new MatMul(mm_params, getText)
+      const mm = new MatMul(mm_params)
       this.mms.push(mm)
       this.group.add(mm.group)
     }
@@ -1387,8 +1456,7 @@ export class MLPT {
 //
 
 export class Attn2 {
-  constructor(params, getText) {
-    this.getText = getText
+  constructor(params) {
     this.params = { ...params }
     this.group = new THREE.Group()
 
@@ -1452,7 +1520,7 @@ export class Attn2 {
       pos: new THREE.Vector3(-2, 0, 0),
       rot: new THREE.Vector3(0, -Math.PI / 2, 0)
     }
-    this.qmm = new MatMul(qmm_params, this.getText)
+    this.qmm = new MatMul(qmm_params)
     this.group.add(this.qmm.group)
     this.input_data = this.qmm.left_data // NOTE
   }
@@ -1480,7 +1548,7 @@ export class Attn2 {
       pos: new THREE.Vector3(0, 2, 0),
       rot: new THREE.Vector3(-Math.PI / 2, 0, 0)
     }
-    this.kmm = new MatMul(kmm_params, this.getText)
+    this.kmm = new MatMul(kmm_params)
     this.group.add(this.kmm.group)
   }
 
@@ -1500,7 +1568,7 @@ export class Attn2 {
 
       pos: new THREE.Vector3(0, 0, 0),
     }
-    this.mm1 = new MatMul(mm1_params, this.getText)
+    this.mm1 = new MatMul(mm1_params)
     this.group.add(this.mm1.group)
   }
 
@@ -1526,7 +1594,7 @@ export class Attn2 {
       pos: new THREE.Vector3(0, -this.params.n_q - 1, this.params.d_qk + 1),
       rot: new THREE.Vector3(Math.PI / 2, 0, Math.PI / 2)
     }
-    this.vmm = new MatMul(vmm_params, this.getText)
+    this.vmm = new MatMul(vmm_params)
     this.group.add(this.vmm.group)
   }
 
@@ -1550,7 +1618,7 @@ export class Attn2 {
       rot: new THREE.Vector3(0, Math.PI / 2, 0),
       pos: new THREE.Vector3(0, 0, this.mm1.D + 1),
     }
-    this.mm2 = new MatMul(mm2_params, this.getText)
+    this.mm2 = new MatMul(mm2_params)
     this.group.add(this.mm2.group)
   }
 
@@ -1573,14 +1641,13 @@ export class Attn2 {
       pos: new THREE.Vector3(this.params.n_q + 1, 0, this.params.d_qk + 1),
       // rot: new THREE.Vector3(Math.PI / 2, 0, Math.PI / 2)
     }
-    this.omm = new MatMul(omm_params, this.getText)
+    this.omm = new MatMul(omm_params)
     this.group.add(this.omm.group)
   }
 }
 
 export class Attn3 {
-  constructor(params, getText) {
-    this.getText = getText
+  constructor(params) {
     this.params = { ...params }
     this.group = new THREE.Group()
 
@@ -1609,7 +1676,7 @@ export class Attn3 {
       'left sparsity': this.params['q sparsity'], // TODO
       legend: { name: "input", height: "n_q", width: "d_model", hleft: false, wtop: true },
     }
-    const input = Mat.fromParams(this.params.n_q, this.params.d_model, input_params, this.getText)
+    const input = Mat.fromParams(this.params.n_q, this.params.d_model, input_params)
     input.group.rotation.x = Math.PI
     input.group.position.x = -this.params.d_model / 2
     input.group.position.y = this.params.n_q / 2
@@ -1619,7 +1686,7 @@ export class Attn3 {
 
     let output_data = input.data
     for (let i = 0; i < num_heads; i++) {
-      const a = new Attn2(this.params, this.getText)
+      const a = new Attn2(this.params)
       output_data = output_data.add(a.omm.result.data)
       if (show_heads) {
         a.group.position.z = i * (this.D + zspace)
@@ -1638,7 +1705,7 @@ export class Attn3 {
       data: output_data,
       legend: { name: "output", height: "n_q", width: "d_model", hleft: false, wtop: true },
     }
-    const output = Mat.fromParams(this.params.n_q, this.params.d_model, output_params, this.getText)
+    const output = Mat.fromParams(this.params.n_q, this.params.d_model, output_params)
     output.group.rotation.x = Math.PI
     output.group.position.x = -this.params.d_model / 2
     output.group.position.y = this.params.n_q / 2
