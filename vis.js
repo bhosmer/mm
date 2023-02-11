@@ -314,6 +314,12 @@ export class Mat {
         const x = this.data.data[ptr]
         sizes[ptr] = this.sizeFromData(x)
         this.setElemHSL(colors, ptr, x)
+        if (this.label_cache && this.label_cache[ptr]) {
+          const label = this.label_cache[ptr]
+          if (label.value != x) {
+            this.label_cache[ptr] = undefined
+          }
+        }
       }
     }
     this.points.geometry.attributes.pointSize.needsUpdate = true
@@ -395,6 +401,10 @@ export class Mat {
     this.colorFromData(x).toArray(a, i * 3)
   }
 
+  getSize(i, j) {
+    return this.points.geometry.attributes.pointSize.array[this.data.addr(i, j)]
+  }
+
   setSize(i, j, x) {
     this.points.geometry.attributes.pointSize.array[this.data.addr(i, j)] = x
     this.points.geometry.attributes.pointSize.needsUpdate = true
@@ -439,6 +449,10 @@ export class Mat {
         this.setHSL(i, j, NaN)
       }
     }
+  }
+
+  isHidden(i, j) {
+    return this.getSize(i, j) == 0 && this.sizeFromData(this.getData(i, j)) != 0
   }
 
   bumpColor(i, j, up) {
@@ -536,54 +550,49 @@ export class Mat {
     }
   }
 
-  updateValues() {
-    if (this.values) {
-      this.group.remove(this.values)
+  updateLabels(spotlight = undefined) {
+    if (spotlight != undefined) {
+      this.params.spotlight = spotlight
+    } else {
+      spotlight = this.params.spotlight
     }
 
-    const points = []
-    for (let i = 0; i < this.h; i++) {
-      for (let j = 0; j < this.w; j++) {
-        const local = new THREE.Vector3().fromArray(this.points.geometry.attributes.position.array, this.data.addr(i, j) * 3)
-        const world = this.group.localToWorld(local)
-        const dist = world.distanceTo(this.params.camera.position)
-
-        if (dist < 50) {
-          points.push({ i, j, dist })
-        }
+    if (spotlight == 0) {
+      if (this.label_group) {
+        this.label_group.clear()
+        this.group.remove(this.label_group)
+        this.label_group = undefined
       }
+      return
     }
 
-    points.sort((a, b) => a.dist - b.dist)
-    points.length = 64
+    if (!this.label_group) {
+      this.label_group = new THREE.Group()
+      this.group.add(this.label_group)
+      this.label_cache = []
+    } else {
+      this.label_group.clear()
+    }
 
-    this.values = new THREE.Group()
-    points.forEach(p => {
-      const { i, j } = p
-      const v = this.params.getText(`${this.getData(i, j).toFixed(5)}`, 0xaabbff, 0.125)
-      const { h, w } = util.bbhw(v.geometry)
-      v.geometry.rotateX(Math.PI)
-      v.geometry.translate(util.center(j * 2, w), h + util.center(i * 2, h), -0.25)
-      this.values.add(v)
+    this.params.raycaster.params.Points.threshold = spotlight
+    this.params.raycaster.intersectObject(this.points).forEach(x => {
+      const index = x.index
+      const i = Math.floor(index / this.w)
+      const j = index % this.w
+      if (!this.isHidden(i, j)) {
+        let label = this.label_cache[index]
+        if (!label) {
+          const x = this.getData(i, j)
+          const fsiz = 0.175 - Math.log(1 + x / 10000)
+          label = this.params.getText(`${x.toFixed(4)}`, 0xffffff, fsiz)
+          label.geometry.rotateX(Math.PI)
+          const { h, w } = util.bbhw(label.geometry)
+          label.geometry.translate(util.center(j * 2, w), h + util.center(i * 2, h), -0.25)
+          this.label_cache[index] = label
+        }
+        this.label_group.add(label)
+      }
     })
-    // for (let i = 0; i < this.h; i++) {
-    //   for (let j = 0; j < this.w; j++) {
-    //     const local = new THREE.Vector3().fromArray(this.points.geometry.attributes.position.array, this.data.addr(i, j) * 3)
-    //     const world = this.group.localToWorld(local)
-    //     const dist = world.distanceTo(this.params.camera.position)
-
-    //     // console.log(`HEY i ${i} j ${j} local ${[...local]} world ${[...world]} this.params.camera.position ${[...this.params.camera.position]} this.params.camera.position.distanceTo(world) ${this.params.camera.position.distanceTo(world)}`)
-    //     // if (frustum.containsPoint(world) && dist < 100) {
-    //     if (dist < 20) {
-    //       const v = this.params.getText(`${this.getData(i, j).toFixed(5)}`, 0xaabbff, 0.125)
-    //       const { h, w } = util.bbhw(v.geometry)
-    //       v.geometry.rotateX(Math.PI)
-    //       v.geometry.translate(util.center(j * 2, w), h + util.center(i * 2, h), -0.25)
-    //       this.values.add(v)
-    //     }
-    //   }
-    // }
-    this.group.add(this.values)
   }
 }
 
@@ -698,18 +707,19 @@ export class MatMul {
     this.initLeftVis()
     this.initRightVis()
     this.initResultVis()
+    this.setFlowGuide()
 
     this.setAnimation()
 
     this.setPosition()
 
-    this.updateValues()
+    this.updateLabels()
   }
 
-  updateValues() {
-    this.left.updateValues()
-    this.right.updateValues()
-    this.result.updateValues()
+  updateLabels(spotlight = undefined) {
+    this.left.updateLabels(spotlight)
+    this.right.updateLabels(spotlight)
+    this.result.updateLabels(spotlight)
   }
 
   setPosition() {
@@ -856,7 +866,7 @@ export class MatMul {
 
   grid(dims, f) {
     const info = this.getThreadInfo()
-    const lims = dims.split('').map(d => info[d].n)
+    const lims = Array.from(dims).map(d => info[d].n)
     const loop = (ixs, lims, f) => lims.length == 0 ?
       f(...ixs) :
       [...Array(lims[0]).keys()].map(i => loop([...ixs, i], lims.slice(1), f))
@@ -944,6 +954,9 @@ export class MatMul {
         const vmp = vmps[i * nj * nk + j * nk + k]
         vmp.reinit((jx, kx) => this.ijkmul(i * ip + curi, j * jp + jx, k * kp + kx + curk))
       })
+
+      // update values
+      this.updateLabels()
     }
   }
 
@@ -1008,6 +1021,9 @@ export class MatMul {
         const mvp = mvps[i * nj * nk + j * nk + k]
         mvp.reinit((ix, jx) => this.ijkmul(i * ip + ix + curi, j * jp + jx, k * kp + curk))
       })
+
+      // update values
+      this.updateLabels()
     }
   }
 
@@ -1074,6 +1090,9 @@ export class MatMul {
         const vvp = vvps[i * nj * nk + j * nk + k]
         vvp.reinit((ix, kx) => this.ijkmul(i * ip + ix, j * jp + curj, k * kp + kx + curk))
       })
+
+      // update values
+      this.updateLabels()
     }
   }
 
@@ -1086,11 +1105,13 @@ export class MatMul {
       this.right.setGuides(enabled)
     }
     this.result.setGuides(enabled)
-    // 
-    // not 
-    if (enabled) {
+    this.setFlowGuide()
+  }
+
+  setFlowGuide() {
+    if (this.params.guides) {
       if (!this.guide_group) {
-        const guide = util.resultGuide(this.h, this.w)
+        const guide = util.flowGuide(this.H, this.D, this.W)
         this.group.add(guide)
         this.guide_group = guide
       }
@@ -1304,9 +1325,9 @@ export class MLP {
 
         ...(i > 0 ? { right: this.mms[i - 1].result } : {}),
 
-        left_legend: { name: `L${i}`, height: `i${i}`, width: i == 0 ? "j0" : `j${i} = i${i - 1}` },
-        right_legend: i == 0 ? { name: `R${i}`, height: `j${i}`, width: "k" } : {},
-        result_legend: { name: `R${i + 1} = L${i} R${i}`, height: `i${i}`, width: "k", hleft: i % 2 == 1 },
+        left_legend: { name: `L${i} `, height: `i${i} `, width: i == 0 ? "j0" : `j${i} = i${i - 1} ` },
+        right_legend: i == 0 ? { name: `R${i} `, height: `j${i} `, width: "k" } : {},
+        result_legend: { name: `R${i + 1} = L${i} R${i} `, height: `i${i} `, width: "k", hleft: i % 2 == 1 },
 
         pos: i == 0 ?
           new THREE.Vector3(0, 0, 0) :
@@ -1378,8 +1399,8 @@ export class MLPT {
     const nlayers = params.nlayers ? params.nlayers : 5
     for (let i = 0; i < nlayers; i++) {
       const I = params.I
-      const J = i == 0 ? params.J_0 : params[`K_${i - 1}`]
-      const K = params[`K_${i}`]
+      const J = i == 0 ? params.J_0 : params[`K_${i - 1} `]
+      const K = params[`K_${i} `]
       const mm_params = {
         ...this.params,
         I: I,
@@ -1388,9 +1409,9 @@ export class MLPT {
 
         ...(i > 0 ? { left: this.mms[i - 1].result } : {}),
 
-        left_legend: { name: `L${i}`, height: "i", width: `j${i}` },
-        right_legend: { name: `R${i}`, height: i == 0 ? "j0" : `j${i} = k${i - 1}`, width: `k${i} ` },
-        result_legend: { name: `L${i + 1} = L${i} R${i}`, height: "i", width: `k${i}`, wtop: i % 2 == 1 },
+        left_legend: { name: `L${i} `, height: "i", width: `j${i} ` },
+        right_legend: { name: `R${i} `, height: i == 0 ? "j0" : `j${i} = k${i - 1} `, width: `k${i} ` },
+        result_legend: { name: `L${i + 1} = L${i} R${i} `, height: "i", width: `k${i} `, wtop: i % 2 == 1 },
 
         pos: i == 0 ?
           new THREE.Vector3(0, 0, 0) :

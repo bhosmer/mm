@@ -119,7 +119,7 @@
       // load params from url
       util.updateFromSearchParams(params, new URL(window.location).searchParams)
 
-      let axes = util.axes(window)
+      let axes = util.axes()
       function initAxes(enabled) {
         if (enabled) {
           scene.add(axes)

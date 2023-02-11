@@ -29,10 +29,10 @@
     import * as vis from './vis.js'
     import * as util from './util.js'
 
-    import { FontLoader } from 'https://threejs.org/examples/jsm/loaders/FontLoader.js';
-    import { GUI } from 'https://threejs.org/examples/jsm/libs/lil-gui.module.min.js';
+    import { FontLoader } from 'https://threejs.org/examples/jsm/loaders/FontLoader.js'
+    import { GUI } from 'https://threejs.org/examples/jsm/libs/lil-gui.module.min.js'
     import { OrbitControls } from 'https://threejs.org/examples/jsm/controls/OrbitControls.js'
-    import { ArcballControls } from 'https://threejs.org/examples/jsm/controls/ArcballControls.js';
+    import { ArcballControls } from 'https://threejs.org/examples/jsm/controls/ArcballControls.js'
     import { EffectComposer } from 'https://threejs.org/examples/jsm/postprocessing/EffectComposer.js'
     import { RenderPass } from 'https://threejs.org/examples/jsm/postprocessing/RenderPass.js'
 
@@ -40,7 +40,7 @@
     const init_funcs = ['rows', 'cols', 'row major', 'col major', 'pt linear', 'pt linear+', 'uniform', 'gaussian', 'tril', 'triu', 'eye', 'diff']
     const epilog_funcs = ['none', 'x/J', 'x/sqrt(J)', 'softmax(x/sqrt(J))', 'tanh(x)', 'relu(x)', 'layernorm']
     const sensitivities = ['local', 'global']
-    const anim_algs = ['dotprod (row major)', 'dotprod (col major)', 'axpy', 'mvprod', 'vmprod', 'vvprod', 'none']
+    const anim_algs = ['none', 'dotprod (row major)', 'dotprod (col major)', 'axpy', 'vmprod', 'mvprod', 'vvprod']
 
     const params = {
       // shape
@@ -59,7 +59,7 @@
       epilog: 'none',
       // animation
       alg: 'none',
-      speed: 50,
+      speed: 5,
       'hide inputs': false,
       'i threads': 1,
       'j threads': 1,
@@ -75,7 +75,7 @@
       // viz
       guides: false,
       legends: true,
-      axes: false,
+      spotlight: 3,
       // set from orbit control
       xcam: -init_dims.i * 2,
       ycam: init_dims.j * 2,
@@ -84,18 +84,18 @@
 
     // update URL with param changes
 
-    let addressBarUpdatePending = false
+    let address_bar_update_pending = false
     function setParams(obj) {
       for (const k in obj) {
         params[k] = obj[k]
       }
       // throttle address bar update
-      if (!addressBarUpdatePending) {
-        addressBarUpdatePending = true
+      if (!address_bar_update_pending) {
+        address_bar_update_pending = true
         setTimeout(function () {
           const url = `${window.location.pathname}?${new URLSearchParams(params)}`
           window.history.replaceState({}, '', url)
-          addressBarUpdatePending = false
+          address_bar_update_pending = false
         }, 250);
       }
     }
@@ -131,21 +131,35 @@
       // load params from url
       util.updateFromSearchParams(params, new URL(window.location).searchParams)
 
-      let axes = util.axes(window)
-      function initAxes(enabled) {
-        if (enabled) {
-          scene.add(axes)
-        } else {
-          scene.remove(axes)
-        }
-      }
-
-      if (params.axes) {
-        initAxes(true)
-      }
-
+      // camera
       const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 5, 10000);
       camera.position.set(params.xcam, params.ycam, params.zcam)
+
+      // --
+
+      // 1
+      // const dir_light = new THREE.DirectionalLight(0xffffff, 0.8);
+      // dir_light.position.set(0, 10, 10);
+      // scene.add(dir_light);
+
+      // 2
+      // const hem_light = new THREE.HemisphereLight(0xffffff, 0x080808, 1);
+      // hem_light.position.set(- 1.25, 1, 1.25);
+      // scene.add(hem_light);
+
+      // 3
+      const ambientLight = new THREE.AmbientLight(0xcccccc, 0.4);
+      scene.add(ambientLight);
+      const pointLight = new THREE.PointLight(0xffffff, 0.8);
+      camera.add(pointLight);
+      scene.add(camera);
+
+      // --
+
+      const raycaster = new THREE.Raycaster()
+      raycaster.far = 128
+      raycaster.params.Points.threshold = 2.5
+      const pointer = new THREE.Vector2(0, 0)
 
       let obj
       function getObj() {
@@ -156,10 +170,13 @@
         if (obj) {
           scene.remove(obj.group)
         }
-        obj = new vis.MatMul({ ...params, getText: getText, camera: camera })
+        const context_params = { getText: getText, camera: camera, raycaster: raycaster }
+        obj = new vis.MatMul({ ...params, ...context_params })
         scene.add(obj.group)
       }
       initObj()
+
+      // renderer, composer
 
       const renderer = new THREE.WebGLRenderer({ antialias: true });
       renderer.setPixelRatio(window.devicePixelRatio)
@@ -169,13 +186,37 @@
       const composer = new EffectComposer(renderer)
       composer.addPass(new RenderPass(scene, camera))
 
-      let cam_change = 0
+      // labels
+
+      let cam_changing = false
+      let label_update_pending = false
+      const postLabelUpdate = (t = 5) => {
+        if (!label_update_pending) {
+          label_update_pending = true
+          setTimeout(function () {
+            raycaster.setFromCamera(pointer, camera)
+            getObj().updateLabels()
+            label_update_pending = false
+          }, t);
+        }
+      }
+
+      // orbit
+
       let orbit = new OrbitControls(camera, renderer.domElement)
+      orbit.listenToKeyEvents(window)
+
+      orbit.addEventListener('start', _ => cam_changing = true)
+
+      orbit.addEventListener('end', _ => {
+        cam_changing = false
+        postLabelUpdate(0)
+      })
+
       orbit.addEventListener('change', function () {
         if (camera.position.x != params.xcam ||
           camera.position.y != params.ycam ||
           camera.position.z != params.zcam) {
-          cam_change = performance.now()
           setParams({ xcam: camera.position.x, ycam: camera.position.y, zcam: camera.position.z })
         }
       }, false)
@@ -185,57 +226,36 @@
       //   setParams({ xcam: camera.position.x, ycam: camera.position.y, zcam: camera.position.z })
       // }, false)
 
-      function onWindowResize() {
+      window.addEventListener('resize', function () {
         camera.aspect = window.innerWidth / window.innerHeight
         camera.updateProjectionMatrix()
         composer.setSize(window.innerWidth, window.innerHeight)
         renderer.setSize(window.innerWidth, window.innerHeight)
-      }
-      window.addEventListener('resize', onWindowResize, false)
+      }, false)
 
-      initGui(getObj, initObj, initAxes)
-
-
-      function render() {
-        // const raycaster = new THREE.Raycaster()
-        // const pointer = new THREE.Vector2(0, 0)
-        // raycaster.setFromCamera(pointer, camera)
-
-        // const intersects = raycaster.intersectObject(obj.group)
-        // if (intersects.length > 0) {
-        //   const closest = intersects[0]
-        //   if (closest.object.onRollover) {
-        //     closest.object.onRollover(closest)
-        //   }
-        // }
-
-        // const frustum = new THREE.Frustum().setFromProjectionMatrix(
-        //   new THREE.Matrix4().multiplyMatrices(
-        //     camera.projectionMatrix,
-        //     camera.matrixWorldInverse
-        //   )
-        // )
-
-        // console.log(camera.position.distanceTo(obj.group.position))
-
-        if (cam_change != 0 && performance.now() - cam_change > 250) {
-          getObj().updateValues()
-          cam_change = 0
+      function onPointerMove(event) {
+        pointer.x = (event.clientX / window.innerWidth) * 2 - 1
+        pointer.y = - (event.clientY / window.innerHeight) * 2 + 1
+        if (!cam_changing) {
+          postLabelUpdate()
         }
-
-        composer.render(scene, camera)
       }
+      window.addEventListener('pointermove', onPointerMove)
+
+      // gui
+
+      initGui(getObj, initObj)
+
+      // let's go
 
       let last = 0
       function animate() {
         const t = performance.now()
-        if (params.alg != 'none' && params.speed > 0 && (t - last) > (1500 / params.speed)) {
+        if (params.alg != 'none' && params.speed > 0 && (t - last) > (500 / params.speed)) {
           obj.bump()
           last = t
         }
-
-        render()
-
+        composer.render(scene, camera)
         requestAnimationFrame(animate)
       }
       return animate
@@ -245,7 +265,7 @@
     // Gui
     //
 
-    function initGui(getObj, initObj, initAxes) {
+    function initGui(getObj, initObj) {
 
       function set(n, v, f = initObj, always = false) {
         setParams({ [n]: v })
@@ -257,9 +277,9 @@
       const gui = new GUI();
 
       const gui_shape = gui.addFolder('shape')
-      gui_shape.add(params, 'I', 1, 512).onChange(x => set('I', Math.floor(x)))
-      gui_shape.add(params, 'J', 1, 512).onChange(x => set('J', Math.floor(x)))
-      gui_shape.add(params, 'K', 1, 512).onChange(x => set('K', Math.floor(x)))
+      gui_shape.add(params, 'I', 1, 256).onChange(x => set('I', Math.floor(x)))
+      gui_shape.add(params, 'J', 1, 256).onChange(x => set('J', Math.floor(x)))
+      gui_shape.add(params, 'K', 1, 256).onChange(x => set('K', Math.floor(x)))
 
       const gui_data = gui.addFolder('data')
       const gui_left = gui_data.addFolder('left')
@@ -277,7 +297,7 @@
 
       const gui_anim = gui.addFolder('animation')
       gui_anim.add(params, 'alg', anim_algs).onChange(x => set('alg', x, _ => getObj().initVis(params)))
-      gui_anim.add(params, 'speed', 0, 100).onChange(x => set('speed', Math.floor(x), _ => { }))
+      gui_anim.add(params, 'speed', 0, 10).onChange(x => set('speed', Math.floor(x), _ => { }))
       gui_anim.add(params, 'hide inputs').onChange(x => set('hide inputs', x, _ => getObj().initVis(params)))
       gui_anim.add(params, 'i threads', 1, 8).onChange(x => set('i threads', Math.floor(x)))
       gui_anim.add(params, 'j threads', 1, 8).onChange(x => set('j threads', Math.floor(x)))
@@ -295,7 +315,7 @@
       const gui_vis = gui.addFolder('vis')
       gui_vis.add(params, 'guides').onChange(x => set('guides', x, x => getObj().setGuides(x)))
       gui_vis.add(params, 'legends').onChange(x => set('legends', x, x => getObj().setLegends(x)))
-      gui_vis.add(params, 'axes').onChange(x => set('axes', x, initAxes, true))
+      gui_vis.add(params, 'spotlight', 0, 10).onChange(x => set('spotlight', Math.floor(x), x => getObj().updateLabels(x)))
     }
 
   </script>
