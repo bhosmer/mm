@@ -267,7 +267,7 @@ export class Mat {
     const data = params.data || Array2D.fromInit(h, w, initFuncFromParams(params.init))
     const m = new Mat(data, undefined, params)
 
-    m.setGuides(params.guides)
+    m.setRowGuides()
 
     const custom = params.legend ? params.legend : {}
     const defaults = { name: "X", height: "i", width: "j", hleft: true, wtop: false }
@@ -478,17 +478,17 @@ export class Mat {
     }
   }
 
-  setGuides(enabled) {
+  setRowGuides(enabled = undefined) {
+    enabled = util.syncProp(this.params, 'row guides', enabled)
     if (enabled) {
-      if (!this.guide_group) {
-        const guide = util.rowGuide(this.h, this.w)
-        this.group.add(guide)
-        this.guide_group = guide
+      if (!this.row_guide_group) {
+        this.row_guide_group = util.rowGuide(this.h, this.w)
+        this.group.add(this.row_guide_group)
       }
     } else {
-      if (this.guide_group) {
-        this.group.remove(this.guide_group)
-        this.guide_group = undefined
+      if (this.row_guide_group) {
+        this.group.remove(this.row_guide_group)
+        this.row_guide_group = undefined
       }
     }
   }
@@ -500,7 +500,7 @@ export class Mat {
       name_color: 0xccccff,
       name_size: sa_geo / 2,
       dim_color: 0x00aaff,
-      dim_size: sa_geo / 5,
+      dim_size: sa_geo / 6,
     }
     const res = { ...defaults, ...custom }
     return res
@@ -754,7 +754,7 @@ export class MatMul {
     if (this.params.left_pos) {
       Object.keys(this.params.left_pos).map(k => this.left.group.position[k] += this.params.left_pos[k])
     }
-    this.left.setGuides(this.params.guides)
+    this.left.setRowGuides()
     this.setLeftLegends(this.params.legends)
 
     this.group.add(this.left.group)
@@ -777,7 +777,7 @@ export class MatMul {
     if (this.params.right_pos) {
       Object.keys(this.params.right_pos).map(k => this.right.group.position[k] += this.params.right_pos[k])
     }
-    this.right.setGuides(this.params.guides)
+    this.right.setRowGuides()
     this.setRightLegends(this.params.legends)
     this.group.add(this.right.group)
   }
@@ -800,7 +800,7 @@ export class MatMul {
     if (this.params.result_pos) {
       Object.keys(this.params.result_pos).map(k => this.result.group.position[k] += this.params.result_pos[k])
     }
-    this.result.setGuides(this.params.guides)
+    this.result.setRowGuides()
     this.setResultLegends(this.params.legends)
     this.group.add(this.result.group)
   }
@@ -1096,29 +1096,28 @@ export class MatMul {
     }
   }
 
-  setGuides(enabled) {
-    this.params.guides = enabled
+  setRowGuides(enabled) {
+    enabled = util.syncProp(this.params, 'row guides', enabled)
     if (!this.params.left) {
-      this.left.setGuides(enabled)
+      this.left.setRowGuides(enabled)
     }
     if (!this.params.right) {
-      this.right.setGuides(enabled)
+      this.right.setRowGuides(enabled)
     }
-    this.result.setGuides(enabled)
-    this.setFlowGuide()
+    this.result.setRowGuides(enabled)
   }
 
-  setFlowGuide() {
-    if (this.params.guides) {
-      if (!this.guide_group) {
-        const guide = util.flowGuide(this.H, this.D, this.W)
-        this.group.add(guide)
-        this.guide_group = guide
+  setFlowGuide(enabled) {
+    enabled = util.syncProp(this.params, 'flow guides', enabled)
+    if (enabled) {
+      if (!this.flow_guide_group) {
+        this.flow_guide_group = util.flowGuide(this.H, this.D, this.W)
+        this.group.add(this.flow_guide_group)
       }
     } else {
-      if (this.guide_group) {
-        this.group.remove(this.guide_group)
-        this.guide_group = undefined
+      if (this.flow_guide_group) {
+        this.group.remove(this.flow_guide_group)
+        this.flow_guide_group = undefined
       }
     }
   }

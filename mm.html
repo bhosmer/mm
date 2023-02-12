@@ -73,9 +73,10 @@
       'hue gap': 0.2,
       'hue spread': 0.01,
       // viz
-      guides: false,
       legends: true,
       spotlight: 3,
+      'row guides': false,
+      'flow guides': false,
       // set from orbit control
       xcam: -init_dims.i * 2,
       ycam: init_dims.j * 2,
@@ -161,6 +162,8 @@
       raycaster.params.Points.threshold = 2.5
       const pointer = new THREE.Vector2(0, 0)
 
+      const context_params = { getText: getText, raycaster: raycaster }
+
       let obj
       function getObj() {
         return obj
@@ -170,7 +173,6 @@
         if (obj) {
           scene.remove(obj.group)
         }
-        const context_params = { getText: getText, camera: camera, raycaster: raycaster }
         obj = new vis.MatMul({ ...params, ...context_params })
         scene.add(obj.group)
       }
@@ -313,9 +315,10 @@
       gui_colors.add(params, 'hue spread', 0.0, 1.0).onChange(x => set('hue spread', x))
 
       const gui_vis = gui.addFolder('vis')
-      gui_vis.add(params, 'guides').onChange(x => set('guides', x, x => getObj().setGuides(x)))
       gui_vis.add(params, 'legends').onChange(x => set('legends', x, x => getObj().setLegends(x)))
       gui_vis.add(params, 'spotlight', 0, 10).onChange(x => set('spotlight', Math.floor(x), x => getObj().updateLabels(x)))
+      gui_vis.add(params, 'row guides').onChange(x => set('row guides', x, x => getObj().setRowGuides(x)))
+      gui_vis.add(params, 'flow guides').onChange(x => set('flow guides', x, x => getObj().setFlowGuide(x)))
     }
 
   </script>

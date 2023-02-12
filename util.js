@@ -1,4 +1,3 @@
-
 import * as THREE from 'three'
 
 //
@@ -81,15 +80,9 @@ export function rowGuide(h, w, trunc = true, rdenom = 16, cdenom = 16) {
   }
 
   for (let i = 0; i < h; i += rstride) {
-    if (i < h - rstride) {
-      draw(i, 0, i + rstride, 0)
-    }
-    let j = 0
-    for (; j < w - cstride; j += cstride) {
-      draw(i, j, i, j + cstride)
-    }
-    if (j < w - 1) {
-      draw(i, j, i, w - 1)
+    draw(i, 0, Math.min(i + rstride, h - 1), 0)
+    for (let j = 0; j < w; j += cstride) {
+      draw(i, j, i, Math.min(j + cstride, w - 1))
     }
   }
 
@@ -126,8 +119,7 @@ const MMGUIDE_MATERIAL = new THREE.RawShaderMaterial({
 
     gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
 
-  }
-`,
+  }`,
 
   fragmentShader: `
   precision mediump float;
@@ -145,8 +137,7 @@ const MMGUIDE_MATERIAL = new THREE.RawShaderMaterial({
 
     gl_FragColor = color;
 
-  }
-`,
+  }`,
 
   side: THREE.DoubleSide,
   transparent: true
@@ -154,23 +145,10 @@ const MMGUIDE_MATERIAL = new THREE.RawShaderMaterial({
 
 // TODO will need to be parameterized on orientation
 export function flowGuide(h, d, w) {
-  // const colors = [
-  //   134, 156, 249, 159,
-  //   21, 138, 192, 244,
-  //   179, 127, 199, 74
-  // ]
-
-  // glowing middle
-  // const colors = [
-  //   21, 138, 192, 244,
-  //   179, 127, 199, 74,
-  //   134, 156, 249, 159,
-  // ]
-
   const colors = [
-    179, 127, 199, 74,
-    21, 138, 192, 244,
-    134, 156, 249, 159,
+    179, 127, 199, 50,
+    21, 138, 192, 163,
+    134, 156, 249, 107,
   ]
   const color_attr = new THREE.Uint8BufferAttribute(colors, 4)
   color_attr.normalized = true
@@ -204,7 +182,6 @@ export function flowGuide(h, d, w) {
   return group
 }
 
-
 //
 // bounding box stuff for text positioning
 //
@@ -230,3 +207,10 @@ export function updateProps(obj, props) {
   Object.entries(props).map(([k, v]) => obj[k] = v)
 }
 
+export function syncProp(obj, k, v) {
+  if (v == undefined) {
+    return obj[k]
+  }
+  obj[k] = v
+  return v
+}
