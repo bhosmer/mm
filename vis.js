@@ -508,43 +508,46 @@ export class Mat {
 
   setLegends(enabled, props) {
     if (enabled) {
-      if (!this.legends) {
-        this.legends = new THREE.Group()
-        if (props.name) {
-          const name = this.params.getText(props.name, props.name_color, props.name_size)
-          const { h, w } = util.bbhw(name.geometry)
-          name.geometry.rotateZ(Math.PI)
-          name.geometry.rotateY(Math.PI)
-          name.geometry.translate(util.center(this.w - 1, w), h + util.center(this.h - 1, h), -(1 + h / 2))
-          this.legends.add(name)
-        }
-        if (props.height) {
-          const height = this.params.getText(`${props.height} = ${this.h}`, props.dim_color, props.dim_size)
-          const { h, w } = util.bbhw(height.geometry)
-          height.geometry.rotateX(Math.PI)
-          const zrot = (props.hleft ? -1 : 1) * Math.PI / 2
-          height.geometry.rotateZ(zrot)
-          const spacer = 0.5
-          const xoff = props.hleft ? -h * 1 - spacer : this.w - 1 + h + spacer
-          const yoff = props.hleft ? w + util.center(this.h - 1, w) : util.center(this.h - 1, w)
-          height.geometry.translate(xoff, yoff, 0)
-          this.legends.add(height)
-        }
-        if (props.width) {
-          const width = this.params.getText(`${props.width} = ${this.w}`, props.dim_color, props.dim_size)
-          const { h, w } = util.bbhw(width.geometry)
-          width.geometry.rotateX(Math.PI)
-          const spacer = 0.5
-          const xoff = util.center(this.w - 1, w)
-          const yoff = props.wtop ? -h * 1 - spacer : this.h - 1 + h * 1.5 + spacer
-          width.geometry.translate(xoff, yoff, 0)
-          this.legends.add(width)
-        }
-        this.group.add(this.legends)
+      if (this.legends) {
+        this.group.remove(this.legends)
+        this.legends.clear()
       }
+      this.legends = new THREE.Group()
+      if (props.name) {
+        const name = this.params.getText(props.name, props.name_color, props.name_size)
+        const { h, w } = util.bbhw(name.geometry)
+        name.geometry.rotateZ(Math.PI)
+        name.geometry.rotateY(Math.PI)
+        name.geometry.translate(util.center(this.w - 1, w), h + util.center(this.h - 1, h), -(1 + h / 2))
+        this.legends.add(name)
+      }
+      if (props.height) {
+        const height = this.params.getText(`${props.height} = ${this.h}`, props.dim_color, props.dim_size)
+        const { h, w } = util.bbhw(height.geometry)
+        height.geometry.rotateX(Math.PI)
+        const zrot = (props.hleft ? -1 : 1) * Math.PI / 2
+        height.geometry.rotateZ(zrot)
+        const spacer = 0.5
+        const xoff = props.hleft ? -h * 1 - spacer : this.w - 1 + h + spacer
+        const yoff = props.hleft ? w + util.center(this.h - 1, w) : util.center(this.h - 1, w)
+        height.geometry.translate(xoff, yoff, 0)
+        this.legends.add(height)
+      }
+      if (props.width) {
+        const width = this.params.getText(`${props.width} = ${this.w}`, props.dim_color, props.dim_size)
+        const { h, w } = util.bbhw(width.geometry)
+        width.geometry.rotateX(Math.PI)
+        const spacer = 0.5
+        const xoff = util.center(this.w - 1, w)
+        const yoff = props.wtop ? -h * 1 - spacer : this.h - 1 + h * 1.5 + spacer
+        width.geometry.translate(xoff, yoff, 0)
+        this.legends.add(width)
+      }
+      this.group.add(this.legends)
     } else {
       if (this.legends) {
         this.group.remove(this.legends)
+        this.legends.clear()
         this.legends = undefined
       }
     }
@@ -1151,6 +1154,31 @@ export class MatMul {
     const defaults = { name: "XY", height: "i", width: "k", hleft: false, wtop: false }
     const props = { ...this.result.getLegendProps(), ...defaults, ...custom }
     this.result.setLegends(enabled, props)
+  }
+
+  setNames(params) {
+    let changed = false
+    const left_name = params['left name']
+    if (left_name != undefined && left_name != this.params['left name']) {
+      this.params['left name'] = left_name
+      this.params.left_legend = { ...(this.params.left_legend || {}), name: left_name }
+      changed = true
+    }
+    const right_name = params['right name']
+    if (right_name != undefined && right_name != this.params['right name']) {
+      this.params['right name'] = right_name
+      this.params.right_legend = { ...(this.params.right_legend || {}), name: right_name }
+      changed = true
+    }
+    const result_name = params['result name']
+    if (result_name != undefined && result_name != this.params['result name']) {
+      this.params['result name'] = result_name
+      this.params.result_legend = { ...(this.params.result_legend || {}), name: result_name }
+      changed = true
+    }
+    if (changed) {
+      this.setLegends(this.params.legends)
+    }
   }
 
   setLegends(enabled) {
