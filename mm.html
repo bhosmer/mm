@@ -124,6 +124,21 @@
       animate()
     })
 
+    // raycaster, used for spotlight intersections
+    const raycaster = new THREE.Raycaster()
+    raycaster.far = 128
+    raycaster.params.Points.threshold = 2.5
+    const pointer = new THREE.Vector2(0, 0)
+
+    // object params plus context
+    function getParams() {
+      return {
+        getText: getText,
+        raycaster: raycaster,
+        ...params,
+      }
+    }
+
     // main
 
     function init() {
@@ -136,34 +151,6 @@
       const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 5, 10000);
       camera.position.set(params.xcam, params.ycam, params.zcam)
 
-      // --
-
-      // 1
-      // const dir_light = new THREE.DirectionalLight(0xffffff, 0.8);
-      // dir_light.position.set(0, 10, 10);
-      // scene.add(dir_light);
-
-      // 2
-      // const hem_light = new THREE.HemisphereLight(0xffffff, 0x080808, 1);
-      // hem_light.position.set(- 1.25, 1, 1.25);
-      // scene.add(hem_light);
-
-      // 3
-      const ambientLight = new THREE.AmbientLight(0xcccccc, 0.4);
-      scene.add(ambientLight);
-      const pointLight = new THREE.PointLight(0xffffff, 0.8);
-      camera.add(pointLight);
-      scene.add(camera);
-
-      // --
-
-      const raycaster = new THREE.Raycaster()
-      raycaster.far = 128
-      raycaster.params.Points.threshold = 2.5
-      const pointer = new THREE.Vector2(0, 0)
-
-      const context_params = { getText: getText, raycaster: raycaster }
-
       let obj
       function getObj() {
         return obj
@@ -173,7 +160,7 @@
         if (obj) {
           scene.remove(obj.group)
         }
-        obj = new vis.MatMul({ ...params, ...context_params })
+        obj = new vis.MatMul(getParams())
         scene.add(obj.group)
       }
       initObj()
@@ -298,12 +285,18 @@
       gui_result.add(params, 'epilog', epilog_funcs).onChange(x => set('epilog', x))
 
       const gui_anim = gui.addFolder('animation')
-      gui_anim.add(params, 'alg', anim_algs).onChange(x => set('alg', x, _ => getObj().initVis(params)))
+      gui_anim.add(params, 'alg', anim_algs).onChange(x => set('alg', x, _ => getObj().initVis(getParams())))
       gui_anim.add(params, 'speed', 0, 10).onChange(x => set('speed', Math.floor(x), _ => { }))
-      gui_anim.add(params, 'hide inputs').onChange(x => set('hide inputs', x, _ => getObj().initVis(params)))
+      gui_anim.add(params, 'hide inputs').onChange(x => set('hide inputs', x, _ => getObj().initVis(getParams())))
       gui_anim.add(params, 'i threads', 1, 8).onChange(x => set('i threads', Math.floor(x)))
       gui_anim.add(params, 'j threads', 1, 8).onChange(x => set('j threads', Math.floor(x)))
       gui_anim.add(params, 'k threads', 1, 8).onChange(x => set('k threads', Math.floor(x)))
+
+      const gui_vis = gui.addFolder('vis')
+      gui_vis.add(params, 'legends').onChange(x => set('legends', x, x => getObj().setLegends(x)))
+      gui_vis.add(params, 'spotlight', 0, 10).onChange(x => set('spotlight', Math.floor(x), x => getObj().updateLabels(x)))
+      gui_vis.add(params, 'row guides').onChange(x => set('row guides', x, x => getObj().setRowGuides(x)))
+      gui_vis.add(params, 'flow guides').onChange(x => set('flow guides', x, x => getObj().setFlowGuide(x)))
 
       const gui_colors = gui.addFolder('colors and sizes')
       gui_colors.add(params, 'sensitivity', sensitivities).onChange(x => set('sensitivity', x))
@@ -313,12 +306,6 @@
       gui_colors.add(params, 'max light', 0.0, 1.0).onChange(x => set('max light', x))
       gui_colors.add(params, 'hue gap', 0.0, 1.0).onChange(x => set('hue gap', x))
       gui_colors.add(params, 'hue spread', 0.0, 1.0).onChange(x => set('hue spread', x))
-
-      const gui_vis = gui.addFolder('vis')
-      gui_vis.add(params, 'legends').onChange(x => set('legends', x, x => getObj().setLegends(x)))
-      gui_vis.add(params, 'spotlight', 0, 10).onChange(x => set('spotlight', Math.floor(x), x => getObj().updateLabels(x)))
-      gui_vis.add(params, 'row guides').onChange(x => set('row guides', x, x => getObj().setRowGuides(x)))
-      gui_vis.add(params, 'flow guides').onChange(x => set('flow guides', x, x => getObj().setFlowGuide(x)))
     }
 
   </script>

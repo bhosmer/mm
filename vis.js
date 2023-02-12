@@ -702,11 +702,14 @@ export class MatMul {
     if (params) {
       this.params = { ...params }
     }
+
     this.group.clear()
+    this.flow_guide_group = undefined
 
     this.initLeftVis()
     this.initRightVis()
     this.initResultVis()
+
     this.setFlowGuide()
 
     this.setAnimation()
@@ -1154,10 +1157,6 @@ export class MatMul {
     if (!this.params.result) {
       this.setResultLegends(enabled)
     }
-  }
-
-  getGuiCallback(name) {
-    throw Error(`HEY unknown callback ${name}`)
   }
 }
 
