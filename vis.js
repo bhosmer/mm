@@ -820,6 +820,7 @@ export class MatMul {
   setAnimation() {
     const prev_alg = this.anim_alg
     this.anim_alg = this.params.alg || 'none'
+    this.anim_mats = this.anim_mats || []
 
     // TODO clean this shit up
     if (this.anim_alg == 'none') {
