@@ -723,6 +723,7 @@ export class MatMul {
     this.left.updateLabels(spotlight)
     this.right.updateLabels(spotlight)
     this.result.updateLabels(spotlight)
+    this.anim_mats.map(m => m.updateLabels(spotlight))
   }
 
   setPosition() {
@@ -817,11 +818,11 @@ export class MatMul {
   }
 
   setAnimation() {
-    const prev_alg = this.alg
-    this.alg = this.params.alg || 'none'
+    const prev_alg = this.anim_alg
+    this.anim_alg = this.params.alg || 'none'
 
     // TODO clean this shit up
-    if (this.alg == 'none') {
+    if (this.anim_alg == 'none') {
       this.left.show()
       this.right.show()
       this.result.show()
@@ -833,19 +834,20 @@ export class MatMul {
       this.result.hide()
     }
 
-    if (this.alg == 'dotprod (row major)') {
+    if (this.anim_alg == 'dotprod (row major)') {
       this.initAnimVmprod(true)
-    } else if (this.alg == 'dotprod (col major)') {
+    } else if (this.anim_alg == 'dotprod (col major)') {
       this.initAnimMvprod(true)
-    } else if (this.alg == 'axpy') {
+    } else if (this.anim_alg == 'axpy') {
       this.initAnimVvprod(true)
-    } else if (this.alg == 'mvprod') {
+    } else if (this.anim_alg == 'mvprod') {
       this.initAnimMvprod(false)
-    } else if (this.alg == 'vmprod') {
+    } else if (this.anim_alg == 'vmprod') {
       this.initAnimVmprod(false)
-    } else if (this.alg == 'vvprod') {
+    } else if (this.anim_alg == 'vvprod') {
       this.initAnimVvprod(false)
-    } else if (this.alg == 'none') {
+    } else if (this.anim_alg == 'none') {
+      this.anim_mats = []
       if (prev_alg == 'vvprod' || prev_alg == 'axpy') {
         this.initResultData() // depthwise animations accum into result
         this.result.params.stretch_limits = false
@@ -892,6 +894,7 @@ export class MatMul {
       result.hide()
       results.push(result)
       this.group.add(result.group)
+      this.anim_mats.push(result)
     })
     return results
   }
@@ -911,6 +914,7 @@ export class MatMul {
       vmp.group.rotation.x = Math.PI / 2
       vmps.push(vmp)
       vmpgroup.add(vmp.group)
+      this.anim_mats.push(vmp)
     })
     this.group.add(vmpgroup)
 
@@ -978,6 +982,7 @@ export class MatMul {
       util.updateProps(mvp.group.rotation, { y: Math.PI / 2, z: Math.PI })
       mvps.push(mvp)
       mvpgroup.add(mvp.group)
+      this.anim_mats.push(mvp)
     })
     this.group.add(mvpgroup)
 
@@ -1040,11 +1045,12 @@ export class MatMul {
     this.grid('ijk', (i, j, k) => {
       const vvpinit = (ix, kx) => this.ijkmul(i * ip + ix, j * jp, k * kp + kx)
       const params = { stretch_limits: true }
-      const vvprod = Mat.fromInit(ip, sweep ? 1 : kp, vvpinit, this, params)
-      util.updateProps(vvprod.group.position, { x: k * kp, y: -i * ip, z: j * jp })
-      vvprod.group.rotation.x = Math.PI
-      vvps.push(vvprod)
-      vvpgroup.add(vvprod.group)
+      const vvp = Mat.fromInit(ip, sweep ? 1 : kp, vvpinit, this, params)
+      util.updateProps(vvp.group.position, { x: k * kp, y: -i * ip, z: j * jp })
+      vvp.group.rotation.x = Math.PI
+      vvps.push(vvp)
+      vvpgroup.add(vvp.group)
+      this.anim_mats.push(vvp)
     })
     this.group.add(vvpgroup)
 
