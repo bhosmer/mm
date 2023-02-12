@@ -133,7 +133,7 @@ function getInPlaceEpilog(name) {
 // Array2D
 //
 
-function arrayInit(a, h, w, f, epi = undefined, r = undefined, c = undefined) {
+function arrayDataInit(a, h, w, f, epi = undefined, r = undefined, c = undefined) {
   const [rstart, rend] = r == undefined ? [0, h] : [r, r + 1]
   const [cstart, cend] = c == undefined ? [0, w] : [c, c + 1]
   for (let i = rstart; i < rend; i++) {
@@ -155,8 +155,8 @@ class Array2D {
 
   static fromInit(h, w, f, epi = undefined) {
     const data = new Float32Array(h * w)
-    arrayInit(data, h, w, f, epi)
-    return new Array2D(h, w, data, epi)
+    arrayDataInit(data, h, w, f, epi)
+    return new Array2D(h, w, data)
   }
 
   constructor(h, w, data) {
@@ -166,7 +166,7 @@ class Array2D {
   }
 
   reinit(f, epi = undefined, r = undefined, c = undefined) {
-    arrayInit(this.data, this.h, this.w, f, epi, r, c)
+    arrayDataInit(this.data, this.h, this.w, f, epi, r, c)
   }
 
   numel() {
@@ -234,11 +234,11 @@ class Array2D {
   }
 }
 
-const ELEM_SIZE = 1792
-
 //
 // Mat
 //
+
+const ELEM_SIZE = 1792
 
 function emptyPoints(h, w) {
   const n = h * w
