@@ -259,13 +259,15 @@ function emptyPoints(h, w) {
 
 export class Mat {
 
-  static fromInit(h, w, init, container, params = undefined) {
-    return new Mat(Array2D.fromInit(h, w, init), container, params)
+  static fromInit(h, w, init, params) {
+    const data = Array2D.fromInit(h, w, init)
+    return new Mat(data, params)
   }
 
   static fromParams(h, w, params) {
-    const data = params.data || Array2D.fromInit(h, w, initFuncFromParams(params.init))
-    const m = new Mat(data, undefined, params)
+    const init = initFuncFromParams(params.init)
+    const data = params.data || Array2D.fromInit(h, w, init)
+    const m = new Mat(data, params)
 
     m.setRowGuides()
 
@@ -277,31 +279,22 @@ export class Mat {
     return m
   }
 
-  constructor(data, container, params) {
-    if (container) {
-      params = params || {}
-      this.params = { ...container.params, ...params }
-      this.container = container
-    } else {
-      if (!params) {
-        throw Error('passed neither container nor params to Mat')
-      }
-      this.params = { ...params }
-    }
-
-    this.h = data.h
-    this.w = data.w
-    this.points = emptyPoints(this.h, this.w)
+  constructor(data, params, init_vis) {
+    this.params = { ...params }
 
     this.data = data
+    this.h = data.h
+    this.w = data.w
     this.absmax = this.data.absmax()
     this.absmin = this.data.absmin()
 
-    // TODO deferred in 2 pass setup for correct global sizes
-    this.initVis()
-
+    this.points = emptyPoints(this.h, this.w)
     this.group = new THREE.Group()
     this.group.add(this.points)
+
+    if (init_vis) {
+      this.initVis()
+    }
   }
 
   initVis(r = undefined, c = undefined) {
@@ -327,7 +320,7 @@ export class Mat {
   }
 
   getGlobalAbsmax() {
-    return this.container ? this.container.getGlobalAbsmax() : this.absmax
+    return this.params.getGlobalAbsmax ? this.params.getGlobalAbsmax() : this.absmax
   }
 
   reinit(f, epi = undefined, r = undefined, c = undefined) {
@@ -345,10 +338,6 @@ export class Mat {
 
   getPointColors() {
     return this.points.geometry.attributes.pointColor.array
-  }
-
-  getAbsmax() {
-    return this.absmax
   }
 
   sizeFromData(x) {
@@ -508,18 +497,18 @@ export class Mat {
 
   setLegends(enabled, props) {
     if (enabled) {
-      if (this.legends) {
-        this.group.remove(this.legends)
-        this.legends.clear()
+      if (this.legends_group) {
+        this.group.remove(this.legends_group)
+        this.legends_group.clear()
       }
-      this.legends = new THREE.Group()
+      this.legends_group = new THREE.Group()
       if (props.name) {
         const name = this.params.getText(props.name, props.name_color, props.name_size)
         const { h, w } = util.bbhw(name.geometry)
         name.geometry.rotateZ(Math.PI)
         name.geometry.rotateY(Math.PI)
         name.geometry.translate(util.center(this.w - 1, w), h + util.center(this.h - 1, h), -(1 + h / 2))
-        this.legends.add(name)
+        this.legends_group.add(name)
       }
       if (props.height) {
         const height = this.params.getText(`${props.height} = ${this.h}`, props.dim_color, props.dim_size)
@@ -531,7 +520,7 @@ export class Mat {
         const xoff = props.hleft ? -h * 1 - spacer : this.w - 1 + h + spacer
         const yoff = props.hleft ? w + util.center(this.h - 1, w) : util.center(this.h - 1, w)
         height.geometry.translate(xoff, yoff, 0)
-        this.legends.add(height)
+        this.legends_group.add(height)
       }
       if (props.width) {
         const width = this.params.getText(`${props.width} = ${this.w}`, props.dim_color, props.dim_size)
@@ -541,14 +530,14 @@ export class Mat {
         const xoff = util.center(this.w - 1, w)
         const yoff = props.wtop ? -h * 1 - spacer : this.h - 1 + h * 1.5 + spacer
         width.geometry.translate(xoff, yoff, 0)
-        this.legends.add(width)
+        this.legends_group.add(width)
       }
-      this.group.add(this.legends)
+      this.group.add(this.legends_group)
     } else {
-      if (this.legends) {
-        this.group.remove(this.legends)
-        this.legends.clear()
-        this.legends = undefined
+      if (this.legends_group) {
+        this.group.remove(this.legends_group)
+        this.legends_group.clear()
+        this.legends_group = undefined
       }
     }
   }
@@ -605,10 +594,9 @@ export class Mat {
 
 export class MatMul {
 
-  constructor(params, container = undefined) {
+  constructor(params) {
     this.params = { ...params }
     this.group = new THREE.Group()
-    this.getGlobalAbsmax = container ? () => container.getGlobalAbsmax() : () => this.getAbsmax()
 
     this.H = params.I
     this.D = params.J
@@ -617,58 +605,50 @@ export class MatMul {
     this.initLeftData()
     this.initRightData()
     this.initResultData()
-    this.initAbsmax()
+    // this.initAbsmax()
 
     this.initVis()
   }
 
   initLeftData() {
     if (this.params.left) {
-      this.left_data = this.params.left.data
+      this.left = this.params.left
       return
     }
-    if (this.params.left_data) {
-      this.left_data = this.params.left_data
-      return
-    }
-    const name = this.params['left init']
-    const min = this.params['left min']
-    const max = this.params['left max']
-    const sparsity = this.params['left sparsity']
-    const f = getInitFunc(name, min, max, sparsity)
-    this.left_data = Array2D.fromInit(this.H, this.D, f)
+    const data = this.params.left_data || (_ => {
+      const init = this.params['left init']
+      const min = this.params['left min']
+      const max = this.params['left max']
+      const sparsity = this.params['left sparsity']
+      const f = getInitFunc(init, min, max, sparsity)
+      return Array2D.fromInit(this.H, this.D, f)
+    })()
+    const params = { ...this.params, getGlobalAbsmax: this.getGlobalAbsmax.bind(this) }
+    this.left = new Mat(data, params, false)
   }
 
   initRightData() {
     if (this.params.right) {
-      this.right_data = this.params.right.data
+      this.right = this.params.right
       return
     }
-    if (this.params.right_data) {
-      this.right_data = this.params.right_data
-      return
-    }
-    const name = this.params['right init']
-    const min = this.params['right min']
-    const max = this.params['right max']
-    const sparsity = this.params['right sparsity']
-    const f = getInitFunc(name, min, max, sparsity)
-    this.right_data = Array2D.fromInit(this.D, this.W, f)
+    const data = this.params.right_data || (_ => {
+      const name = this.params['right init']
+      const min = this.params['right min']
+      const max = this.params['right max']
+      const sparsity = this.params['right sparsity']
+      const f = getInitFunc(name, min, max, sparsity)
+      return Array2D.fromInit(this.D, this.W, f)
+    })()
+    const params = { ...this.params, getGlobalAbsmax: this.getGlobalAbsmax.bind(this) }
+    this.right = new Mat(data, params, false)
   }
 
   initResultData() {
-    if (this.params.result) {
-      throw Error(`HEY this.params.result`)
-      this.result_data = this.params.result.data
-      return
-    }
-    if (this.params.result_data) {
-      throw Error(`HEY this.params.result_data`)
-      this.result_data = this.params.result_data
-      return
-    }
-    const result_init = (y, x) => this._dotprod_val(this.left_data, this.right_data, y, x)
-    this.result_data = Array2D.fromInit(this.H, this.W, result_init, this.params.epilog)
+    const result_init = (y, x) => this._dotprod_val(this.left.data, this.right.data, y, x)
+    const data = Array2D.fromInit(this.H, this.W, result_init, this.params.epilog)
+    const params = { ...this.params, getGlobalAbsmax: this.getGlobalAbsmax.bind(this) }
+    this.result = new Mat(data, params, false)
   }
 
   _dotprod_val(a, b, i, k, minj = undefined, maxj = undefined) {
@@ -714,12 +694,71 @@ export class MatMul {
     this.initResultVis()
 
     this.setFlowGuide()
-
     this.setAnimation()
-
     this.setPosition()
-
     this.updateLabels()
+  }
+
+  initLeftVis() {
+    if (this.params.left) {
+      return
+    }
+    if (this.left) {
+      this.group.remove(this.left.group)
+    }
+    this.left.initVis()
+    this.left.group.rotation.y = Math.PI / 2
+    this.left.group.rotation.z = Math.PI
+    if (this.params.left_rot) {
+      Object.keys(this.params.left_rot).map(k => this.left.group.rotation[k] += this.params.left_rot[k])
+    }
+    this.left.group.position.x = -1
+    if (this.params.left_pos) {
+      Object.keys(this.params.left_pos).map(k => this.left.group.position[k] += this.params.left_pos[k])
+    }
+    this.left.setRowGuides()
+    this.setLeftLegends(this.params.legends)
+
+    this.group.add(this.left.group)
+  }
+
+  initRightVis() {
+    if (this.params.right) {
+      return
+    }
+    if (this.right) {
+      this.group.remove(this.right.group)
+    }
+    this.right.initVis()
+    this.right.group.rotation.x = Math.PI / 2
+    if (this.params.right_rot) {
+      Object.keys(this.params.right_rot).map(k => this.right.group.rotation[k] += this.params.right_rot[k])
+    }
+    this.right.group.position.y = 1
+    if (this.params.right_pos) {
+      Object.keys(this.params.right_pos).map(k => this.right.group.position[k] += this.params.right_pos[k])
+    }
+    this.right.setRowGuides()
+    this.setRightLegends(this.params.legends)
+    this.group.add(this.right.group)
+  }
+
+  initResultVis() {
+    if (this.result) {
+      this.group.remove(this.result.group)
+    }
+    this.result.initVis()
+    this.result.group.rotation.x = Math.PI
+    if (this.params.result_rot) {
+      Object.keys(this.params.result_rot).map(k => this.result.group.rotation[k] += this.params.result_rot[k])
+    }
+    this.result.group.position.z = this.D
+    if (this.params.result_pos) {
+      Object.keys(this.params.result_pos).map(k => this.result.group.position[k] += this.params.result_pos[k])
+    }
+    this.result.setRowGuides()
+    this.setResultLegends(this.params.legends)
+    this.group.add(this.result.group)
   }
 
   updateLabels(spotlight = undefined) {
@@ -743,81 +782,12 @@ export class MatMul {
     this.group.rotation.z = rot.z
   }
 
-  initLeftVis() {
-    if (this.params.left) {
-      this.left = this.params.left
-      return
-    }
-    if (this.left) {
-      this.group.remove(this.left.group)
-    }
-    this.left = new Mat(this.left_data, this)
-    this.left.group.rotation.y = Math.PI / 2
-    this.left.group.rotation.z = Math.PI
-    if (this.params.left_rot) {
-      Object.keys(this.params.left_rot).map(k => this.left.group.rotation[k] += this.params.left_rot[k])
-    }
-    this.left.group.position.x = -1
-    if (this.params.left_pos) {
-      Object.keys(this.params.left_pos).map(k => this.left.group.position[k] += this.params.left_pos[k])
-    }
-    this.left.setRowGuides()
-    this.setLeftLegends(this.params.legends)
-
-    this.group.add(this.left.group)
-  }
-
-  initRightVis() {
-    if (this.params.right) {
-      this.right = this.params.right
-      return
-    }
-    if (this.right) {
-      this.group.remove(this.right.group)
-    }
-    this.right = new Mat(this.right_data, this)
-    this.right.group.rotation.x = Math.PI / 2
-    if (this.params.right_rot) {
-      Object.keys(this.params.right_rot).map(k => this.right.group.rotation[k] += this.params.right_rot[k])
-    }
-    this.right.group.position.y = 1
-    if (this.params.right_pos) {
-      Object.keys(this.params.right_pos).map(k => this.right.group.position[k] += this.params.right_pos[k])
-    }
-    this.right.setRowGuides()
-    this.setRightLegends(this.params.legends)
-    this.group.add(this.right.group)
-  }
-
-  initResultVis() {
-    if (this.params.result) {
-      throw Error(`HEY this.params.result`)
-      this.result = this.params.result
-      return
-    }
-    if (this.result) {
-      this.group.remove(this.result.group)
-    }
-    this.result = new Mat(this.result_data, this)
-    this.result.group.rotation.x = Math.PI
-    if (this.params.result_rot) {
-      Object.keys(this.params.result_rot).map(k => this.result.group.rotation[k] += this.params.result_rot[k])
-    }
-    this.result.group.position.z = this.D
-    if (this.params.result_pos) {
-      Object.keys(this.params.result_pos).map(k => this.result.group.position[k] += this.params.result_pos[k])
-    }
-    this.result.setRowGuides()
-    this.setResultLegends(this.params.legends)
-    this.group.add(this.result.group)
-  }
-
-  initAbsmax() {
-    this.absmax = Math.max(this.left_data.absmax(), this.right_data.absmax(), this.result_data.absmax())
-  }
-
   getAbsmax() {
-    return this.absmax
+    return Math.max(this.left.absmax, this.right.absmax, this.result.absmax)
+  }
+
+  getGlobalAbsmax() {
+    return this.params.getGlobalAbsmax ? this.params.getGlobalAbsmax() : this.getAbsmax()
   }
 
   setAnimation() {
@@ -891,8 +861,8 @@ export class MatMul {
     const results = []
     this.grid('j', j => {
       const result_init = (y, x) => this.dotprod_val(y, x, j * jp, (j + 1) * jp)
-      const params = { stretch_limits: true }
-      const result = Mat.fromInit(this.H, this.W, result_init, this, params)
+      const params = { ...this.params, stretch_limits: true }
+      const result = Mat.fromInit(this.H, this.W, result_init, params)
       result.group.position.z = j * jp + jp - 1
       result.group.rotation.x = Math.PI
       result.hide()
@@ -912,8 +882,8 @@ export class MatMul {
     const vmpgroup = new THREE.Group()
     this.grid('ijk', (i, j, k) => {
       const vmpinit = (jx, kx) => this.ijkmul(i * ip, j * jp + jx, k * kp + kx)
-      const params = { stretch_limits: true }
-      const vmp = Mat.fromInit(jp, sweep ? 1 : kp, vmpinit, this, params)
+      const params = { ...this.params, stretch_limits: true }
+      const vmp = Mat.fromInit(jp, sweep ? 1 : kp, vmpinit, params)
       util.updateProps(vmp.group.position, { x: k * kp, y: -i * ip, z: j * jp })
       vmp.group.rotation.x = Math.PI / 2
       vmps.push(vmp)
@@ -980,8 +950,8 @@ export class MatMul {
     const mvpgroup = new THREE.Group()
     this.grid('ijk', (i, j, k) => {
       const mvpinit = (ix, jx) => this.ijkmul(i * ip + ix, j * jp + jx, k * kp)
-      const params = { stretch_limits: true }
-      const mvp = Mat.fromInit(sweep ? 1 : ip, jp, mvpinit, this, params)
+      const params = { ...this.params, stretch_limits: true }
+      const mvp = Mat.fromInit(sweep ? 1 : ip, jp, mvpinit, params)
       util.updateProps(mvp.group.position, { x: k * kp, y: -i * ip, z: j * jp })
       util.updateProps(mvp.group.rotation, { y: Math.PI / 2, z: Math.PI })
       mvps.push(mvp)
@@ -1048,8 +1018,8 @@ export class MatMul {
     const vvpgroup = new THREE.Group()
     this.grid('ijk', (i, j, k) => {
       const vvpinit = (ix, kx) => this.ijkmul(i * ip + ix, j * jp, k * kp + kx)
-      const params = { stretch_limits: true }
-      const vvp = Mat.fromInit(ip, sweep ? 1 : kp, vvpinit, this, params)
+      const params = { ...this.params, stretch_limits: true }
+      const vvp = Mat.fromInit(ip, sweep ? 1 : kp, vvpinit, params)
       util.updateProps(vvp.group.position, { x: k * kp, y: -i * ip, z: j * jp })
       vvp.group.rotation.x = Math.PI
       vvps.push(vvp)
@@ -1217,11 +1187,9 @@ export class Attn {
     }
     this.group.clear()
 
-    // this._setAbsmax(this.left_data, this.right_data, this.result_data)
-
     this.initmm1()
     this.initmm2()
-    this.initAbsmax()
+    // this.initAbsmax()
 
     // this.setAnimation(this.params.animation)
 
@@ -1290,12 +1258,8 @@ export class Attn {
     this.group.add(this.mm2.group)
   }
 
-  initAbsmax() {
-    this.absmax = Math.max(this.mm1.getAbsmax(), this.mm2.getAbsmax())
-  }
-
   getGlobalAbsmax() {
-    return this.absmax
+    return Math.max(this.mm1.getAbsmax(), this.mm2.getAbsmax())
   }
 
   initQ(params = undefined) {
