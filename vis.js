@@ -259,7 +259,7 @@ function emptyPoints(h, w) {
 
 export class Mat {
 
-  constructor(data, params, init_vis = false) {
+  constructor(data, params, init_vis) {
     this.params = { ...params }
 
     this.data = data
@@ -587,9 +587,12 @@ export class MatMul {
     this.initLeft()
     this.initRight()
     this.initResult()
-    // this.initAbsmax()
 
     this.initVis()
+  }
+
+  getChildParams() {
+    return { ...this.params, getGlobalAbsmax: this.getGlobalAbsmax.bind(this) }
   }
 
   initLeft() {
@@ -608,8 +611,7 @@ export class MatMul {
       const f = getInitFunc(init, min, max, sparsity)
       return Array2D.fromInit(this.H, this.D, f)
     })()
-    const params = { ...this.params, getGlobalAbsmax: this.getGlobalAbsmax.bind(this) }
-    this.left = new Mat(data, params, false)
+    this.left = new Mat(data, this.getChildParams(), false)
   }
 
   initRight() {
@@ -628,8 +630,7 @@ export class MatMul {
       const f = getInitFunc(name, min, max, sparsity)
       return Array2D.fromInit(this.D, this.W, f)
     })()
-    const params = { ...this.params, getGlobalAbsmax: this.getGlobalAbsmax.bind(this) }
-    this.right = new Mat(data, params, false)
+    this.right = new Mat(data, this.getChildParams(), false)
   }
 
   initResult() {
@@ -638,8 +639,7 @@ export class MatMul {
     }
     const result_init = (i, j) => this.dotprod_val(i, j)
     const data = Array2D.fromInit(this.H, this.W, result_init, this.params.epilog)
-    const params = { ...this.params, getGlobalAbsmax: this.getGlobalAbsmax.bind(this) }
-    this.result = new Mat(data, params, false)
+    this.result = new Mat(data, this.getChildParams(), false)
   }
 
   dotprod_val(i, k, minj = undefined, maxj = undefined) {
@@ -829,6 +829,10 @@ export class MatMul {
     loop([], lims, f)
   }
 
+  getAnimMatParams() {
+    return { ...this.getChildParams(), stretch_limits: true }
+  }
+
   getAnimResultMats() {
     const { j: { n: nj, p: jp } } = this.getThreadInfo()
     if (nj == 1) {
@@ -838,8 +842,8 @@ export class MatMul {
     const results = []
     this.grid('j', j => {
       const result_init = (i, k) => this.dotprod_val(i, k, j * jp, (j + 1) * jp)
-      const params = { ...this.params, stretch_limits: true }
-      const result = new Mat(Array2D.fromInit(this.H, this.W, result_init), params, true)
+      const data = Array2D.fromInit(this.H, this.W, result_init)
+      const result = new Mat(data, this.getAnimMatParams(), true)
       result.group.position.z = j * jp + jp - 1
       result.group.rotation.x = Math.PI
       result.hide()
@@ -859,8 +863,8 @@ export class MatMul {
     const vmpgroup = new THREE.Group()
     this.grid('ijk', (i, j, k) => {
       const vmpinit = (jx, kx) => this.ijkmul(i * ip, j * jp + jx, k * kp + kx)
-      const params = { ...this.params, stretch_limits: true }
-      const vmp = new Mat(Array2D.fromInit(jp, sweep ? 1 : kp, vmpinit), params)
+      const data = Array2D.fromInit(jp, sweep ? 1 : kp, vmpinit)
+      const vmp = new Mat(data, this.getAnimMatParams(), true)
       util.updateProps(vmp.group.position, { x: k * kp, y: -i * ip, z: j * jp })
       vmp.group.rotation.x = Math.PI / 2
       vmps.push(vmp)
@@ -927,8 +931,8 @@ export class MatMul {
     const mvpgroup = new THREE.Group()
     this.grid('ijk', (i, j, k) => {
       const mvpinit = (ix, jx) => this.ijkmul(i * ip + ix, j * jp + jx, k * kp)
-      const params = { ...this.params, stretch_limits: true }
-      const mvp = new Mat(Array2D.fromInit(sweep ? 1 : ip, jp, mvpinit), params)
+      const data = Array2D.fromInit(sweep ? 1 : ip, jp, mvpinit)
+      const mvp = new Mat(data, this.getAnimMatParams(), true)
       util.updateProps(mvp.group.position, { x: k * kp, y: -i * ip, z: j * jp })
       util.updateProps(mvp.group.rotation, { y: Math.PI / 2, z: Math.PI })
       mvps.push(mvp)
@@ -995,8 +999,8 @@ export class MatMul {
     const vvpgroup = new THREE.Group()
     this.grid('ijk', (i, j, k) => {
       const vvpinit = (ix, kx) => this.ijkmul(i * ip + ix, j * jp, k * kp + kx)
-      const params = { ...this.params, stretch_limits: true }
-      const vvp = new Mat(Array2D.fromInit(ip, sweep ? 1 : kp, vvpinit), params)
+      const data = Array2D.fromInit(ip, sweep ? 1 : kp, vvpinit)
+      const vvp = new Mat(data, this.getAnimMatParams(), true)
       util.updateProps(vvp.group.position, { x: k * kp, y: -i * ip, z: j * jp })
       vvp.group.rotation.x = Math.PI
       vvps.push(vvp)
@@ -1657,7 +1661,7 @@ export class Attn3 {
   static matFromParams(h, w, params) {
     const init = initFuncFromParams(params.init)
     const data = params.data || Array2D.fromInit(h, w, init)
-    const m = new Mat(data, params)
+    const m = new Mat(data, params, false)
 
     m.setRowGuides()
 
