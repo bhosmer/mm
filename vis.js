@@ -315,11 +315,8 @@ export class Mat {
   }
 
   sizeFromData(x) {
-    if (x == undefined) {
+    if (x == undefined || isNaN(x)) {
       throw Error(`HEY sizeFromData(${x})`)
-    }
-    if (isNaN(x)) {
-      return 0 // used to hide
     }
 
     const local_sens = this.params.sensitivity == 'local'
@@ -338,11 +335,8 @@ export class Mat {
   }
 
   colorFromData(x) {
-    if (x == undefined) {
-      throw Error(`HEY colorFromData(${x}) == undefined`)
-    }
-    if (isNaN(x)) {
-      throw Error(`HEY colorFromData(${x}) is NaN`)
+    if (x == undefined || isNaN(x)) {
+      throw Error(`HEY colorFromData(${x})`)
     }
 
     const local_sens = this.params.sensitivity == 'local'
@@ -364,15 +358,6 @@ export class Mat {
     this.colorFromData(x).toArray(a, i * 3)
   }
 
-  getSize(i, j) {
-    return this.points.geometry.attributes.pointSize.array[this.data.addr(i, j)]
-  }
-
-  setSize(i, j, x) {
-    this.points.geometry.attributes.pointSize.array[this.data.addr(i, j)] = x
-    this.points.geometry.attributes.pointSize.needsUpdate = true
-  }
-
   setHSL(i, j, x) {
     this.setElemHSL(this.points.geometry.attributes.pointColor.array, this.data.addr(i, j), x)
     this.points.geometry.attributes.pointColor.needsUpdate = true
@@ -392,24 +377,32 @@ export class Mat {
     return this.data.get(i, j)
   }
 
-  show(r = undefined, c = undefined) {
+  getSize(i, j) {
+    return this.points.geometry.attributes.pointSize.array[this.data.addr(i, j)]
+  }
+
+  setSize(i, j, x) {
+    this.points.geometry.attributes.pointSize.array[this.data.addr(i, j)] = x
+    this.points.geometry.attributes.pointSize.needsUpdate = true
+  }
+
+  setSizes(show, r, c) {
     const [rstart, rend] = r == undefined ? [0, this.h] : [r, r + 1]
     const [cstart, cend] = c == undefined ? [0, this.w] : [c, c + 1]
+    const size = show ? (i, j) => this.sizeFromData(this.getData(i, j)) : (i, j) => 0
     for (let i = rstart; i < rend; i++) {
       for (let j = cstart; j < cend; j++) {
-        this.setSize(i, j, this.sizeFromData(this.getData(i, j)))
+        this.setSize(i, j, size(i, j))
       }
     }
   }
 
+  show(r = undefined, c = undefined) {
+    this.setSizes(true, r, c)
+  }
+
   hide(r = undefined, c = undefined) {
-    const [rstart, rend] = r == undefined ? [0, this.h] : [r, r + 1]
-    const [cstart, cend] = c == undefined ? [0, this.w] : [c, c + 1]
-    for (let i = rstart; i < rend; i++) {
-      for (let j = cstart; j < cend; j++) {
-        this.setSize(i, j, this.sizeFromData(NaN))
-      }
-    }
+    this.setSizes(false, r, c)
   }
 
   isHidden(i, j) {
