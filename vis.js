@@ -259,11 +259,6 @@ function emptyPoints(h, w) {
 
 export class Mat {
 
-  static fromInit(h, w, init, params) {
-    const data = Array2D.fromInit(h, w, init)
-    return new Mat(data, params)
-  }
-
   static fromParams(h, w, params) {
     const init = initFuncFromParams(params.init)
     const data = params.data || Array2D.fromInit(h, w, init)
@@ -862,7 +857,7 @@ export class MatMul {
     this.grid('j', j => {
       const result_init = (y, x) => this.dotprod_val(y, x, j * jp, (j + 1) * jp)
       const params = { ...this.params, stretch_limits: true }
-      const result = Mat.fromInit(this.H, this.W, result_init, params)
+      const result = new Mat(Array2D.fromInit(this.H, this.W, result_init), params)
       result.group.position.z = j * jp + jp - 1
       result.group.rotation.x = Math.PI
       result.hide()
@@ -883,7 +878,7 @@ export class MatMul {
     this.grid('ijk', (i, j, k) => {
       const vmpinit = (jx, kx) => this.ijkmul(i * ip, j * jp + jx, k * kp + kx)
       const params = { ...this.params, stretch_limits: true }
-      const vmp = Mat.fromInit(jp, sweep ? 1 : kp, vmpinit, params)
+      const vmp = new Mat(Array2D.fromInit(jp, sweep ? 1 : kp, vmpinit), params)
       util.updateProps(vmp.group.position, { x: k * kp, y: -i * ip, z: j * jp })
       vmp.group.rotation.x = Math.PI / 2
       vmps.push(vmp)
@@ -951,7 +946,7 @@ export class MatMul {
     this.grid('ijk', (i, j, k) => {
       const mvpinit = (ix, jx) => this.ijkmul(i * ip + ix, j * jp + jx, k * kp)
       const params = { ...this.params, stretch_limits: true }
-      const mvp = Mat.fromInit(sweep ? 1 : ip, jp, mvpinit, params)
+      const mvp = new Mat(Array2D.fromInit(sweep ? 1 : ip, jp, mvpinit), params)
       util.updateProps(mvp.group.position, { x: k * kp, y: -i * ip, z: j * jp })
       util.updateProps(mvp.group.rotation, { y: Math.PI / 2, z: Math.PI })
       mvps.push(mvp)
@@ -1019,7 +1014,7 @@ export class MatMul {
     this.grid('ijk', (i, j, k) => {
       const vvpinit = (ix, kx) => this.ijkmul(i * ip + ix, j * jp, k * kp + kx)
       const params = { ...this.params, stretch_limits: true }
-      const vvp = Mat.fromInit(ip, sweep ? 1 : kp, vvpinit, params)
+      const vvp = new Mat(Array2D.fromInit(ip, sweep ? 1 : kp, vvpinit), params)
       util.updateProps(vvp.group.position, { x: k * kp, y: -i * ip, z: j * jp })
       vvp.group.rotation.x = Math.PI
       vvps.push(vvp)
