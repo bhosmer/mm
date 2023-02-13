@@ -319,7 +319,7 @@ export class Mat {
       throw Error(`HEY sizeFromData(${x})`)
     }
     if (isNaN(x)) {
-      return 0
+      return 0 // used to hide
     }
 
     const local_sens = this.params.sensitivity == 'local'
@@ -339,10 +339,10 @@ export class Mat {
 
   colorFromData(x) {
     if (x == undefined) {
-      throw Error(`HEY colorFromData(${x})`)
+      throw Error(`HEY colorFromData(${x}) == undefined`)
     }
     if (isNaN(x)) {
-      return new THREE.Color().setHSL(0, 0, 0)
+      throw Error(`HEY colorFromData(${x}) is NaN`)
     }
 
     const local_sens = this.params.sensitivity == 'local'
@@ -398,7 +398,6 @@ export class Mat {
     for (let i = rstart; i < rend; i++) {
       for (let j = cstart; j < cend; j++) {
         this.setSize(i, j, this.sizeFromData(this.getData(i, j)))
-        this.setHSL(i, j, this.getData(i, j))
       }
     }
   }
@@ -409,7 +408,6 @@ export class Mat {
     for (let i = rstart; i < rend; i++) {
       for (let j = cstart; j < cend; j++) {
         this.setSize(i, j, this.sizeFromData(NaN))
-        this.setHSL(i, j, NaN)
       }
     }
   }
@@ -839,9 +837,9 @@ export class MatMul {
     }
     const results = []
     this.grid('j', j => {
-      const result_init = (y, x) => this.dotprod_val(y, x, j * jp, (j + 1) * jp)
+      const result_init = (i, k) => this.dotprod_val(i, k, j * jp, (j + 1) * jp)
       const params = { ...this.params, stretch_limits: true }
-      const result = new Mat(Array2D.fromInit(this.H, this.W, result_init), params)
+      const result = new Mat(Array2D.fromInit(this.H, this.W, result_init), params, true)
       result.group.position.z = j * jp + jp - 1
       result.group.rotation.x = Math.PI
       result.hide()
