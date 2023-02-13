@@ -638,7 +638,6 @@ export class MatMul {
     if (this.result) {
       this.group.remove(this.result.group)
     }
-    // const result_init = (y, x) => this._dotprod_val(this.left.data, this.right.data, y, x)
     const result_init = (i, j) => this.dotprod_val(i, j)
     const data = Array2D.fromInit(this.H, this.W, result_init, this.params.epilog)
     const params = { ...this.params, getGlobalAbsmax: this.getGlobalAbsmax.bind(this) }
@@ -646,20 +645,18 @@ export class MatMul {
   }
 
   dotprod_val(i, k, minj = undefined, maxj = undefined) {
-    const a = this.left.data
-    const b = this.right.data
-    let x = 0.0
     if (minj == undefined) {
       minj = 0
     }
     if (maxj == undefined) {
-      maxj = a.w
+      maxj = this.left.data.w
     }
+    let x = 0.0
     for (let j = minj; j < maxj; j++) {
-      x += a.get(i, j) * b.get(j, k)
+      x += this.left.data.get(i, j) * this.right.data.get(j, k)
     }
     if (isNaN(x)) {
-      console.log(`HEY`)
+      console.log(`HEY dotprod_val(${i}, ${j}, ${minj}, ${maxj}) is NaN`)
     }
     const epi = this.params.epilog
     return epi == 'x/J' ? x / this.D :
