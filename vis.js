@@ -133,29 +133,29 @@ function getInPlaceEpilog(name) {
 // Array2D
 //
 
-function arrayDataInit(a, h, w, f, epi = undefined, r = undefined, c = undefined) {
+function initArrayData_(data, h, w, init, epi = undefined, r = undefined, c = undefined) {
   const [rstart, rend] = r == undefined ? [0, h] : [r, r + 1]
   const [cstart, cend] = c == undefined ? [0, w] : [c, c + 1]
   for (let i = rstart; i < rend; i++) {
     for (let j = cstart, ptr = i * w + cstart; j < cend; j++, ptr++) {
-      const x = f(i, j, h, w)
+      const x = init(i, j, h, w)
       if (isNaN(x)) {
-        throw Error(`HEY init f(${i}, ${j}, ${h}, ${w}) is NaN`)
+        throw Error(`HEY init(${i}, ${j}, ${h}, ${w}) is NaN`)
       }
-      a[ptr] = x
+      data[ptr] = x
     }
   }
   const epi_ = epi && getInPlaceEpilog(epi)
   if (epi_) {
-    epi_(h, w, a)
+    epi_(h, w, data)
   }
 }
 
 class Array2D {
 
-  static fromInit(h, w, f, epi = undefined) {
+  static fromInit(h, w, init, epi = undefined) {
     const data = new Float32Array(h * w)
-    arrayDataInit(data, h, w, f, epi)
+    initArrayData_(data, h, w, init, epi)
     return new Array2D(h, w, data)
   }
 
@@ -166,7 +166,7 @@ class Array2D {
   }
 
   reinit(f, epi = undefined, r = undefined, c = undefined) {
-    arrayDataInit(this.data, this.h, this.w, f, epi, r, c)
+    initArrayData_(this.data, this.h, this.w, f, epi, r, c)
   }
 
   numel() {
@@ -242,15 +242,15 @@ const ELEM_SIZE = 1792
 
 function emptyPoints(h, w) {
   const n = h * w
-  const geom = new THREE.BufferGeometry();
   const points = new Float32Array(n * 3)
-  for (let i = 0, ptr3 = 0; i < h; i++) {
-    for (let j = 0; j < w; j++, ptr3 += 3) {
-      points[ptr3] = j
-      points[ptr3 + 1] = i
-      points[ptr3 + 2] = 0
+  for (let i = 0, ptr = 0; i < h; i++) {
+    for (let j = 0; j < w; j++) {
+      points[ptr++] = j
+      points[ptr++] = i
+      points[ptr++] = 0
     }
   }
+  const geom = new THREE.BufferGeometry();
   geom.setAttribute('position', new THREE.BufferAttribute(points, 3));
   geom.setAttribute('pointSize', new THREE.Float32BufferAttribute(new Float32Array(n), 1))
   geom.setAttribute('pointColor', new THREE.Float32BufferAttribute(new Float32Array(n * 3), 3))
@@ -259,22 +259,7 @@ function emptyPoints(h, w) {
 
 export class Mat {
 
-  static fromParams(h, w, params) {
-    const init = initFuncFromParams(params.init)
-    const data = params.data || Array2D.fromInit(h, w, init)
-    const m = new Mat(data, params)
-
-    m.setRowGuides()
-
-    const custom = params.legend ? params.legend : {}
-    const defaults = { name: "X", height: "i", width: "j", hleft: true, wtop: false }
-    const props = { ...m.getLegendProps(), ...defaults, ...custom }
-    m.setLegends(params.legends, props)
-
-    return m
-  }
-
-  constructor(data, params, init_vis) {
+  constructor(data, params, init_vis = false) {
     this.params = { ...params }
 
     this.data = data
@@ -286,7 +271,6 @@ export class Mat {
     this.points = emptyPoints(this.h, this.w)
     this.group = new THREE.Group()
     this.group.add(this.points)
-
     if (init_vis) {
       this.initVis()
     }
@@ -302,20 +286,11 @@ export class Mat {
         const x = this.data.data[ptr]
         sizes[ptr] = this.sizeFromData(x)
         this.setElemHSL(colors, ptr, x)
-        if (this.label_cache && this.label_cache[ptr]) {
-          const label = this.label_cache[ptr]
-          if (label.value != x) {
-            this.label_cache[ptr] = undefined
-          }
-        }
+        this.checkLabel(ptr, x)
       }
     }
     this.points.geometry.attributes.pointSize.needsUpdate = true
     this.points.geometry.attributes.pointColor.needsUpdate = true
-  }
-
-  getGlobalAbsmax() {
-    return this.params.getGlobalAbsmax ? this.params.getGlobalAbsmax() : this.absmax
   }
 
   reinit(f, epi = undefined, r = undefined, c = undefined) {
@@ -333,6 +308,10 @@ export class Mat {
 
   getPointColors() {
     return this.points.geometry.attributes.pointColor.array
+  }
+
+  getGlobalAbsmax() {
+    return this.params.getGlobalAbsmax ? this.params.getGlobalAbsmax() : this.absmax
   }
 
   sizeFromData(x) {
@@ -537,6 +516,15 @@ export class Mat {
     }
   }
 
+  checkLabel(i, x) {
+    if (this.label_cache) {
+      const label = this.label_cache[i]
+      if (label != undefined && label.value != x) {
+        this.label_cache[i] = undefined
+      }
+    }
+  }
+
   updateLabels(spotlight = undefined) {
     if (spotlight != undefined) {
       this.params.spotlight = spotlight
@@ -572,6 +560,7 @@ export class Mat {
           const x = this.getData(i, j)
           const fsiz = 0.175 - Math.log(1 + x / 10000)
           label = this.params.getText(`${x.toFixed(4)}`, 0xffffff, fsiz)
+          label.value = x
           label.geometry.rotateX(Math.PI)
           const { h, w } = util.bbhw(label.geometry)
           label.geometry.translate(util.center(j * 2, w), h + util.center(i * 2, h), -0.25)
@@ -597,15 +586,18 @@ export class MatMul {
     this.D = params.J
     this.W = params.K
 
-    this.initLeftData()
-    this.initRightData()
-    this.initResultData()
+    this.initLeft()
+    this.initRight()
+    this.initResult()
     // this.initAbsmax()
 
     this.initVis()
   }
 
-  initLeftData() {
+  initLeft() {
+    if (this.left) {
+      this.group.remove(this.left.group)
+    }
     if (this.params.left) {
       this.left = this.params.left
       return
@@ -622,7 +614,10 @@ export class MatMul {
     this.left = new Mat(data, params, false)
   }
 
-  initRightData() {
+  initRight() {
+    if (this.right) {
+      this.group.remove(this.right.group)
+    }
     if (this.params.right) {
       this.right = this.params.right
       return
@@ -639,14 +634,20 @@ export class MatMul {
     this.right = new Mat(data, params, false)
   }
 
-  initResultData() {
-    const result_init = (y, x) => this._dotprod_val(this.left.data, this.right.data, y, x)
+  initResult() {
+    if (this.result) {
+      this.group.remove(this.result.group)
+    }
+    // const result_init = (y, x) => this._dotprod_val(this.left.data, this.right.data, y, x)
+    const result_init = (i, j) => this.dotprod_val(i, j)
     const data = Array2D.fromInit(this.H, this.W, result_init, this.params.epilog)
     const params = { ...this.params, getGlobalAbsmax: this.getGlobalAbsmax.bind(this) }
     this.result = new Mat(data, params, false)
   }
 
-  _dotprod_val(a, b, i, k, minj = undefined, maxj = undefined) {
+  dotprod_val(i, k, minj = undefined, maxj = undefined) {
+    const a = this.left.data
+    const b = this.right.data
     let x = 0.0
     if (minj == undefined) {
       minj = 0
@@ -666,10 +667,6 @@ export class MatMul {
         epi == 'tanh(x)' ? Math.tanh(x) :
           epi == 'relu(x)' ? Math.max(0, x) :
             x
-  }
-
-  dotprod_val(i, k, minj = undefined, maxj = undefined) {
-    return this._dotprod_val(this.left.data, this.right.data, i, k, minj, maxj)
   }
 
   ijkmul(i, j, k) {
@@ -698,9 +695,6 @@ export class MatMul {
     if (this.params.left) {
       return
     }
-    if (this.left) {
-      this.group.remove(this.left.group)
-    }
     this.left.initVis()
     this.left.group.rotation.y = Math.PI / 2
     this.left.group.rotation.z = Math.PI
@@ -721,9 +715,6 @@ export class MatMul {
     if (this.params.right) {
       return
     }
-    if (this.right) {
-      this.group.remove(this.right.group)
-    }
     this.right.initVis()
     this.right.group.rotation.x = Math.PI / 2
     if (this.params.right_rot) {
@@ -739,9 +730,6 @@ export class MatMul {
   }
 
   initResultVis() {
-    if (this.result) {
-      this.group.remove(this.result.group)
-    }
     this.result.initVis()
     this.result.group.rotation.x = Math.PI
     if (this.params.result_rot) {
@@ -788,9 +776,17 @@ export class MatMul {
   setAnimation() {
     const prev_alg = this.anim_alg
     this.anim_alg = this.params.alg || 'none'
-    this.anim_mats = this.anim_mats || []
+    if (this.anim_alg == prev_alg) {
+      return
+    }
 
-    // TODO clean this shit up
+    this.anim_mats = []
+    if (prev_alg == 'vvprod' || prev_alg == 'axpy') {
+      this.initResult() // clear depthwise accum into result
+      this.result.params.stretch_limits = false
+      this.initResultVis()
+    }
+
     if (this.anim_alg == 'none') {
       this.left.show()
       this.right.show()
@@ -801,28 +797,19 @@ export class MatMul {
         this.right.hide()
       }
       this.result.hide()
-    }
 
-    if (this.anim_alg == 'dotprod (row major)') {
-      this.initAnimVmprod(true)
-    } else if (this.anim_alg == 'dotprod (col major)') {
-      this.initAnimMvprod(true)
-    } else if (this.anim_alg == 'axpy') {
-      this.initAnimVvprod(true)
-    } else if (this.anim_alg == 'mvprod') {
-      this.initAnimMvprod(false)
-    } else if (this.anim_alg == 'vmprod') {
-      this.initAnimVmprod(false)
-    } else if (this.anim_alg == 'vvprod') {
-      this.initAnimVvprod(false)
-    } else if (this.anim_alg == 'none') {
-      this.anim_mats = []
-      if (prev_alg == 'vvprod' || prev_alg == 'axpy') {
-        this.initResultData() // depthwise animations accum into result
-        this.result.params.stretch_limits = false
-        this.initResultVis()
-      } else {
-        this.result.show()
+      if (this.anim_alg == 'dotprod (row major)') {
+        this.initAnimVmprod(true)
+      } else if (this.anim_alg == 'dotprod (col major)') {
+        this.initAnimMvprod(true)
+      } else if (this.anim_alg == 'axpy') {
+        this.initAnimVvprod(true)
+      } else if (this.anim_alg == 'mvprod') {
+        this.initAnimMvprod(false)
+      } else if (this.anim_alg == 'vmprod') {
+        this.initAnimVmprod(false)
+      } else if (this.anim_alg == 'vvprod') {
+        this.initAnimVvprod(false)
       }
     }
   }
@@ -1267,13 +1254,13 @@ export class Attn {
 
   setAttnEpilog(epilog) {
     this.params['attn epilog'] = epilog
-    this.mm1.initResultData()
+    this.mm1.initResult()
     this.initVis()
   }
 
   setResultEpilog(epilog) {
     this.params['result epilog'] = epilog
-    this.mm2.initResultData()
+    this.mm2.initResult()
     this.initVis()
   }
 
@@ -1671,6 +1658,22 @@ export class Attn3 {
     this.initVis()
   }
 
+  // moved from Mat - should go away in cleanup
+  static matFromParams(h, w, params) {
+    const init = initFuncFromParams(params.init)
+    const data = params.data || Array2D.fromInit(h, w, init)
+    const m = new Mat(data, params)
+
+    m.setRowGuides()
+
+    const custom = params.legend ? params.legend : {}
+    const defaults = { name: "X", height: "i", width: "j", hleft: true, wtop: false }
+    const props = { ...m.getLegendProps(), ...defaults, ...custom }
+    m.setLegends(params.legends, props)
+
+    return m
+  }
+
   initVis(params = undefined) {
     if (params) {
       this.params = { ...params }
@@ -1689,7 +1692,7 @@ export class Attn3 {
       'left sparsity': this.params['q sparsity'], // TODO
       legend: { name: "input", height: "n_q", width: "d_model", hleft: false, wtop: true },
     }
-    const input = Mat.fromParams(this.params.n_q, this.params.d_model, input_params)
+    const input = Attn3.matFromParams(this.params.n_q, this.params.d_model, input_params)
     input.group.rotation.x = Math.PI
     input.group.position.x = -this.params.d_model / 2
     input.group.position.y = this.params.n_q / 2
@@ -1718,7 +1721,7 @@ export class Attn3 {
       data: output_data,
       legend: { name: "output", height: "n_q", width: "d_model", hleft: false, wtop: true },
     }
-    const output = Mat.fromParams(this.params.n_q, this.params.d_model, output_params)
+    const output = Attn3.matFromParams(this.params.n_q, this.params.d_model, output_params)
     output.group.rotation.x = Math.PI
     output.group.position.x = -this.params.d_model / 2
     output.group.position.y = this.params.n_q / 2
