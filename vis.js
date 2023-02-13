@@ -321,8 +321,8 @@ export class Mat {
   reinit(f, epi = undefined, r = undefined, c = undefined) {
     this.data.reinit(f, epi, r, c)
     if (this.params.stretch_limits) {
-      this.absmin = this.data.absmin()
-      this.absmax = this.data.absmax()
+      this.absmin = Math.min(this.absmin, this.data.absmin())
+      this.absmax = Math.max(this.absmax, this.data.absmax())
     }
     this.initVis(r, c)
   }
