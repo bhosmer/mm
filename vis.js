@@ -242,7 +242,7 @@ class Array2D {
 // Mat
 //
 
-const ELEM_SIZE = 1792
+const ELEM_SIZE = 2000
 const ZERO_COLOR = new THREE.Color(0, 0, 0)
 
 function emptyPoints(h, w) {
@@ -282,11 +282,11 @@ export class Mat {
     }
   }
 
-  initVis(r = undefined, c = undefined, hide = false) {
+  initVis(r = undefined, c = undefined, size = undefined, color = undefined) {
     const [rstart, rend] = toRange(r, this.h)
     const [cstart, cend] = toRange(c, this.w)
-    const size = hide ? _ => 0 : x => this.sizeFromData(x)
-    const color = hide ? _ => ZERO_COLOR : x => this.colorFromData(x)
+    size = size || this.sizeFromData.bind(this)
+    color = color || this.colorFromData.bind(this)
     for (let i = rstart; i < rend; i++) {
       for (let j = cstart; j < cend; j++) {
         const x = this.getData(i, j)
@@ -295,19 +295,6 @@ export class Mat {
         this.checkLabel(i, j, x)
       }
     }
-  }
-
-  reinit(init, epi = undefined, r = undefined, c = undefined) {
-    this.data.reinit(init, epi, r, c)
-    if (this.params.stretch_limits) {
-      this.absmin = Math.min(this.absmin, this.data.absmin())
-      this.absmax = Math.max(this.absmax, this.data.absmax())
-    }
-    this.initVis(r, c)
-  }
-
-  getGlobalAbsmax() {
-    return this.params.getGlobalAbsmax ? this.params.getGlobalAbsmax() : this.absmax
   }
 
   sizeFromData(x) {
@@ -350,6 +337,23 @@ export class Mat {
     return new THREE.Color().setHSL(hue, 1.0, light)
   }
 
+  getGlobalAbsmax() {
+    return this.params.getGlobalAbsmax ? this.params.getGlobalAbsmax() : this.absmax
+  }
+
+  reinit(init, epi = undefined, r = undefined, c = undefined) {
+    this.data.reinit(init, epi, r, c)
+    if (this.params.stretch_limits) {
+      this.absmin = Math.min(this.absmin, this.data.absmin())
+      this.absmax = Math.max(this.absmax, this.data.absmax())
+    }
+    this.initVis(r, c)
+  }
+
+  getData(i, j) {
+    return this.data.get(i, j)
+  }
+
   setElemHSL(a, i, x) {
     this.colorFromData(x).toArray(a, i * 3)
   }
@@ -369,10 +373,6 @@ export class Mat {
     this.points.geometry.attributes.pointColor.needsUpdate = true
   }
 
-  getData(i, j) {
-    return this.data.get(i, j)
-  }
-
   getSize(i, j) {
     return this.points.geometry.attributes.pointSize.array[this.data.addr(i, j)]
   }
@@ -383,38 +383,20 @@ export class Mat {
   }
 
   show(r = undefined, c = undefined) {
-    this.initVis(r, c, false)
+    this.initVis(r, c)
   }
 
   hide(r = undefined, c = undefined) {
-    this.initVis(r, c, true)
+    this.initVis(r, c, _ => 0, _ => ZERO_COLOR)
   }
 
   isHidden(i, j) {
     return this.getColor(i, j).equals(ZERO_COLOR)
   }
 
-  bumpColor(i, j, up) {
-    if (up) {
-      let c = this.getColor(i, j)
-      const bump = new THREE.Color(0x808080)
-      c.add(bump)
-      this.setColor(i, j, c)
-    } else {
-      this.setHSL(i, j, this.getData(i, j))
-    }
-  }
-
-  bumpRowColor(i, up) {
-    for (let j = 0; j < this.w; j++) {
-      this.bumpColor(i, j, up)
-    }
-  }
-
-  bumpColumnColor(j, up) {
-    for (let i = 0; i < this.h; i++) {
-      this.bumpColor(i, j, up)
-    }
+  bumpColor(r = undefined, c = undefined) {
+    const bump = new THREE.Color(0x808080)
+    this.initVis(r, c, undefined, x => this.colorFromData(x).add(bump))
   }
 
   setRowGuides(enabled = undefined) {
@@ -882,14 +864,14 @@ export class MatMul {
       if (!this.params['hide inputs']) {
         if (oldi != curi) {
           this.grid('i', i => {
-            this.left.bumpRowColor(i * ip + oldi, false)
-            this.left.bumpRowColor(i * ip + curi, true)
+            this.left.initVis(i * ip + oldi, undefined)
+            this.left.bumpColor(i * ip + curi, undefined)
           })
         }
         if (sweep) {
           this.grid('k', k => {
-            this.right.bumpColumnColor(oldk + k * kp, false)
-            this.right.bumpColumnColor(curk + k * kp, true)
+            this.right.initVis(undefined, oldk + k * kp)
+            this.right.bumpColor(undefined, curk + k * kp)
           })
         }
       }
@@ -950,14 +932,14 @@ export class MatMul {
       if (!this.params['hide inputs']) {
         if (sweep) {
           this.grid('i', i => {
-            this.left.bumpRowColor(i * ip + oldi, false)
-            this.left.bumpRowColor(i * ip + curi, true)
+            this.left.initVis(i * ip + oldi, undefined)
+            this.left.bumpColor(i * ip + curi, undefined)
           })
         }
         if (oldk != curk) {
           this.grid('k', k => {
-            this.right.bumpColumnColor(k * kp + oldk, false)
-            this.right.bumpColumnColor(k * kp + curk, true)
+            this.right.initVis(undefined, k * kp + oldk)
+            this.right.bumpColor(undefined, k * kp + curk)
           })
         }
       }
@@ -1016,18 +998,18 @@ export class MatMul {
       // update input highlights
       if (!this.params['hide inputs']) {
         this.grid('j', j => {
-          this.left.bumpColumnColor(j * jp + oldj, false)
-          this.left.bumpColumnColor(j * jp + curj, true)
+          this.left.initVis(undefined, j * jp + oldj)
+          this.left.bumpColor(undefined, j * jp + curj)
         })
         if (sweep) {
           this.grid('jk', (j, k) => {
-            this.right.bumpColor(j * jp + oldj, k * kp + oldk, false)
-            this.right.bumpColor(j * jp + curj, k * kp + curk, true)
+            this.right.initVis(j * jp + oldj, k * kp + oldk)
+            this.right.bumpColor(j * jp + curj, k * kp + curk)
           })
         } else {
           this.grid('j', j => {
-            this.right.bumpRowColor(j * jp + oldj, false)
-            this.right.bumpRowColor(j * jp + curj, true)
+            this.right.initVis(j * jp + oldj, undefined)
+            this.right.bumpColor(j * jp + curj, undefined)
           })
         }
       }
