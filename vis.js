@@ -393,16 +393,13 @@ export class Mat {
   }
 
   getLegendProps() {
-    const custom = this.params.legend_props ? this.params.legend_props : {}
     const sa_geo = Math.cbrt(Math.max(5, this.h) * Math.max(this.w, 5))
-    const defaults = {
+    return {
       name_color: 0xccccff,
       name_size: sa_geo / 2,
       dim_color: 0x00aaff,
       dim_size: sa_geo / 6,
     }
-    const res = { ...defaults, ...custom }
-    return res
   }
 
   setLegends(enabled, props) {
@@ -538,8 +535,8 @@ export class MatMul {
     if (this.left) {
       this.group.remove(this.left.group)
     }
-    if (this.params.left) {
-      this.left = this.params.left
+    if (this.params.extern_left) {
+      this.left = this.params.extern_left
       return
     }
     const data = this.params.left_data || (_ => {
@@ -557,8 +554,8 @@ export class MatMul {
     if (this.right) {
       this.group.remove(this.right.group)
     }
-    if (this.params.right) {
-      this.right = this.params.right
+    if (this.params.extern_right) {
+      this.right = this.params.extern_right
       return
     }
     const data = this.params.right_data || (_ => {
@@ -626,7 +623,7 @@ export class MatMul {
   }
 
   initLeftVis() {
-    if (this.params.left) {
+    if (this.params.extern_left) {
       return
     }
     this.left.initVis()
@@ -646,7 +643,7 @@ export class MatMul {
   }
 
   initRightVis() {
-    if (this.params.right) {
+    if (this.params.extern_right) {
       return
     }
     this.right.initVis()
@@ -725,6 +722,94 @@ export class MatMul {
       }
     }
   }
+
+
+  setRowGuides(enabled) {
+    enabled = util.syncProp(this.params, 'row guides', enabled)
+    if (!this.params.extern_left) {
+      this.left.setRowGuides(enabled)
+    }
+    if (!this.params.extern_right) {
+      this.right.setRowGuides(enabled)
+    }
+    this.result.setRowGuides(enabled)
+  }
+
+  setFlowGuide(enabled) {
+    enabled = util.syncProp(this.params, 'flow guides', enabled)
+    if (enabled) {
+      if (!this.flow_guide_group) {
+        this.flow_guide_group = util.flowGuide(this.H, this.D, this.W)
+        this.group.add(this.flow_guide_group)
+      }
+    } else {
+      if (this.flow_guide_group) {
+        this.group.remove(this.flow_guide_group)
+        this.flow_guide_group = undefined
+      }
+    }
+  }
+
+  setLeftLegends(enabled) {
+    const custom = this.params.left_legend ? this.params.left_legend : {}
+    const defaults = { name: "X", height: "i", width: "j", hleft: true, wtop: false }
+    const props = { ...this.left.getLegendProps(), ...defaults, ...custom }
+    this.left.setLegends(enabled, props)
+  }
+
+  setRightLegends(enabled) {
+    const custom = this.params.right_legend ? this.params.right_legend : {}
+    const defaults = { name: "Y", height: "j", width: "k", hleft: false, wtop: true }
+    const props = { ...this.right.getLegendProps(), ...defaults, ...custom }
+    this.right.setLegends(enabled, props)
+  }
+
+  setResultLegends(enabled) {
+    const custom = this.params.result_legend ? this.params.result_legend : {}
+    const defaults = { name: "XY", height: "i", width: "k", hleft: false, wtop: false }
+    const props = { ...this.result.getLegendProps(), ...defaults, ...custom }
+    this.result.setLegends(enabled, props)
+  }
+
+  setNames(params) {
+    let changed = false
+    const left_name = params['left name']
+    if (left_name != undefined && left_name != this.params['left name']) {
+      this.params['left name'] = left_name
+      this.params.left_legend = { ...(this.params.left_legend || {}), name: left_name }
+      changed = true
+    }
+    const right_name = params['right name']
+    if (right_name != undefined && right_name != this.params['right name']) {
+      this.params['right name'] = right_name
+      this.params.right_legend = { ...(this.params.right_legend || {}), name: right_name }
+      changed = true
+    }
+    const result_name = params['result name']
+    if (result_name != undefined && result_name != this.params['result name']) {
+      this.params['result name'] = result_name
+      this.params.result_legend = { ...(this.params.result_legend || {}), name: result_name }
+      changed = true
+    }
+    if (changed) {
+      this.setLegends(this.params.legends)
+    }
+  }
+
+  setLegends(enabled) {
+    this.params.legends = enabled
+    if (!this.params.extern_left) {
+      this.setLeftLegends(enabled)
+    }
+    if (!this.params.extern_right) {
+      this.setRightLegends(enabled)
+    }
+    if (!this.params.result) {
+      this.setResultLegends(enabled)
+    }
+  }
+
+  // animation
 
   initAnimation() {
     this.anim_alg = this.params.alg || 'none'
@@ -861,7 +946,7 @@ export class MatMul {
         vmp.reinit((jx, kx) => this.ijkmul(i * ip + curi, j * jp + jx, k * kp + kx + curk))
       })
 
-      // update values
+      // update labels
       this.updateLabels()
     }
   }
@@ -929,7 +1014,7 @@ export class MatMul {
         mvp.reinit((ix, jx) => this.ijkmul(i * ip + ix + curi, j * jp + jx, k * kp + curk))
       })
 
-      // update values
+      // update labels
       this.updateLabels()
     }
   }
@@ -999,93 +1084,8 @@ export class MatMul {
         vvp.reinit((ix, kx) => this.ijkmul(i * ip + ix, j * jp + curj, k * kp + kx + curk))
       })
 
-      // update values
+      // update labels
       this.updateLabels()
-    }
-  }
-
-  setRowGuides(enabled) {
-    enabled = util.syncProp(this.params, 'row guides', enabled)
-    if (!this.params.left) {
-      this.left.setRowGuides(enabled)
-    }
-    if (!this.params.right) {
-      this.right.setRowGuides(enabled)
-    }
-    this.result.setRowGuides(enabled)
-  }
-
-  setFlowGuide(enabled) {
-    enabled = util.syncProp(this.params, 'flow guides', enabled)
-    if (enabled) {
-      if (!this.flow_guide_group) {
-        this.flow_guide_group = util.flowGuide(this.H, this.D, this.W)
-        this.group.add(this.flow_guide_group)
-      }
-    } else {
-      if (this.flow_guide_group) {
-        this.group.remove(this.flow_guide_group)
-        this.flow_guide_group = undefined
-      }
-    }
-  }
-
-  setLeftLegends(enabled) {
-    const custom = this.params.left_legend ? this.params.left_legend : {}
-    const defaults = { name: "X", height: "i", width: "j", hleft: true, wtop: false }
-    const props = { ...this.left.getLegendProps(), ...defaults, ...custom }
-    this.left.setLegends(enabled, props)
-  }
-
-  setRightLegends(enabled) {
-    const custom = this.params.right_legend ? this.params.right_legend : {}
-    const defaults = { name: "Y", height: "j", width: "k", hleft: false, wtop: true }
-    const props = { ...this.right.getLegendProps(), ...defaults, ...custom }
-    this.right.setLegends(enabled, props)
-  }
-
-  setResultLegends(enabled) {
-    const custom = this.params.result_legend ? this.params.result_legend : {}
-    const defaults = { name: "XY", height: "i", width: "k", hleft: false, wtop: false }
-    const props = { ...this.result.getLegendProps(), ...defaults, ...custom }
-    this.result.setLegends(enabled, props)
-  }
-
-  setNames(params) {
-    let changed = false
-    const left_name = params['left name']
-    if (left_name != undefined && left_name != this.params['left name']) {
-      this.params['left name'] = left_name
-      this.params.left_legend = { ...(this.params.left_legend || {}), name: left_name }
-      changed = true
-    }
-    const right_name = params['right name']
-    if (right_name != undefined && right_name != this.params['right name']) {
-      this.params['right name'] = right_name
-      this.params.right_legend = { ...(this.params.right_legend || {}), name: right_name }
-      changed = true
-    }
-    const result_name = params['result name']
-    if (result_name != undefined && result_name != this.params['result name']) {
-      this.params['result name'] = result_name
-      this.params.result_legend = { ...(this.params.result_legend || {}), name: result_name }
-      changed = true
-    }
-    if (changed) {
-      this.setLegends(this.params.legends)
-    }
-  }
-
-  setLegends(enabled) {
-    this.params.legends = enabled
-    if (!this.params.left) {
-      this.setLeftLegends(enabled)
-    }
-    if (!this.params.right) {
-      this.setRightLegends(enabled)
-    }
-    if (!this.params.result) {
-      this.setResultLegends(enabled)
     }
   }
 }
