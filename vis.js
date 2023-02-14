@@ -197,18 +197,6 @@ class Array2D {
     return absmax
   }
 
-  absmin() {
-    const data = this.data
-    let absmin = Infinity
-    for (let i = 0; i < data.length; i++) {
-      const absx = Math.abs(data[i])
-      if (absmin > absx) {
-        absmin = absx
-      }
-    }
-    return absmin
-  }
-
   transpose() {
     return Array2D.fromInit(this.w, this.h, (i, j) => this.get(j, i))
   }
@@ -271,7 +259,7 @@ export class Mat {
     this.h = data.h
     this.w = data.w
     this.absmax = this.data.absmax()
-    this.absmin = this.data.absmin()
+    // this.absmin = this.data.absmin()
 
     this.points = emptyPoints(this.h, this.w)
     this.group = new THREE.Group()
@@ -304,14 +292,14 @@ export class Mat {
 
     const local_sens = this.params.sensitivity == 'local'
     const absx = Math.abs(x)
-    const [min, max] = local_sens ? [this.absmin, this.absmax] : [0, this.getGlobalAbsmax()]
+    const absmax = local_sens ? this.absmax : this.getGlobalAbsmax()
 
-    const vol = min == max ? 1 : (absx - min) / (max - min)
+    const vol = absmax == 0 ? 0 : absx / absmax
     const zsize = this.params['min size'] * ELEM_SIZE
     const size = zsize + (ELEM_SIZE - zsize) * Math.cbrt(vol)
 
-    if (absx < min || absx > max || size < 0 || size > ELEM_SIZE || isNaN(size)) {
-      throw Error(`HEY size ${size} absx ${absx} max ${max} min ${min} zsize ${zsize} sens ${local_sens}`)
+    if (absx > absmax || size < 0 || size > ELEM_SIZE || isNaN(size)) {
+      throw Error(`HEY size ${size} absx ${absx} absmax ${absmax} zsize ${zsize} sens ${local_sens}`)
     }
 
     return size
@@ -324,13 +312,13 @@ export class Mat {
 
     const local_sens = this.params.sensitivity == 'local'
     const absx = Math.abs(x)
-    const [min, max] = local_sens ? [this.absmin, this.absmax] : [0, this.getGlobalAbsmax()]
+    const absmax = local_sens ? this.absmax : this.getGlobalAbsmax()
 
-    const hue_vol = min == max ? x : x / (max - min)
+    const hue_vol = absmax == 0 ? 0 : x / absmax
     const gap = this.params['hue gap'] * Math.sign(x)
     const hue = (this.params['zero hue'] + gap + (Math.cbrt(hue_vol) * this.params['hue spread'])) % 1
 
-    const light_vol = min == max ? 1 : (absx - min) / (max - min)
+    const light_vol = absmax == 0 ? 0 : absx / absmax
     const range = this.params['max light'] - this.params['min light']
     const light = this.params['min light'] + range * Math.cbrt(light_vol)
 
@@ -343,8 +331,7 @@ export class Mat {
 
   reinit(init, epi = undefined, r = undefined, c = undefined) {
     this.data.reinit(init, epi, r, c)
-    if (this.params.stretch_limits) {
-      this.absmin = Math.min(this.absmin, this.data.absmin())
+    if (this.params.stretch_absmax) {
       this.absmax = Math.max(this.absmax, this.data.absmax())
     }
     this.initVis(r, c)
@@ -787,13 +774,13 @@ export class MatMul {
   }
 
   getAnimMatParams() {
-    return { ...this.getChildParams(), stretch_limits: true }
+    return { ...this.getChildParams(), stretch_absmax: true }
   }
 
   getAnimResultMats() {
     const { j: { n: nj, p: jp } } = this.getThreadInfo()
     if (nj == 1) {
-      this.result.params.stretch_limits = true
+      this.result.params.stretch_absmax = true
       return [this.result]
     }
     const results = []
