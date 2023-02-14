@@ -133,9 +133,13 @@ function getInPlaceEpilog(name) {
 // Array2D
 //
 
+function toRange(x, n) {
+  return x === undefined ? [0, n] : x.constructor === Array ? x : [x, x + 1]
+}
+
 function initArrayData_(data, h, w, init, epi = undefined, r = undefined, c = undefined) {
-  const [rstart, rend] = r == undefined ? [0, h] : [r, r + 1]
-  const [cstart, cend] = c == undefined ? [0, w] : [c, c + 1]
+  const [rstart, rend] = toRange(r, h)
+  const [cstart, cend] = toRange(c, w)
   for (let i = rstart; i < rend; i++) {
     for (let j = cstart, ptr = i * w + cstart; j < cend; j++, ptr++) {
       const x = init(i, j, h, w)
@@ -277,8 +281,8 @@ export class Mat {
   }
 
   initVis(r = undefined, c = undefined) {
-    const [rstart, rend] = r == undefined ? [0, this.h] : [r, r + 1]
-    const [cstart, cend] = c == undefined ? [0, this.w] : [c, c + 1]
+    const [rstart, rend] = toRange(r, this.h)
+    const [cstart, cend] = toRange(c, this.w)
     const sizes = this.getPointSizes()
     const colors = this.getPointColors()
     for (let i = rstart; i < rend; i++) {
@@ -315,7 +319,7 @@ export class Mat {
   }
 
   sizeFromData(x) {
-    if (x == undefined || isNaN(x)) {
+    if (x === undefined || isNaN(x)) {
       throw Error(`HEY sizeFromData(${x})`)
     }
 
@@ -335,7 +339,7 @@ export class Mat {
   }
 
   colorFromData(x) {
-    if (x == undefined || isNaN(x)) {
+    if (x === undefined || isNaN(x)) {
       throw Error(`HEY colorFromData(${x})`)
     }
 
@@ -387,8 +391,8 @@ export class Mat {
   }
 
   setSizes(show, r, c) {
-    const [rstart, rend] = r == undefined ? [0, this.h] : [r, r + 1]
-    const [cstart, cend] = c == undefined ? [0, this.w] : [c, c + 1]
+    const [rstart, rend] = toRange(r, this.h)
+    const [cstart, cend] = toRange(c, this.w)
     const size = show ? (i, j) => this.sizeFromData(this.getData(i, j)) : (i, j) => 0
     for (let i = rstart; i < rend; i++) {
       for (let j = cstart; j < cend; j++) {
@@ -636,10 +640,10 @@ export class MatMul {
   }
 
   dotprod_val(i, k, minj = undefined, maxj = undefined) {
-    if (minj == undefined) {
+    if (minj === undefined) {
       minj = 0
     }
-    if (maxj == undefined) {
+    if (maxj === undefined) {
       maxj = this.left.data.w
     }
     let x = 0.0
@@ -884,7 +888,7 @@ export class MatMul {
         results.forEach(r => r.hide())
       }
       this.grid('ik', (i, k) =>
-        results.forEach(r => r.show(i * ip + curi, sweep ? k * kp + curk : undefined))
+        results.forEach(r => r.show(i * ip + curi, sweep ? k * kp + curk : [k * kp, k * kp + kp]))
       )
 
       // update input hilights
@@ -952,7 +956,7 @@ export class MatMul {
         results.forEach(r => r.hide())
       }
       this.grid('ik', (i, k) =>
-        results.forEach(r => r.show(sweep ? i * ip + curi : undefined, k * kp + curk))
+        results.forEach(r => r.show(sweep ? i * ip + curi : [i * ip, i * ip + ip], k * kp + curk))
       )
 
       // update input hilights
@@ -1019,7 +1023,7 @@ export class MatMul {
       }
       this.grid('jk', (j, k) => {
         const f = (i, kx) => this.dotprod_val(i, kx, j * jp, j * jp + curj + 1)
-        results[j].reinit(f, undefined, undefined, sweep ? k * kp + curk : undefined)
+        results[j].reinit(f, undefined, undefined, sweep ? k * kp + curk : [k * kp, k * kp + kp])
       })
 
       // update input highlights
@@ -1041,7 +1045,7 @@ export class MatMul {
         }
       }
 
-      // udpate intermediates
+      // update intermediates
       util.updateProps(vvpgroup.position, { x: curk, z: curj })
       this.grid('ijk', (i, j, k) => {
         const vvp = vvps[i * nj * nk + j * nk + k]
