@@ -392,7 +392,7 @@ export class Mat {
     }
   }
 
-  getLegendProps() {
+  getLegendTextProps() {
     const sa_geo = Math.cbrt(Math.max(5, this.h) * Math.max(this.w, 5))
     return {
       name_color: 0xccccff,
@@ -409,6 +409,7 @@ export class Mat {
         this.legends_group.clear()
       }
       this.legends_group = new THREE.Group()
+      props = { ...this.getLegendTextProps(), ...props }
       if (props.name) {
         const name = this.params.getText(props.name, props.name_color, props.name_size)
         const { h, w } = util.bbhw(name.geometry)
@@ -637,8 +638,7 @@ export class MatMul {
       Object.keys(this.params.left_pos).map(k => this.left.group.position[k] += this.params.left_pos[k])
     }
     this.left.setRowGuides()
-    this.setLeftLegends(this.params.legends)
-
+    this.setLeftLegends()
     this.group.add(this.left.group)
   }
 
@@ -656,7 +656,7 @@ export class MatMul {
       Object.keys(this.params.right_pos).map(k => this.right.group.position[k] += this.params.right_pos[k])
     }
     this.right.setRowGuides()
-    this.setRightLegends(this.params.legends)
+    this.setRightLegends()
     this.group.add(this.right.group)
   }
 
@@ -671,7 +671,7 @@ export class MatMul {
       Object.keys(this.params.result_pos).map(k => this.result.group.position[k] += this.params.result_pos[k])
     }
     this.result.setRowGuides()
-    this.setResultLegends(this.params.legends)
+    this.setResultLegends()
     this.group.add(this.result.group)
   }
 
@@ -723,7 +723,6 @@ export class MatMul {
     }
   }
 
-
   setRowGuides(enabled) {
     enabled = util.syncProp(this.params, 'row guides', enabled)
     if (!this.params.extern_left) {
@@ -750,63 +749,51 @@ export class MatMul {
     }
   }
 
-  setLeftLegends(enabled) {
-    const custom = this.params.left_legend ? this.params.left_legend : {}
-    const defaults = { name: "X", height: "i", width: "j", hleft: true, wtop: false }
-    const props = { ...this.left.getLegendProps(), ...defaults, ...custom }
-    this.left.setLegends(enabled, props)
+  setLeftLegends() {
+    const props = {
+      name: this.params['left name'] || "X",
+      height: "i",
+      width: "j",
+      hleft: true,
+      wtop: false,
+      ...(this.params.left_legend || {})
+    }
+    this.left.setLegends(this.params.legends, props)
   }
 
-  setRightLegends(enabled) {
-    const custom = this.params.right_legend ? this.params.right_legend : {}
-    const defaults = { name: "Y", height: "j", width: "k", hleft: false, wtop: true }
-    const props = { ...this.right.getLegendProps(), ...defaults, ...custom }
-    this.right.setLegends(enabled, props)
+  setRightLegends() {
+    const props = {
+      name: this.params['right name'] || "Y",
+      height: "j",
+      width: "k",
+      hleft: false,
+      wtop: true,
+      ...(this.params.right_legend || {})
+    }
+    this.right.setLegends(this.params.legends, props)
   }
 
-  setResultLegends(enabled) {
-    const custom = this.params.result_legend ? this.params.result_legend : {}
-    const defaults = { name: "XY", height: "i", width: "k", hleft: false, wtop: false }
-    const props = { ...this.result.getLegendProps(), ...defaults, ...custom }
-    this.result.setLegends(enabled, props)
+  setResultLegends() {
+    const props = {
+      name: this.params['result name'] || "XY",
+      height: "i",
+      width: "k",
+      hleft: false,
+      wtop: false,
+      ...(this.params.result_legend || {})
+    }
+    this.result.setLegends(this.params.legends, props)
   }
 
-  setNames(params) {
-    let changed = false
-    const left_name = params['left name']
-    if (left_name != undefined && left_name != this.params['left name']) {
-      this.params['left name'] = left_name
-      this.params.left_legend = { ...(this.params.left_legend || {}), name: left_name }
-      changed = true
-    }
-    const right_name = params['right name']
-    if (right_name != undefined && right_name != this.params['right name']) {
-      this.params['right name'] = right_name
-      this.params.right_legend = { ...(this.params.right_legend || {}), name: right_name }
-      changed = true
-    }
-    const result_name = params['result name']
-    if (result_name != undefined && result_name != this.params['result name']) {
-      this.params['result name'] = result_name
-      this.params.result_legend = { ...(this.params.result_legend || {}), name: result_name }
-      changed = true
-    }
-    if (changed) {
-      this.setLegends(this.params.legends)
-    }
-  }
-
-  setLegends(enabled) {
-    this.params.legends = enabled
+  setLegends(params) {
+    util.updateProps(this.params, params)
     if (!this.params.extern_left) {
-      this.setLeftLegends(enabled)
+      this.setLeftLegends()
     }
     if (!this.params.extern_right) {
-      this.setRightLegends(enabled)
+      this.setRightLegends()
     }
-    if (!this.params.result) {
-      this.setResultLegends(enabled)
-    }
+    this.setResultLegends()
   }
 
   // animation
@@ -1611,7 +1598,7 @@ export class Attn3 {
 
     const custom = params.legend ? params.legend : {}
     const defaults = { name: "X", height: "i", width: "j", hleft: true, wtop: false }
-    const props = { ...m.getLegendProps(), ...defaults, ...custom }
+    const props = { ...m.getLegendTextProps(), ...defaults, ...custom }
     m.setLegends(params.legends, props)
 
     return m
