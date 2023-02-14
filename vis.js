@@ -243,6 +243,7 @@ class Array2D {
 //
 
 const ELEM_SIZE = 1792
+const ZERO_COLOR = new THREE.Color(0, 0, 0)
 
 function emptyPoints(h, w) {
   const n = h * w
@@ -390,27 +391,30 @@ export class Mat {
     this.points.geometry.attributes.pointSize.needsUpdate = true
   }
 
-  setSizes(show, r, c) {
+  setSizesAndColors(show, r, c) {
     const [rstart, rend] = toRange(r, this.h)
     const [cstart, cend] = toRange(c, this.w)
-    const size = show ? (i, j) => this.sizeFromData(this.getData(i, j)) : (i, j) => 0
+    const size = show ? x => this.sizeFromData(x) : _ => 0
+    const color = show ? x => this.colorFromData(x) : _ => ZERO_COLOR
     for (let i = rstart; i < rend; i++) {
       for (let j = cstart; j < cend; j++) {
-        this.setSize(i, j, size(i, j))
+        const x = this.getData(i, j)
+        this.setSize(i, j, size(x))
+        this.setColor(i, j, color(x))
       }
     }
   }
 
   show(r = undefined, c = undefined) {
-    this.setSizes(true, r, c)
+    this.setSizesAndColors(true, r, c)
   }
 
   hide(r = undefined, c = undefined) {
-    this.setSizes(false, r, c)
+    this.setSizesAndColors(false, r, c)
   }
 
   isHidden(i, j) {
-    return this.getSize(i, j) == 0 && this.sizeFromData(this.getData(i, j)) != 0
+    return this.getSize(i, j) == 0 && this.getColor(i, j).equals(ZERO_COLOR)
   }
 
   bumpColor(i, j, up) {
