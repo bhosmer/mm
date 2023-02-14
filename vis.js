@@ -328,7 +328,7 @@ export class Mat {
     const [min, max] = local_sens ? [this.absmin, this.absmax] : [0, this.getGlobalAbsmax()]
 
     const vol = min == max ? 1 : (absx - min) / (max - min)
-    const zsize = this.params['zero size'] * ELEM_SIZE
+    const zsize = this.params['min size'] * ELEM_SIZE
     const size = zsize + (ELEM_SIZE - zsize) * Math.cbrt(vol)
 
     if (absx < min || absx > max || size < 0 || size > ELEM_SIZE || isNaN(size)) {
@@ -352,8 +352,8 @@ export class Mat {
     const hue = (this.params['zero hue'] + gap + (Math.cbrt(hue_vol) * this.params['hue spread'])) % 1
 
     const light_vol = min == max ? 1 : (absx - min) / (max - min)
-    const range = this.params['max light'] - this.params['zero light']
-    const light = this.params['zero light'] + range * Math.cbrt(light_vol)
+    const range = this.params['max light'] - this.params['min light']
+    const light = this.params['min light'] + range * Math.cbrt(light_vol)
 
     return new THREE.Color().setHSL(hue, 1.0, light)
   }

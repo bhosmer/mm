@@ -70,8 +70,8 @@
       // sizes and colors
       sensitivity: 'global',
       'zero hue': 0.77,
-      'zero size': 0.33,
-      'zero light': 0.33,
+      'min size': 0.33,
+      'min light': 0.33,
       'max light': 0.6,
       'hue gap': 0.2,
       'hue spread': 0.01,
@@ -307,8 +307,8 @@
       const gui_colors = gui.addFolder('colors and sizes')
       gui_colors.add(params, 'sensitivity', sensitivities).onChange(x => set('sensitivity', x))
       gui_colors.add(params, 'zero hue', 0.0, 1.0).onChange(x => set('zero hue', x))
-      gui_colors.add(params, 'zero size', 0.0, 1.0).onChange(x => set('zero size', x))
-      gui_colors.add(params, 'zero light', 0.0, 1.0).onChange(x => set('zero light', x))
+      gui_colors.add(params, 'min size', 0.0, 1.0).onChange(x => set('min size', x))
+      gui_colors.add(params, 'min light', 0.0, 1.0).onChange(x => set('min light', x))
       gui_colors.add(params, 'max light', 0.0, 1.0).onChange(x => set('max light', x))
       gui_colors.add(params, 'hue gap', 0.0, 1.0).onChange(x => set('hue gap', x))
       gui_colors.add(params, 'hue spread', 0.0, 1.0).onChange(x => set('hue spread', x))

@@ -75,8 +75,8 @@
       // colors/sizes
       'sensitivity': 'local',
       'zero hue': 0.25,
-      'zero size': 0.25,
-      'zero light': 0.15,
+      'min size': 0.25,
+      'min light': 0.15,
       'max light': 0.65,
       'hue gap': 0.25,
       'hue spread': 0.01,
@@ -374,13 +374,13 @@
         getObj().initVis(params)
       })
 
-      gui_colors.add(params, 'zero size', 0.0, 1.0).onChange(function (val) {
-        setParams({ 'zero size': val })
+      gui_colors.add(params, 'min size', 0.0, 1.0).onChange(function (val) {
+        setParams({ 'min size': val })
         getObj().initVis(params)
       })
 
-      gui_colors.add(params, 'zero light', 0.0, 1.0).onChange(function (val) {
-        setParams({ 'zero light': val })
+      gui_colors.add(params, 'min light', 0.0, 1.0).onChange(function (val) {
+        setParams({ 'min light': val })
         getObj().initVis(params)
       })
 
