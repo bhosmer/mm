@@ -276,6 +276,7 @@ export class Mat {
     this.points = emptyPoints(this.h, this.w)
     this.group = new THREE.Group()
     this.group.add(this.points)
+
     if (init_vis) {
       this.initVis()
     }
@@ -284,22 +285,18 @@ export class Mat {
   initVis(r = undefined, c = undefined) {
     const [rstart, rend] = toRange(r, this.h)
     const [cstart, cend] = toRange(c, this.w)
-    const sizes = this.getPointSizes()
-    const colors = this.getPointColors()
     for (let i = rstart; i < rend; i++) {
       for (let j = cstart, ptr = i * this.w + cstart; j < cend; j++, ptr++) {
-        const x = this.data.data[ptr]
-        sizes[ptr] = this.sizeFromData(x)
-        this.setElemHSL(colors, ptr, x)
-        this.checkLabel(ptr, x)
+        const x = this.getData(i, j)
+        this.setSize(i, j, this.sizeFromData(x))
+        this.setColor(i, j, this.colorFromData(x))
+        this.checkLabel(i, j, x)
       }
     }
-    this.points.geometry.attributes.pointSize.needsUpdate = true
-    this.points.geometry.attributes.pointColor.needsUpdate = true
   }
 
-  reinit(f, epi = undefined, r = undefined, c = undefined) {
-    this.data.reinit(f, epi, r, c)
+  reinit(init, epi = undefined, r = undefined, c = undefined) {
+    this.data.reinit(init, epi, r, c)
     if (this.params.stretch_limits) {
       this.absmin = Math.min(this.absmin, this.data.absmin())
       this.absmax = Math.max(this.absmax, this.data.absmax())
@@ -307,12 +304,12 @@ export class Mat {
     this.initVis(r, c)
   }
 
-  getPointSizes() {
-    return this.points.geometry.attributes.pointSize.array
+  getPointSizeAttr() {
+    return this.points.geometry.attributes.pointSize
   }
 
-  getPointColors() {
-    return this.points.geometry.attributes.pointColor.array
+  getPointColorAttr() {
+    return this.points.geometry.attributes.pointColor
   }
 
   getGlobalAbsmax() {
@@ -515,11 +512,12 @@ export class Mat {
     }
   }
 
-  checkLabel(i, x) {
+  checkLabel(i, j, x) {
     if (this.label_cache) {
-      const label = this.label_cache[i]
+      const addr = this.data.addr(i, j)
+      const label = this.label_cache[addr]
       if (label != undefined && label.value != x) {
-        this.label_cache[i] = undefined
+        this.label_cache[addr] = undefined
       }
     }
   }
@@ -682,7 +680,7 @@ export class MatMul {
     this.initResultVis()
 
     this.setFlowGuide()
-    this.setAnimation()
+    this.initAnimation()
     this.setPosition()
     this.updateLabels()
   }
@@ -769,25 +767,29 @@ export class MatMul {
     return this.params.getGlobalAbsmax ? this.params.getGlobalAbsmax() : this.getAbsmax()
   }
 
-  setAnimation() {
-    const prev_alg = this.anim_alg
+  hideInputs(hide) {
+    if (this.anim_alg != 'none') {
+      if (this.params['hide inputs']) {
+        if (!hide) {
+          this.params['hide inputs'] = false
+          this.left.show()
+          this.right.show()
+        }
+      } else {
+        if (hide) {
+          this.params['hide inputs'] = true
+          this.left.hide()
+          this.right.hide()
+        }
+      }
+    }
+  }
+
+  initAnimation() {
     this.anim_alg = this.params.alg || 'none'
-    if (this.anim_alg == prev_alg) {
-      return
-    }
-
     this.anim_mats = []
-    if (prev_alg == 'vvprod' || prev_alg == 'axpy') {
-      this.initResult() // clear depthwise accum into result
-      this.result.params.stretch_limits = false
-      this.initResultVis()
-    }
 
-    if (this.anim_alg == 'none') {
-      this.left.show()
-      this.right.show()
-      this.result.show()
-    } else {
+    if (this.anim_alg != 'none') {
       if (this.params['hide inputs']) {
         this.left.hide()
         this.right.hide()

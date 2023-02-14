@@ -47,7 +47,7 @@
       I: init_dims.i,
       J: init_dims.j,
       K: init_dims.k,
-      //data
+      // data
       'left name': 'X',
       'left init': 'rows',
       'left min': -1,
@@ -70,8 +70,8 @@
       // sizes and colors
       sensitivity: 'global',
       'zero hue': 0.77,
-      'min size': 0.33,
-      'min light': 0.33,
+      'min size': 0.15,
+      'min light': 0.25,
       'max light': 0.6,
       'hue gap': 0.2,
       'hue spread': 0.01,
@@ -291,9 +291,9 @@
       gui_result.add(params, 'result name').onChange(x => set('result name', x, _ => getObj().setNames(getParams())))
 
       const gui_anim = gui.addFolder('animation')
-      gui_anim.add(params, 'alg', anim_algs).onChange(x => set('alg', x, _ => getObj().initVis(getParams())))
+      gui_anim.add(params, 'alg', anim_algs).onChange(x => set('alg', x))
       gui_anim.add(params, 'speed', 0, 10).onChange(x => set('speed', Math.floor(x), _ => { }))
-      gui_anim.add(params, 'hide inputs').onChange(x => set('hide inputs', x, _ => getObj().initVis(getParams())))
+      gui_anim.add(params, 'hide inputs').onChange(x => set('hide inputs', x, x => getObj().hideInputs(x)))
       gui_anim.add(params, 'i threads', 1, 8).onChange(x => set('i threads', Math.floor(x)))
       gui_anim.add(params, 'j threads', 1, 8).onChange(x => set('j threads', Math.floor(x)))
       gui_anim.add(params, 'k threads', 1, 8).onChange(x => set('k threads', Math.floor(x)))
