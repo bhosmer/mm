@@ -354,15 +354,6 @@ export class Mat {
     return this.data.get(i, j)
   }
 
-  setElemHSL(a, i, x) {
-    this.colorFromData(x).toArray(a, i * 3)
-  }
-
-  setHSL(i, j, x) {
-    this.setElemHSL(this.points.geometry.attributes.pointColor.array, this.data.addr(i, j), x)
-    this.points.geometry.attributes.pointColor.needsUpdate = true
-  }
-
   getColor(i, j) {
     const c = new THREE.Color()
     return c.fromArray(this.points.geometry.attributes.pointColor.array, this.data.addr(i, j) * 3)
