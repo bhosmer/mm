@@ -282,14 +282,16 @@ export class Mat {
     }
   }
 
-  initVis(r = undefined, c = undefined) {
+  initVis(r = undefined, c = undefined, hide = false) {
     const [rstart, rend] = toRange(r, this.h)
     const [cstart, cend] = toRange(c, this.w)
+    const size = hide ? _ => 0 : x => this.sizeFromData(x)
+    const color = hide ? _ => ZERO_COLOR : x => this.colorFromData(x)
     for (let i = rstart; i < rend; i++) {
-      for (let j = cstart, ptr = i * this.w + cstart; j < cend; j++, ptr++) {
+      for (let j = cstart; j < cend; j++) {
         const x = this.getData(i, j)
-        this.setSize(i, j, this.sizeFromData(x))
-        this.setColor(i, j, this.colorFromData(x))
+        this.setSize(i, j, size(x))
+        this.setColor(i, j, color(x))
         this.checkLabel(i, j, x)
       }
     }
@@ -302,14 +304,6 @@ export class Mat {
       this.absmax = Math.max(this.absmax, this.data.absmax())
     }
     this.initVis(r, c)
-  }
-
-  getPointSizeAttr() {
-    return this.points.geometry.attributes.pointSize
-  }
-
-  getPointColorAttr() {
-    return this.points.geometry.attributes.pointColor
   }
 
   getGlobalAbsmax() {
@@ -388,30 +382,16 @@ export class Mat {
     this.points.geometry.attributes.pointSize.needsUpdate = true
   }
 
-  setSizesAndColors(show, r, c) {
-    const [rstart, rend] = toRange(r, this.h)
-    const [cstart, cend] = toRange(c, this.w)
-    const size = show ? x => this.sizeFromData(x) : _ => 0
-    const color = show ? x => this.colorFromData(x) : _ => ZERO_COLOR
-    for (let i = rstart; i < rend; i++) {
-      for (let j = cstart; j < cend; j++) {
-        const x = this.getData(i, j)
-        this.setSize(i, j, size(x))
-        this.setColor(i, j, color(x))
-      }
-    }
-  }
-
   show(r = undefined, c = undefined) {
-    this.setSizesAndColors(true, r, c)
+    this.initVis(r, c, false)
   }
 
   hide(r = undefined, c = undefined) {
-    this.setSizesAndColors(false, r, c)
+    this.initVis(r, c, true)
   }
 
   isHidden(i, j) {
-    return this.getSize(i, j) == 0 && this.getColor(i, j).equals(ZERO_COLOR)
+    return this.getColor(i, j).equals(ZERO_COLOR)
   }
 
   bumpColor(i, j, up) {
