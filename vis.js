@@ -338,6 +338,9 @@ export class Mat {
   }
 
   getData(i, j) {
+    if (i >= this.h || j >= this.w) {
+      throw Error(`HEY i ${i} >= this.h ${this.h} || j ${j} >= this.w ${this.w}`)
+    }
     return this.data.get(i, j)
   }
 
@@ -829,20 +832,35 @@ export class MatMul {
     const ni = Math.min(this.params['i threads'], this.H)
     const nj = Math.min(this.params['j threads'], this.D)
     const nk = Math.min(this.params['k threads'], this.W)
-    return {
-      i: { n: ni, p: Math.floor(this.H / ni) },
-      j: { n: nj, p: Math.floor(this.D / nj) },
-      k: { n: nk, p: Math.floor(this.W / nk) },
+    const info = {
+      i: { n: ni, ext: Math.floor(this.H / ni), tail: this.H % ni },
+      j: { n: nj, ext: Math.floor(this.D / nj), tail: this.D % nj },
+      k: { n: nk, ext: Math.floor(this.W / nk), tail: this.W % nk },
     }
+    const long_tail = this.params.ragged == 'long tail'
+    Object.values(info).forEach(d => d.longest = d.ext + (long_tail ? d.tail : Math.sign(d.tail)))
+    return info
+  }
+
+  longest(info) {
+    return long_tail ? info.n + into.tail : info.n + Math.sign(info.tail)
   }
 
   grid(dims, f) {
     const info = this.getThreadInfo()
-    const lims = Array.from(dims).map(d => info[d].n)
-    const loop = (ixs, lims, f) => lims.length == 0 ?
-      f(...ixs) :
-      [...Array(lims[0]).keys()].map(i => loop([...ixs, i], lims.slice(1), f))
-    loop([], lims, f)
+    const infos = Array.from(dims).map(d => info[d])
+    const long_tail = this.params.ragged == 'long tail'
+    const loop = (args, infos, f) => infos.length == 0 ?
+      f(...args) :
+      [...Array(infos[0].n).keys()].map(i => {
+        const { n, ext, tail } = infos[0]
+        const [start, extent] = long_tail ?
+          [i * ext, i == n - 1 ? ext + tail : ext] :
+          [i * ext + Math.min(i, tail), i < tail ? ext + 1 : ext]
+        const end = start + extent
+        loop([...args, { start, end, extent }], infos.slice(1), f)
+      })
+    loop([], infos, f)
   }
 
   getAnimMatParams() {
@@ -850,17 +868,16 @@ export class MatMul {
   }
 
   getAnimResultMats() {
-    const { j: { n: nj, p: jp } } = this.getThreadInfo()
-    if (nj == 1) {
+    if (this.getThreadInfo().j.n == 1) {
       this.result.params.stretch_absmax = true
       return [this.result]
     }
     const results = []
-    this.grid('j', j => {
-      const result_init = (i, k) => this.dotprod_val(i, k, j * jp, (j + 1) * jp)
+    this.grid('j', ({ start: j, end: je }) => {
+      const result_init = (i, k) => this.dotprod_val(i, k, j, je)
       const data = Array2D.fromInit(this.H, this.W, result_init)
       const result = new Mat(data, this.getAnimMatParams(), true)
-      result.group.position.z = j * jp + jp - 1
+      result.group.position.z = je - 1
       result.group.rotation.x = Math.PI
       result.hide()
       results.push(result)
@@ -871,66 +888,79 @@ export class MatMul {
   }
 
   initAnimVmprod(sweep) {
-    const { i: { p: ip }, j: { n: nj, p: jp }, k: { n: nk, p: kp } } = this.getThreadInfo()
-
     const results = this.getAnimResultMats()
 
-    const vmps = []
-    const vmpgroup = new THREE.Group()
-    this.grid('ijk', (i, j, k) => {
-      const vmpinit = (jx, kx) => this.ijkmul(i * ip, j * jp + jx, k * kp + kx)
-      const data = Array2D.fromInit(jp, sweep ? 1 : kp, vmpinit)
+    const vmps = {}
+    this.grid('ijk', ({ start: i }, { start: j, extent: jx }, { start: k, extent: kx }) => {
+      const vmpinit = (ji, ki) => this.ijkmul(i, j + ji, k + ki)
+      const data = Array2D.fromInit(jx, sweep ? 1 : kx, vmpinit)
       const vmp = new Mat(data, this.getAnimMatParams(), true)
-      util.updateProps(vmp.group.position, { x: k * kp, y: -i * ip, z: j * jp })
+      util.updateProps(vmp.group.position, { x: k, y: -i, z: j })
       vmp.group.rotation.x = Math.PI / 2
-      vmps.push(vmp)
-      vmpgroup.add(vmp.group)
+      vmps[[i, j, k]] = vmp
       this.anim_mats.push(vmp)
+      this.group.add(vmp.group)
     })
-    this.group.add(vmpgroup)
 
-    let curi = ip - 1
-    let curk = sweep ? kp - 1 : 0
+    const iext = this.getThreadInfo().i.longest
+    let curi = iext - 1
+    const kext = this.getThreadInfo().k.longest
+    let curk = sweep ? kext - 1 : 0
 
     this.bump = () => {
       // update indexes
       const [oldi, oldk] = [curi, curk]
       if (sweep) {
-        curk = (curk + 1) % kp
+        curk = (curk + 1) % kext
       }
       if (curk == 0) {
-        curi = (curi + 1) % ip
+        curi = (curi + 1) % iext
       }
 
       // update result mats
       if (curi == 0 && curk == 0) {
         results.forEach(r => r.hide())
       }
-      this.grid('ik', (i, k) =>
-        results.forEach(r => r.show(i * ip + curi, sweep ? k * kp + curk : [k * kp, k * kp + kp]))
-      )
+      this.grid('ik', ({ start: i, extent: ix }, { start: k, end: ke }) => {
+        if (ix > curi) {
+          results.forEach(r => r.show(i + curi, sweep ? k + curk : [k, ke]))
+        }
+      })
 
       // update input hilights
       if (!this.params['hide inputs']) {
         if (oldi != curi) {
-          this.grid('i', i => {
-            this.left.initVis(i * ip + oldi, undefined)
-            this.left.bumpColor(i * ip + curi, undefined)
+          this.grid('i', ({ start: i, extent: ix }) => {
+            if (ix > oldi) {
+              this.left.initVis(i + oldi, undefined)
+            }
+            if (ix > curi) {
+              this.left.bumpColor(i + curi, undefined)
+            }
           })
         }
         if (sweep) {
-          this.grid('k', k => {
-            this.right.initVis(undefined, oldk + k * kp)
-            this.right.bumpColor(undefined, curk + k * kp)
+          this.grid('k', ({ start: k, extent: kx }) => {
+            if (kx > oldk) {
+              this.right.initVis(undefined, k + oldk)
+            }
+            if (kx > curk) {
+              this.right.bumpColor(undefined, k + curk)
+            }
           })
         }
       }
 
       // update intermediates
-      util.updateProps(vmpgroup.position, { x: curk, y: -curi })
-      this.grid('ijk', (i, j, k) => {
-        const vmp = vmps[i * nj * nk + j * nk + k]
-        vmp.reinit((jx, kx) => this.ijkmul(i * ip + curi, j * jp + jx, k * kp + kx + curk))
+      // util.updateProps(vmpgroup.position, { x: curk, y: -curi })
+      this.grid('ijk', ({ start: i, extent: ix }, { start: j }, { start: k }) => {
+        const vmp = vmps[[i, j, k]]
+        if (ix > curi) {
+          util.updateProps(vmp.group.position, { x: k + curk, y: -i - curi })
+          vmp.reinit((ji, ki) => this.ijkmul(i + curi, j + ji, k + ki + curk))
+        } else {
+          vmp.hide()
+        }
       })
 
       // update labels
@@ -939,7 +969,7 @@ export class MatMul {
   }
 
   initAnimMvprod(sweep) {
-    const { i: { p: ip }, j: { n: nj, p: jp }, k: { n: nk, p: kp } } = this.getThreadInfo()
+    const { i: { ext: ip }, j: { n: nj, ext: jp }, k: { n: nk, ext: kp } } = this.getThreadInfo()
 
     const results = this.getAnimResultMats()
 
@@ -1007,7 +1037,7 @@ export class MatMul {
   }
 
   initAnimVvprod(sweep = false) {
-    const { i: { p: ip }, j: { n: nj, p: jp }, k: { n: nk, p: kp } } = this.getThreadInfo()
+    const { i: { ext: ip }, j: { n: nj, ext: jp }, k: { n: nk, ext: kp } } = this.getThreadInfo()
 
     const results = this.getAnimResultMats()
 

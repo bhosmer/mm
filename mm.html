@@ -41,6 +41,10 @@
     const epilog_funcs = ['none', 'x/J', 'x/sqrt(J)', 'softmax(x/sqrt(J))', 'tanh(x)', 'relu(x)', 'layernorm']
     const sensitivities = ['local', 'global']
     const anim_algs = ['none', 'dotprod (row major)', 'dotprod (col major)', 'axpy', 'vmprod', 'mvprod', 'vvprod']
+    const tails = ['long tail', 'short tails']
+    const x_orientations = ['left', 'right']
+    const y_orientations = ['up', 'down']
+    const z_orientations = ['front', 'back']
 
     const params = {
       // shape
@@ -48,25 +52,35 @@
       J: init_dims.j,
       K: init_dims.k,
       // data
-      'left name': 'X',
+      // left arg
       'left init': 'rows',
       'left min': -1,
       'left max': 1,
       'left sparsity': 0,
-      'right name': 'Y',
+      'left name': 'X',
+      'left placement': 'left',
+      'left direction': 'left',
+      // right arg
       'right init': 'cols',
       'right min': -1,
       'right max': 1,
       'right sparsity': 0,
-      'result name': 'XY',
+      'right name': 'Y',
+      'right placement': 'up',
+      'right direction': 'up',
+      // result
       epilog: 'none',
+      'result name': 'XY',
+      'result placement': 'front',
+      'result direction': 'front',
       // animation
       alg: 'none',
-      speed: 5,
+      speed: 50,
       'hide inputs': false,
       'i threads': 1,
       'j threads': 1,
       'k threads': 1,
+      'ragged': 'long tail',
       // sizes and colors
       sensitivity: 'global',
       'zero hue': 0.77,
@@ -80,6 +94,7 @@
       spotlight: 3,
       'row guides': false,
       'flow guides': false,
+      'arcball': false,
       // set from orbit control
       xcam: -init_dims.i * 2,
       ycam: init_dims.j * 2,
@@ -243,7 +258,7 @@
       let last = 0
       function animate() {
         const t = performance.now()
-        if (params.alg != 'none' && params.speed > 0 && (t - last) > (250 / params.speed)) {
+        if (params.alg != 'none' && params.speed > 0 && (t - last) > (2500 / params.speed)) {
           obj.bump()
           last = t
         }
@@ -266,37 +281,60 @@
         }
       }
 
+      function addNumParam(gui, name, min, max, f = initObj, always = false) {
+        gui.add(params, name, min, max).onChange(x => set(name, x, f, always))
+      }
+
+      function addIntParam(gui, name, min, max, f = initObj, always = false) {
+        gui.add(params, name, min, max).onChange(x => set(name, Math.floor(x), f, always))
+      }
+
+      function addParam(gui, name, vals = undefined, f = initObj, always = false) {
+        gui.add(params, name, vals).onChange(x => set(name, x, f, always))
+      }
+
       const gui = new GUI();
 
       const gui_shape = gui.addFolder('shape')
-      gui_shape.add(params, 'I', 1, 256).onChange(x => set('I', Math.floor(x)))
-      gui_shape.add(params, 'J', 1, 256).onChange(x => set('J', Math.floor(x)))
-      gui_shape.add(params, 'K', 1, 256).onChange(x => set('K', Math.floor(x)))
+      addIntParam(gui_shape, 'I', 1, 256)
+      addIntParam(gui_shape, 'J', 1, 256)
+      addIntParam(gui_shape, 'K', 1, 256)
 
       const gui_data = gui.addFolder('data')
+
       const gui_left = gui_data.addFolder('left')
-      gui_left.add(params, 'left init', init_funcs).onChange(x => set('left init', x))
+      addParam(gui_left, 'left init', init_funcs)
+      // gui_left.add(params, 'left init', init_funcs).onChange(x => set('left init', x))
       gui_left.add(params, 'left min', -1.0, 1.0).onChange(x => set('left min', x))
       gui_left.add(params, 'left max', 0.0, 1.0).onChange(x => set('left max', x))
       gui_left.add(params, 'left sparsity', 0.0, 1.0).onChange(x => set('left sparsity', x))
       gui_left.add(params, 'left name').onChange(x => set('left name', x, _ => getObj().setLegends(getParams())))
+      gui_left.add(params, 'left placement', x_orientations).onChange(x => set('left face', x, _ => getObj().place(getParams())))
+      gui_left.add(params, 'left direction', x_orientations).onChange(x => set('left direction', x, _ => getObj().place(getParams())))
+
       const gui_right = gui_data.addFolder('right')
       gui_right.add(params, 'right init', init_funcs).onChange(x => set('right init', x))
       gui_right.add(params, 'right min', -1.0, 1.0).onChange(x => set('right min', x))
       gui_right.add(params, 'right max', 0.0, 1.0).onChange(x => set('right max', x))
       gui_right.add(params, 'right sparsity', 0.0, 1.0).onChange(x => set('right sparsity', x))
       gui_right.add(params, 'right name').onChange(x => set('right name', x, _ => getObj().setLegends(getParams())))
+      gui_right.add(params, 'right placement', y_orientations).onChange(x => set('right face', x, _ => getObj().place(getParams())))
+      gui_right.add(params, 'right direction', y_orientations).onChange(x => set('right direction', x, _ => getObj().place(getParams())))
+
       const gui_result = gui_data.addFolder('result')
       gui_result.add(params, 'epilog', epilog_funcs).onChange(x => set('epilog', x))
       gui_result.add(params, 'result name').onChange(x => set('result name', x, _ => getObj().setLegends(getParams())))
+      gui_result.add(params, 'result placement', z_orientations).onChange(x => set('result face', x, _ => getObj().place(getParams())))
+      gui_result.add(params, 'result direction', z_orientations).onChange(x => set('result direction', x, _ => getObj().place(getParams())))
 
       const gui_anim = gui.addFolder('animation')
       gui_anim.add(params, 'alg', anim_algs).onChange(x => set('alg', x))
-      gui_anim.add(params, 'speed', 0, 10).onChange(x => set('speed', Math.floor(x), _ => { }))
+      gui_anim.add(params, 'speed', 0, 100).onChange(x => set('speed', Math.floor(x), _ => { }))
       gui_anim.add(params, 'hide inputs').onChange(x => set('hide inputs', x, x => getObj().hideInputs(x)))
       gui_anim.add(params, 'i threads', 1, 8).onChange(x => set('i threads', Math.floor(x)))
       gui_anim.add(params, 'j threads', 1, 8).onChange(x => set('j threads', Math.floor(x)))
       gui_anim.add(params, 'k threads', 1, 8).onChange(x => set('k threads', Math.floor(x)))
+      gui_anim.add(params, 'ragged', tails).onChange(x => set('ragged', x))
 
       const gui_vis = gui.addFolder('vis')
       gui_vis.add(params, 'legends').onChange(x => set('legends', x, x => getObj().setLegends(getParams())))
