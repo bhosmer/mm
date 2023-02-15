@@ -92,6 +92,7 @@
       // viz
       legends: true,
       spotlight: 3,
+      // 'interior spotlight': false,
       'row guides': false,
       'flow guides': false,
       'arcball': false,
@@ -154,6 +155,14 @@
         getText: getText,
         raycaster: raycaster,
         ...params,
+      }
+    }
+
+    let anim_pause = false
+    let anim_step = false
+    function animStep() {
+      if (anim_pause) {
+        anim_step = true
       }
     }
 
@@ -258,9 +267,10 @@
       let last = 0
       function animate() {
         const t = performance.now()
-        if (params.alg != 'none' && params.speed > 0 && (t - last) > (2500 / params.speed)) {
+        if (params.alg != 'none' && (anim_step || !anim_pause) && (t - last) > (5000 / params.speed)) {
           obj.bump()
           last = t
+          anim_step = false
         }
         composer.render(scene, camera)
         requestAnimationFrame(animate)
@@ -329,16 +339,19 @@
 
       const gui_anim = gui.addFolder('animation')
       gui_anim.add(params, 'alg', anim_algs).onChange(x => set('alg', x))
-      gui_anim.add(params, 'speed', 0, 100).onChange(x => set('speed', Math.floor(x), _ => { }))
+      gui_anim.add(params, 'speed', 1, 100).onChange(x => set('speed', Math.floor(x), _ => { }))
+      gui_anim.add({ pause: false }, 'pause').onChange(x => anim_pause = x)
+      gui_anim.add({ step: animStep }, 'step')
       gui_anim.add(params, 'hide inputs').onChange(x => set('hide inputs', x, x => getObj().hideInputs(x)))
-      gui_anim.add(params, 'i threads', 1, 8).onChange(x => set('i threads', Math.floor(x)))
-      gui_anim.add(params, 'j threads', 1, 8).onChange(x => set('j threads', Math.floor(x)))
-      gui_anim.add(params, 'k threads', 1, 8).onChange(x => set('k threads', Math.floor(x)))
+      gui_anim.add(params, 'i threads', 1, 32).onChange(x => set('i threads', Math.floor(x)))
+      gui_anim.add(params, 'j threads', 1, 32).onChange(x => set('j threads', Math.floor(x)))
+      gui_anim.add(params, 'k threads', 1, 32).onChange(x => set('k threads', Math.floor(x)))
       gui_anim.add(params, 'ragged', tails).onChange(x => set('ragged', x))
 
       const gui_vis = gui.addFolder('vis')
       gui_vis.add(params, 'legends').onChange(x => set('legends', x, x => getObj().setLegends(getParams())))
       gui_vis.add(params, 'spotlight', 0, 10).onChange(x => set('spotlight', Math.floor(x), x => getObj().updateLabels(x)))
+      // gui_vis.add(params, 'interior spotlight').onChange(x => set('interior spotlight', x, x => getObj().updateLabels(x)))
       gui_vis.add(params, 'row guides').onChange(x => set('row guides', x, x => getObj().setRowGuides(x)))
       gui_vis.add(params, 'flow guides').onChange(x => set('flow guides', x, x => getObj().setFlowGuide(x)))
 

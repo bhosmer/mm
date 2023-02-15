@@ -682,8 +682,9 @@ export class MatMul {
     this.left.updateLabels(spotlight)
     this.right.updateLabels(spotlight)
     this.result.updateLabels(spotlight)
-    // this is a bit cluttered
-    // this.anim_mats.map(m => m.updateLabels(spotlight))
+    if (this.params['interior spotlight']) {
+      this.anim_mats.map(m => m.updateLabels(spotlight))
+    }
   }
 
   setPosition() {
