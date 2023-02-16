@@ -838,8 +838,8 @@ export class MatMul {
       j: { n: nj, ext: Math.floor(this.D / nj), tail: this.D % nj },
       k: { n: nk, ext: Math.floor(this.W / nk), tail: this.W % nk },
     }
-    const long_tail = this.params.ragged == 'long tail'
-    Object.values(info).forEach(d => d.longest = d.ext + (long_tail ? d.tail : Math.sign(d.tail)))
+    const one_tail = this.params.tail == 'one'
+    Object.values(info).forEach(d => d.longest = d.ext + (one_tail ? d.tail : Math.sign(d.tail)))
     return info
   }
 
@@ -850,14 +850,14 @@ export class MatMul {
   grid(dims, f) {
     const info = this.getThreadInfo()
     const infos = Array.from(dims).map(d => info[d])
-    const long_tail = this.params.ragged == 'long tail'
+    const one_tail = this.params.tail == 'one'
     const loop = (args, infos, f) => infos.length == 0 ?
       f(...args) :
       [...Array(infos[0].n).keys()].map(i => {
         const { n, ext, tail } = infos[0]
-        const [start, extent] = long_tail ?
+        const [start, extent] = one_tail ?
           [i * ext, i == n - 1 ? ext + tail : ext] :
-          [i * ext + Math.min(i, tail), i < tail ? ext + 1 : ext]
+          [i * ext + Math.max(0, tail - n + i), i < n - tail ? ext : ext + 1]
         const end = start + extent
         loop([...args, { start, end, extent }], infos.slice(1), f)
       })

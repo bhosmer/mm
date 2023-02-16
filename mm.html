@@ -41,7 +41,7 @@
     const epilog_funcs = ['none', 'x/J', 'x/sqrt(J)', 'softmax(x/sqrt(J))', 'tanh(x)', 'relu(x)', 'layernorm']
     const sensitivities = ['local', 'global']
     const anim_algs = ['none', 'dotprod (row major)', 'dotprod (col major)', 'axpy', 'vmprod', 'mvprod', 'vvprod']
-    const tails = ['long tail', 'short tails']
+    const tails = ['one', 'many']
     const x_orientations = ['left', 'right']
     const y_orientations = ['up', 'down']
     const z_orientations = ['front', 'back']
@@ -75,12 +75,12 @@
       'result direction': 'front',
       // animation
       alg: 'none',
-      speed: 50,
+      speed: 5,
       'hide inputs': false,
       'i threads': 1,
       'j threads': 1,
       'k threads': 1,
-      'ragged': 'long tail',
+      'tail': 'one',
       // sizes and colors
       sensitivity: 'global',
       'zero hue': 0.77,
@@ -267,7 +267,7 @@
       let last = 0
       function animate() {
         const t = performance.now()
-        if (params.alg != 'none' && (anim_step || !anim_pause) && (t - last) > (5000 / params.speed)) {
+        if (params.alg != 'none' && (anim_step || !anim_pause) && (t - last) > (100 / params.speed)) {
           obj.bump()
           last = t
           anim_step = false
@@ -339,14 +339,14 @@
 
       const gui_anim = gui.addFolder('animation')
       gui_anim.add(params, 'alg', anim_algs).onChange(x => set('alg', x))
-      gui_anim.add(params, 'speed', 1, 100).onChange(x => set('speed', Math.floor(x), _ => { }))
+      gui_anim.add(params, 'speed', 1, 10).onChange(x => set('speed', Math.floor(x), _ => { }))
       gui_anim.add({ pause: false }, 'pause').onChange(x => anim_pause = x)
       gui_anim.add({ step: animStep }, 'step')
       gui_anim.add(params, 'hide inputs').onChange(x => set('hide inputs', x, x => getObj().hideInputs(x)))
       gui_anim.add(params, 'i threads', 1, 32).onChange(x => set('i threads', Math.floor(x)))
       gui_anim.add(params, 'j threads', 1, 32).onChange(x => set('j threads', Math.floor(x)))
       gui_anim.add(params, 'k threads', 1, 32).onChange(x => set('k threads', Math.floor(x)))
-      gui_anim.add(params, 'ragged', tails).onChange(x => set('ragged', x))
+      gui_anim.add(params, 'tail', tails).onChange(x => set('tail', x))
 
       const gui_vis = gui.addFolder('vis')
       gui_vis.add(params, 'legends').onChange(x => set('legends', x, x => getObj().setLegends(getParams())))
