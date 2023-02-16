@@ -901,32 +901,42 @@ export class MatMul {
       this.group.add(vmp.group)
     })
 
-    const { i: { extent: iext }, k: { extent: kext } } = this.getThreadInfo()
-    let curi = iext - 1
-    let curk = sweep ? kext - 1 : 0
+    const { i: { extent: iblock }, k: { extent: kblock } } = this.getThreadInfo()
+    let curi = iblock - 1
+    let curk = sweep ? kblock - 1 : 0
 
     this.bump = () => {
       // update indexes
       const [oldi, oldk] = [curi, curk]
       if (sweep) {
-        curk = (curk + 1) % kext
+        curk = (curk + 1) % kblock
       }
       if (curk == 0) {
-        curi = (curi + 1) % iext
+        curi = (curi + 1) % iblock
       }
 
       // update result mats
       if (curi == 0 && curk == 0) {
         results.forEach(r => r.hide())
       }
-      this.grid('ik', ({ start: i, extent: ix }, { start: k, end: ke }) => {
-        if (curi < ix) {
+      this.grid('ik', ({ start: i, extent: ix }, { start: k, end: ke, extent: kx }) => {
+        if (curi < ix && curk < kx) {
           results.forEach(r => r.show(i + curi, sweep ? k + curk : [k, ke]))
         }
       })
 
       // update input hilights
       if (!this.params['hide inputs']) {
+        if (sweep) {
+          this.grid('k', ({ start: k, extent: kx }) => {
+            if (oldk < kx) {
+              this.right.initVis(undefined, k + oldk)
+            }
+            if (curk < kx) {
+              this.right.bumpColor(undefined, k + curk)
+            }
+          })
+        }
         if (oldi != curi) {
           this.grid('i', ({ start: i, extent: ix }) => {
             if (oldi < ix) {
@@ -937,7 +947,74 @@ export class MatMul {
             }
           })
         }
+      }
+
+      // update intermediates
+      this.grid('ijk', ({ start: i, extent: ix }, { start: j }, { start: k, extent: kx }) => {
+        const vmp = vmps[[i, j, k]]
+        if (curi < ix && curk < kx) {
+          util.updateProps(vmp.group.position, { x: k + curk, y: -i - curi })
+          vmp.reinit((ji, ki) => this.ijkmul(i + curi, j + ji, k + curk + ki))
+        }
+      })
+
+      // update labels
+      this.updateLabels()
+    }
+  }
+
+  initAnimMvprod(sweep) {
+    const results = this.getAnimResultMats()
+
+    const mvps = {}
+    this.grid('ijk', ({ start: i, extent: ix }, { start: j, extent: jx }, { start: k }) => {
+      const mvpinit = (ii, ji) => this.ijkmul(i + ii, j + ji, k)
+      const data = Array2D.fromInit(sweep ? 1 : ix, jx, mvpinit)
+      const mvp = new Mat(data, this.getAnimMatParams(), true)
+      util.updateProps(mvp.group.position, { x: k, y: -i, z: j })
+      util.updateProps(mvp.group.rotation, { y: Math.PI / 2, z: Math.PI })
+      mvps[[i, j, k]] = mvp
+      this.anim_mats.push(mvp)
+      this.group.add(mvp.group)
+    })
+
+    const { i: { extent: iblock }, k: { extent: kblock } } = this.getThreadInfo()
+    let curi = sweep ? iblock - 1 : 0
+    let curk = kblock - 1
+
+    this.bump = () => {
+      // update indexes
+      const [oldi, oldk] = [curi, curk]
+      if (sweep) {
+        curi = (curi + 1) % iblock
+      }
+      if (curi == 0) {
+        curk = (curk + 1) % kblock
+      }
+
+      // update result mats
+      if (curi == 0 && curk == 0) {
+        results.forEach(r => r.hide())
+      }
+      this.grid('ik', ({ start: i, end: ie, extent: ix }, { start: k, extent: kx }) => {
+        if (curi < ix && curk < kx) {
+          results.forEach(r => r.show(sweep ? i + curi : [i, ie], k + curk))
+        }
+      })
+
+      // update input hilights
+      if (!this.params['hide inputs']) {
         if (sweep) {
+          this.grid('i', ({ start: i, extent: ix }) => {
+            if (oldi < ix) {
+              this.left.initVis(i + oldi, undefined)
+            }
+            if (curi < ix) {
+              this.left.bumpColor(i + curi, undefined)
+            }
+          })
+        }
+        if (oldk != curk) {
           this.grid('k', ({ start: k, extent: kx }) => {
             if (oldk < kx) {
               this.right.initVis(undefined, k + oldk)
@@ -950,83 +1027,14 @@ export class MatMul {
       }
 
       // update intermediates
-      // util.updateProps(vmpgroup.position, { x: curk, y: -curi })
-      this.grid('ijk', ({ start: i, extent: ix }, { start: j }, { start: k }) => {
-        const vmp = vmps[[i, j, k]]
-        if (curi < ix) {
-          util.updateProps(vmp.group.position, { x: k + curk, y: -i - curi })
-          vmp.reinit((ji, ki) => this.ijkmul(i + curi, j + ji, k + ki + curk))
-        } else {
-          vmp.hide()
+      // util.updateProps(mvpgroup.position, { x: curk, y: -curi })
+      this.grid('ijk', ({ start: i, extent: ix }, { start: j }, { start: k, extent: kx }) => {
+        // const mvp = mvps[i * nj * nk + j * nk + k]
+        const mvp = mvps[[i, j, k]]
+        if (curi < ix && curk < kx) {
+          util.updateProps(mvp.group.position, { x: k + curk, y: -i - curi })
+          mvp.reinit((ii, ji) => this.ijkmul(i + curi + ii, j + ji, k + curk))
         }
-      })
-
-      // update labels
-      this.updateLabels()
-    }
-  }
-
-  initAnimMvprod(sweep) {
-    const { i: { extent: ip }, j: { n: nj, extent: jp }, k: { n: nk, extent: kp } } = this.getThreadInfo()
-
-    const results = this.getAnimResultMats()
-
-    const mvps = []
-    const mvpgroup = new THREE.Group()
-    this.grid('ijk', (i, j, k) => {
-      const mvpinit = (ix, jx) => this.ijkmul(i * ip + ix, j * jp + jx, k * kp)
-      const data = Array2D.fromInit(sweep ? 1 : ip, jp, mvpinit)
-      const mvp = new Mat(data, this.getAnimMatParams(), true)
-      util.updateProps(mvp.group.position, { x: k * kp, y: -i * ip, z: j * jp })
-      util.updateProps(mvp.group.rotation, { y: Math.PI / 2, z: Math.PI })
-      mvps.push(mvp)
-      mvpgroup.add(mvp.group)
-      this.anim_mats.push(mvp)
-    })
-    this.group.add(mvpgroup)
-
-    let curi = sweep ? ip - 1 : 0
-    let curk = kp - 1
-
-    this.bump = () => {
-      // update indexes
-      const [oldi, oldk] = [curi, curk]
-      if (sweep) {
-        curi = (curi + 1) % ip
-      }
-      if (curi == 0) {
-        curk = (curk + 1) % kp
-      }
-
-      // update result mats
-      if (curi == 0 && curk == 0) {
-        results.forEach(r => r.hide())
-      }
-      this.grid('ik', (i, k) =>
-        results.forEach(r => r.show(sweep ? i * ip + curi : [i * ip, i * ip + ip], k * kp + curk))
-      )
-
-      // update input hilights
-      if (!this.params['hide inputs']) {
-        if (sweep) {
-          this.grid('i', i => {
-            this.left.initVis(i * ip + oldi, undefined)
-            this.left.bumpColor(i * ip + curi, undefined)
-          })
-        }
-        if (oldk != curk) {
-          this.grid('k', k => {
-            this.right.initVis(undefined, k * kp + oldk)
-            this.right.bumpColor(undefined, k * kp + curk)
-          })
-        }
-      }
-
-      // update intermediates
-      util.updateProps(mvpgroup.position, { x: curk, y: -curi })
-      this.grid('ijk', (i, j, k) => {
-        const mvp = mvps[i * nj * nk + j * nk + k]
-        mvp.reinit((ix, jx) => this.ijkmul(i * ip + ix + curi, j * jp + jx, k * kp + curk))
       })
 
       // update labels
