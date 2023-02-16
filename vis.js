@@ -841,29 +841,23 @@ export class MatMul {
     const ni = Math.min(this.params['i threads'], this.H)
     const nj = Math.min(this.params['j threads'], this.D)
     const nk = Math.min(this.params['k threads'], this.W)
-    const info = {
-      i: { n: ni, ext: Math.floor(this.H / ni), tail: this.H % ni },
-      j: { n: nj, ext: Math.floor(this.D / nj), tail: this.D % nj },
-      k: { n: nk, ext: Math.floor(this.W / nk), tail: this.W % nk },
+    return {
+      i: { n: ni, extent: Math.ceil(this.H / ni), max: this.H },
+      j: { n: nj, extent: Math.ceil(this.D / nj), max: this.D },
+      k: { n: nk, extent: Math.ceil(this.W / nk), max: this.W },
     }
-    const one_tail = this.params.tails == 'one'
-    Object.values(info).forEach(i => i.long = i.ext + (one_tail ? i.tail : Math.sign(i.tail)))
-    return info
   }
 
   grid(dims, f) {
     const info = this.getThreadInfo()
     const infos = Array.from(dims).map(d => info[d])
-    const one_tail = this.params.tails == 'one'
     const loop = (args, infos, f) => infos.length == 0 ?
       f(...args) :
       [...Array(infos[0].n).keys()].map(i => {
-        const { n, ext, tail } = infos[0]
-        const [start, extent] = one_tail ?
-          [i * ext, i == n - 1 ? ext + tail : ext] :
-          [i * ext + Math.max(0, tail - n + i), i < n - tail ? ext : ext + 1]
-        const end = start + extent
-        loop([...args, { start, end, extent }], infos.slice(1), f)
+        const { extent, max } = infos[0]
+        const start = i * extent
+        const end = Math.min(start + extent, max)
+        loop([...args, { start, end, extent: end - start }], infos.slice(1), f)
       })
     loop([], infos, f)
   }
@@ -907,7 +901,7 @@ export class MatMul {
       this.group.add(vmp.group)
     })
 
-    const { i: { long: iext }, k: { long: kext } } = this.getThreadInfo()
+    const { i: { extent: iext }, k: { extent: kext } } = this.getThreadInfo()
     let curi = iext - 1
     let curk = sweep ? kext - 1 : 0
 
@@ -926,7 +920,7 @@ export class MatMul {
         results.forEach(r => r.hide())
       }
       this.grid('ik', ({ start: i, extent: ix }, { start: k, end: ke }) => {
-        if (ix > curi) {
+        if (curi < ix) {
           results.forEach(r => r.show(i + curi, sweep ? k + curk : [k, ke]))
         }
       })
@@ -935,20 +929,20 @@ export class MatMul {
       if (!this.params['hide inputs']) {
         if (oldi != curi) {
           this.grid('i', ({ start: i, extent: ix }) => {
-            if (ix > oldi) {
+            if (oldi < ix) {
               this.left.initVis(i + oldi, undefined)
             }
-            if (ix > curi) {
+            if (curi < ix) {
               this.left.bumpColor(i + curi, undefined)
             }
           })
         }
         if (sweep) {
           this.grid('k', ({ start: k, extent: kx }) => {
-            if (kx > oldk) {
+            if (oldk < kx) {
               this.right.initVis(undefined, k + oldk)
             }
-            if (kx > curk) {
+            if (curk < kx) {
               this.right.bumpColor(undefined, k + curk)
             }
           })
@@ -959,7 +953,7 @@ export class MatMul {
       // util.updateProps(vmpgroup.position, { x: curk, y: -curi })
       this.grid('ijk', ({ start: i, extent: ix }, { start: j }, { start: k }) => {
         const vmp = vmps[[i, j, k]]
-        if (ix > curi) {
+        if (curi < ix) {
           util.updateProps(vmp.group.position, { x: k + curk, y: -i - curi })
           vmp.reinit((ji, ki) => this.ijkmul(i + curi, j + ji, k + ki + curk))
         } else {
@@ -973,7 +967,7 @@ export class MatMul {
   }
 
   initAnimMvprod(sweep) {
-    const { i: { ext: ip }, j: { n: nj, ext: jp }, k: { n: nk, ext: kp } } = this.getThreadInfo()
+    const { i: { extent: ip }, j: { n: nj, extent: jp }, k: { n: nk, extent: kp } } = this.getThreadInfo()
 
     const results = this.getAnimResultMats()
 
@@ -1041,7 +1035,7 @@ export class MatMul {
   }
 
   initAnimVvprod(sweep = false) {
-    const { i: { ext: ip }, j: { n: nj, ext: jp }, k: { n: nk, ext: kp } } = this.getThreadInfo()
+    const { i: { extent: ip }, j: { n: nj, extent: jp }, k: { n: nk, extent: kp } } = this.getThreadInfo()
 
     const results = this.getAnimResultMats()
 

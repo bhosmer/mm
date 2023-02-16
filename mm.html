@@ -41,7 +41,6 @@
     const epilog_funcs = ['none', 'x/J', 'x/sqrt(J)', 'softmax(x/sqrt(J))', 'tanh(x)', 'relu(x)', 'layernorm']
     const sensitivities = ['local', 'global']
     const anim_algs = ['none', 'dotprod (row major)', 'dotprod (col major)', 'axpy', 'vmprod', 'mvprod', 'vvprod']
-    const tails = ['one', 'many']
     const x_orientations = ['left', 'right']
     const y_orientations = ['up', 'down']
     const z_orientations = ['front', 'back']
@@ -80,7 +79,6 @@
       'i threads': 1,
       'j threads': 1,
       'k threads': 1,
-      'tails': 'one',
       // sizes and colors
       sensitivity: 'global',
       'zero hue': 0.77,
@@ -346,7 +344,6 @@
       gui_anim.add(params, 'i threads', 1, 16).onChange(x => set('i threads', Math.floor(x)))
       gui_anim.add(params, 'j threads', 1, 16).onChange(x => set('j threads', Math.floor(x)))
       gui_anim.add(params, 'k threads', 1, 16).onChange(x => set('k threads', Math.floor(x)))
-      gui_anim.add(params, 'tails', tails).onChange(x => set('tails', x))
 
       const gui_vis = gui.addFolder('vis')
       gui_vis.add(params, 'legends').onChange(x => set('legends', x, x => getObj().setLegends(getParams())))
