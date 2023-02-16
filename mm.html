@@ -80,7 +80,7 @@
       'i threads': 1,
       'j threads': 1,
       'k threads': 1,
-      'tail': 'one',
+      'tails': 'one',
       // sizes and colors
       sensitivity: 'global',
       'zero hue': 0.77,
@@ -343,10 +343,10 @@
       gui_anim.add({ pause: false }, 'pause').onChange(x => anim_pause = x)
       gui_anim.add({ step: animStep }, 'step')
       gui_anim.add(params, 'hide inputs').onChange(x => set('hide inputs', x, x => getObj().hideInputs(x)))
-      gui_anim.add(params, 'i threads', 1, 32).onChange(x => set('i threads', Math.floor(x)))
-      gui_anim.add(params, 'j threads', 1, 32).onChange(x => set('j threads', Math.floor(x)))
-      gui_anim.add(params, 'k threads', 1, 32).onChange(x => set('k threads', Math.floor(x)))
-      gui_anim.add(params, 'tail', tails).onChange(x => set('tail', x))
+      gui_anim.add(params, 'i threads', 1, 16).onChange(x => set('i threads', Math.floor(x)))
+      gui_anim.add(params, 'j threads', 1, 16).onChange(x => set('j threads', Math.floor(x)))
+      gui_anim.add(params, 'k threads', 1, 16).onChange(x => set('k threads', Math.floor(x)))
+      gui_anim.add(params, 'tails', tails).onChange(x => set('tails', x))
 
       const gui_vis = gui.addFolder('vis')
       gui_vis.add(params, 'legends').onChange(x => set('legends', x, x => getObj().setLegends(getParams())))

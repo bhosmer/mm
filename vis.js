@@ -846,19 +846,15 @@ export class MatMul {
       j: { n: nj, ext: Math.floor(this.D / nj), tail: this.D % nj },
       k: { n: nk, ext: Math.floor(this.W / nk), tail: this.W % nk },
     }
-    const one_tail = this.params.tail == 'one'
-    Object.values(info).forEach(d => d.longest = d.ext + (one_tail ? d.tail : Math.sign(d.tail)))
+    const one_tail = this.params.tails == 'one'
+    Object.values(info).forEach(i => i.long = i.ext + (one_tail ? i.tail : Math.sign(i.tail)))
     return info
-  }
-
-  longest(info) {
-    return long_tail ? info.n + into.tail : info.n + Math.sign(info.tail)
   }
 
   grid(dims, f) {
     const info = this.getThreadInfo()
     const infos = Array.from(dims).map(d => info[d])
-    const one_tail = this.params.tail == 'one'
+    const one_tail = this.params.tails == 'one'
     const loop = (args, infos, f) => infos.length == 0 ?
       f(...args) :
       [...Array(infos[0].n).keys()].map(i => {
@@ -911,9 +907,8 @@ export class MatMul {
       this.group.add(vmp.group)
     })
 
-    const iext = this.getThreadInfo().i.longest
+    const { i: { long: iext }, k: { long: kext } } = this.getThreadInfo()
     let curi = iext - 1
-    const kext = this.getThreadInfo().k.longest
     let curk = sweep ? kext - 1 : 0
 
     this.bump = () => {
