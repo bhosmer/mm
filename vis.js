@@ -842,9 +842,9 @@ export class MatMul {
     const nj = Math.min(this.params['j threads'], this.D)
     const nk = Math.min(this.params['k threads'], this.W)
     return {
-      i: { n: ni, extent: Math.ceil(this.H / ni), max: this.H },
-      j: { n: nj, extent: Math.ceil(this.D / nj), max: this.D },
-      k: { n: nk, extent: Math.ceil(this.W / nk), max: this.W },
+      i: { n: ni, block: Math.ceil(this.H / ni), max: this.H },
+      j: { n: nj, block: Math.ceil(this.D / nj), max: this.D },
+      k: { n: nk, block: Math.ceil(this.W / nk), max: this.W },
     }
   }
 
@@ -853,11 +853,14 @@ export class MatMul {
     const infos = Array.from(dims).map(d => info[d])
     const loop = (args, infos, f) => infos.length == 0 ?
       f(...args) :
-      [...Array(infos[0].n).keys()].map(i => {
-        const { extent, max } = infos[0]
-        const start = i * extent
-        const end = Math.min(start + extent, max)
-        loop([...args, { start, end, extent: end - start }], infos.slice(1), f)
+      [...Array(infos[0].n).keys()].map(index => {
+        const { block, max } = infos[0]
+        const start = index * block
+        if (start < max) {  // dead final block when block * n - max > block
+          const end = Math.min(start + block, max)
+          const extent = end - start
+          loop([...args, { index, start, end, extent }], infos.slice(1), f)
+        }
       })
     loop([], infos, f)
   }
@@ -901,7 +904,7 @@ export class MatMul {
       this.group.add(vmp.group)
     })
 
-    const { i: { extent: iblock }, k: { extent: kblock } } = this.getThreadInfo()
+    const { i: { block: iblock }, k: { block: kblock } } = this.getThreadInfo()
     let curi = iblock - 1
     let curk = sweep ? kblock - 1 : 0
 
@@ -978,7 +981,7 @@ export class MatMul {
       this.group.add(mvp.group)
     })
 
-    const { i: { extent: iblock }, k: { extent: kblock } } = this.getThreadInfo()
+    const { i: { block: iblock }, k: { block: kblock } } = this.getThreadInfo()
     let curi = sweep ? iblock - 1 : 0
     let curk = kblock - 1
 
@@ -1027,9 +1030,7 @@ export class MatMul {
       }
 
       // update intermediates
-      // util.updateProps(mvpgroup.position, { x: curk, y: -curi })
       this.grid('ijk', ({ start: i, extent: ix }, { start: j }, { start: k, extent: kx }) => {
-        // const mvp = mvps[i * nj * nk + j * nk + k]
         const mvp = mvps[[i, j, k]]
         if (curi < ix && curk < kx) {
           util.updateProps(mvp.group.position, { x: k + curk, y: -i - curi })
@@ -1042,69 +1043,84 @@ export class MatMul {
     }
   }
 
-  initAnimVvprod(sweep = false) {
-    const { i: { extent: ip }, j: { n: nj, extent: jp }, k: { n: nk, extent: kp } } = this.getThreadInfo()
-
+  initAnimVvprod(sweep) {
     const results = this.getAnimResultMats()
 
-    const vvps = []
-    const vvpgroup = new THREE.Group()
-    this.grid('ijk', (i, j, k) => {
-      const vvpinit = (ix, kx) => this.ijkmul(i * ip + ix, j * jp, k * kp + kx)
-      const data = Array2D.fromInit(ip, sweep ? 1 : kp, vvpinit)
+    const vvps = {}
+    this.grid('ijk', ({ start: i, extent: ix }, { start: j }, { start: k, extent: kx }) => {
+      const vvpinit = (ii, ki) => this.ijkmul(i + ii, j, k + ki)
+      const data = Array2D.fromInit(ix, sweep ? 1 : kx, vvpinit)
       const vvp = new Mat(data, this.getAnimMatParams(), true)
-      util.updateProps(vvp.group.position, { x: k * kp, y: -i * ip, z: j * jp })
+      util.updateProps(vvp.group.position, { x: k, y: -i, z: j })
       vvp.group.rotation.x = Math.PI
-      vvps.push(vvp)
-      vvpgroup.add(vvp.group)
+      vvps[[i, j, k]] = vvp
       this.anim_mats.push(vvp)
+      this.group.add(vvp.group)
     })
-    this.group.add(vvpgroup)
 
-    let curj = jp - 1
-    let curk = sweep ? kp - 1 : 0
+    const { j: { block: jblock }, k: { block: kblock } } = this.getThreadInfo()
+    let curj = jblock - 1
+    let curk = sweep ? kblock - 1 : 0
 
     this.bump = () => {
       // update indexes
       const [oldj, oldk] = [curj, curk]
-      curj = (curj + 1) % jp
+      curj = (curj + 1) % jblock
       if (curj == 0 && sweep) {
-        curk = (curk + 1) % kp
+        curk = (curk + 1) % kblock
       }
 
       // update result mats
       if (curj == 0 && curk == 0) {
         results.forEach(r => r.hide())
       }
-      this.grid('jk', (j, k) => {
-        const f = (i, kx) => this.dotprod_val(i, kx, j * jp, j * jp + curj + 1)
-        results[j].reinit(f, undefined, undefined, sweep ? k * kp + curk : [k * kp, k * kp + kp])
+      this.grid('jk', ({ start: j, extent: jx, index: ji }, { start: k, end: ke, extent: kx }) => {
+        if (curj < jx && curk < kx) {
+          const f = (ii, ki) => this.dotprod_val(ii, ki, j, j + curj + 1)
+          results[ji].reinit(f, undefined, undefined, sweep ? k + curk : [k, ke])
+        }
       })
 
       // update input highlights
       if (!this.params['hide inputs']) {
-        this.grid('j', j => {
-          this.left.initVis(undefined, j * jp + oldj)
-          this.left.bumpColor(undefined, j * jp + curj)
-        })
         if (sweep) {
-          this.grid('jk', (j, k) => {
-            this.right.initVis(j * jp + oldj, k * kp + oldk)
-            this.right.bumpColor(j * jp + curj, k * kp + curk)
+          this.grid('jk', ({ start: j, extent: jx }, { start: k, extent: kx }) => {
+            if (oldj < jx && oldk < kx) {
+              this.right.initVis(j + oldj, k + oldk)
+            }
+            if (curj < jx && curk < kx) {
+              this.right.bumpColor(j + curj, k + curk)
+            }
           })
         } else {
-          this.grid('j', j => {
-            this.right.initVis(j * jp + oldj, undefined)
-            this.right.bumpColor(j * jp + curj, undefined)
+          this.grid('j', ({ start: j, extent: jx }) => {
+            if (oldj < jx) {
+              this.right.initVis(j + oldj, undefined)
+            }
+            if (curj < jx) {
+              this.right.bumpColor(j + curj, undefined)
+            }
           })
         }
+        this.grid('j', ({ start: j, extent: jx }) => {
+          if (oldj < jx) {
+            this.left.initVis(undefined, j + oldj)
+          }
+          if (curj < jx) {
+            this.left.bumpColor(undefined, j + curj)
+          }
+        })
       }
 
       // update intermediates
-      util.updateProps(vvpgroup.position, { x: curk, z: curj })
-      this.grid('ijk', (i, j, k) => {
-        const vvp = vvps[i * nj * nk + j * nk + k]
-        vvp.reinit((ix, kx) => this.ijkmul(i * ip + ix, j * jp + curj, k * kp + kx + curk))
+      // util.updateProps(vvpgroup.position, { x: curk, z: curj })
+      this.grid('ijk', ({ start: i }, { start: j, extent: jx }, { start: k, extent: kx }) => {
+        // const vvp = vvps[i * nj * nk + j * nk + k]
+        const vvp = vvps[[i, j, k]]
+        if (curj < jx && curk < kx) {
+          util.updateProps(vvp.group.position, { x: k + curk, z: j + curj })
+          vvp.reinit((ii, ki) => this.ijkmul(i + ii, j + curj, k + curk + ki))
+        }
       })
 
       // update labels
