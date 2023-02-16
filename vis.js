@@ -493,18 +493,20 @@ export class Mat {
       const i = Math.floor(index / this.w)
       const j = index % this.w
       if (!this.isHidden(i, j)) {
-        let label = this.label_cache[index]
-        if (!label) {
-          const x = this.getData(i, j)
-          const fsiz = 0.175 - Math.log(1 + x / 10000)
-          label = this.params.getText(`${x.toFixed(4)}`, 0xffffff, fsiz)
-          label.value = x
-          label.geometry.rotateX(Math.PI)
-          const { h, w } = util.bbhw(label.geometry)
-          label.geometry.translate(util.center(j * 2, w), h + util.center(i * 2, h), -0.25)
-          this.label_cache[index] = label
+        const x = this.getData(i, j)
+        if (x != 0) { // declutter
+          let label = this.label_cache[index]
+          if (!label) {
+            const fsiz = 0.175 - Math.log(1 + x / 10000)
+            label = this.params.getText(`${x.toFixed(4)}`, 0xffffff, fsiz)
+            label.value = x
+            label.geometry.rotateX(Math.PI)
+            const { h, w } = util.bbhw(label.geometry)
+            label.geometry.translate(util.center(j * 2, w), h + util.center(i * 2, h), -0.25)
+            this.label_cache[index] = label
+          }
+          this.label_group.add(label)
         }
-        this.label_group.add(label)
       }
     })
   }
@@ -678,13 +680,19 @@ export class MatMul {
     this.group.add(this.result.group)
   }
 
-  updateLabels(spotlight = undefined) {
+  updateLabels(params = undefined) {
+    if (params) {
+      this.params.spotlight = params.spotlight
+      this.params['interior spotlight'] = params['interior spotlight']
+    }
+
+    const spotlight = this.params.spotlight
     this.left.updateLabels(spotlight)
     this.right.updateLabels(spotlight)
     this.result.updateLabels(spotlight)
-    if (this.params['interior spotlight']) {
-      this.anim_mats.map(m => m.updateLabels(spotlight))
-    }
+
+    const interior_spotlight = this.params['interior spotlight'] ? spotlight : 0
+    this.anim_mats.map(m => m.updateLabels(interior_spotlight))
   }
 
   setPosition() {

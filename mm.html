@@ -92,7 +92,7 @@
       // viz
       legends: true,
       spotlight: 3,
-      // 'interior spotlight': false,
+      'interior spotlight': false,
       'row guides': false,
       'flow guides': false,
       'arcball': false,
@@ -267,7 +267,7 @@
       let last = 0
       function animate() {
         const t = performance.now()
-        if (params.alg != 'none' && (anim_step || !anim_pause) && (t - last) > (100 / params.speed)) {
+        if (params.alg != 'none' && (anim_step || !anim_pause) && (t - last) > (300 / params.speed)) {
           obj.bump()
           last = t
           anim_step = false
@@ -350,8 +350,8 @@
 
       const gui_vis = gui.addFolder('vis')
       gui_vis.add(params, 'legends').onChange(x => set('legends', x, x => getObj().setLegends(getParams())))
-      gui_vis.add(params, 'spotlight', 0, 10).onChange(x => set('spotlight', Math.floor(x), x => getObj().updateLabels(x)))
-      // gui_vis.add(params, 'interior spotlight').onChange(x => set('interior spotlight', x, x => getObj().updateLabels(x)))
+      gui_vis.add(params, 'spotlight', 0, 10).onChange(x => set('spotlight', Math.floor(x), x => getObj().updateLabels(getParams())))
+      gui_vis.add(params, 'interior spotlight').onChange(x => set('interior spotlight', x, x => getObj().updateLabels(getParams())))
       gui_vis.add(params, 'row guides').onChange(x => set('row guides', x, x => getObj().setRowGuides(x)))
       gui_vis.add(params, 'flow guides').onChange(x => set('flow guides', x, x => getObj().setFlowGuide(x)))
 
