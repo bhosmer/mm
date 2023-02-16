@@ -282,23 +282,27 @@
 
     function initGui(getObj, initObj) {
 
-      function set(n, v, f = initObj, always = false) {
+      function set(n, v, f = initObj) {
         setParams({ [n]: v })
-        if (always || getObj().params[n] != v) {
+        if (getObj().params[n] != v) {
           f(v)
         }
       }
 
-      function addNumParam(gui, name, min, max, f = initObj, always = false) {
-        gui.add(params, name, min, max).onChange(x => set(name, x, f, always))
+      function addNumParam(gui, name, min, max, f = initObj) {
+        gui.add(params, name, min, max).onChange(x => set(name, x, f))
       }
 
-      function addIntParam(gui, name, min, max, f = initObj, always = false) {
-        gui.add(params, name, min, max).onChange(x => set(name, Math.floor(x), f, always))
+      function addIntParam(gui, name, min, max, f = initObj) {
+        gui.add(params, name, min, max).onChange(x => set(name, Math.floor(x), f))
       }
 
-      function addParam(gui, name, vals = undefined, f = initObj, always = false) {
-        gui.add(params, name, vals).onChange(x => set(name, x, f, always))
+      function addChoiceParam(gui, name, choices, f = initObj) {
+        gui.add(params, name, choices).onChange(x => set(name, x, f))
+      }
+
+      function addParam(gui, name, f = initObj) {
+        gui.add(params, name).onChange(x => set(name, x, f))
       }
 
       const gui = new GUI();
@@ -311,55 +315,54 @@
       const gui_data = gui.addFolder('data')
 
       const gui_left = gui_data.addFolder('left')
-      addParam(gui_left, 'left init', init_funcs)
-      // gui_left.add(params, 'left init', init_funcs).onChange(x => set('left init', x))
-      gui_left.add(params, 'left min', -1.0, 1.0).onChange(x => set('left min', x))
-      gui_left.add(params, 'left max', 0.0, 1.0).onChange(x => set('left max', x))
-      gui_left.add(params, 'left sparsity', 0.0, 1.0).onChange(x => set('left sparsity', x))
-      gui_left.add(params, 'left name').onChange(x => set('left name', x, _ => getObj().setLegends(getParams())))
-      gui_left.add(params, 'left placement', x_orientations).onChange(x => set('left face', x, _ => getObj().place(getParams())))
-      gui_left.add(params, 'left direction', x_orientations).onChange(x => set('left direction', x, _ => getObj().place(getParams())))
+      addChoiceParam(gui_left, 'left init', init_funcs)
+      addNumParam(gui_left, 'left min', -1.0, 1.0)
+      addNumParam(gui_left, 'left max', 0.0, 1.0)
+      addNumParam(gui_left, 'left sparsity', 0.0, 1.0)
+      addParam(gui_left, 'left name', _ => getObj().setLegends(getParams()))
+      addChoiceParam(gui_left, 'left placement', x_orientations, _ => getObj().place(getParams()))
+      addChoiceParam(gui_left, 'left direction', x_orientations, _ => getObj().place(getParams()))
 
       const gui_right = gui_data.addFolder('right')
-      gui_right.add(params, 'right init', init_funcs).onChange(x => set('right init', x))
-      gui_right.add(params, 'right min', -1.0, 1.0).onChange(x => set('right min', x))
-      gui_right.add(params, 'right max', 0.0, 1.0).onChange(x => set('right max', x))
-      gui_right.add(params, 'right sparsity', 0.0, 1.0).onChange(x => set('right sparsity', x))
-      gui_right.add(params, 'right name').onChange(x => set('right name', x, _ => getObj().setLegends(getParams())))
-      gui_right.add(params, 'right placement', y_orientations).onChange(x => set('right face', x, _ => getObj().place(getParams())))
-      gui_right.add(params, 'right direction', y_orientations).onChange(x => set('right direction', x, _ => getObj().place(getParams())))
+      addChoiceParam(gui_right, 'right init', init_funcs)
+      addNumParam(gui_right, 'right min', -1.0, 1.0)
+      addNumParam(gui_right, 'right max', 0.0, 1.0)
+      addNumParam(gui_right, 'right sparsity', 0.0, 1.0)
+      addParam(gui_right, 'right name', _ => getObj().setLegends(getParams()))
+      addChoiceParam(gui_right, 'right placement', y_orientations, _ => getObj().place(getParams()))
+      addChoiceParam(gui_right, 'right direction', y_orientations, _ => getObj().place(getParams()))
 
       const gui_result = gui_data.addFolder('result')
-      gui_result.add(params, 'epilog', epilog_funcs).onChange(x => set('epilog', x))
-      gui_result.add(params, 'result name').onChange(x => set('result name', x, _ => getObj().setLegends(getParams())))
-      gui_result.add(params, 'result placement', z_orientations).onChange(x => set('result face', x, _ => getObj().place(getParams())))
-      gui_result.add(params, 'result direction', z_orientations).onChange(x => set('result direction', x, _ => getObj().place(getParams())))
+      addChoiceParam(gui_result, 'epilog', epilog_funcs)
+      addParam(gui_result, 'result name', _ => getObj().setLegends(getParams()))
+      addChoiceParam(gui_result, 'result placement', z_orientations, _ => getObj().place(getParams()))
+      addChoiceParam(gui_result, 'result direction', z_orientations, _ => getObj().place(getParams()))
 
       const gui_anim = gui.addFolder('animation')
-      gui_anim.add(params, 'alg', anim_algs).onChange(x => set('alg', x))
-      gui_anim.add(params, 'speed', 1, 10).onChange(x => set('speed', Math.floor(x), _ => { }))
+      addChoiceParam(gui_anim, 'alg', anim_algs)
+      addIntParam(gui_anim, 'speed', 1, 10, _ => { })
       gui_anim.add({ pause: false }, 'pause').onChange(x => anim_pause = x)
       gui_anim.add({ step: animStep }, 'step')
-      gui_anim.add(params, 'hide inputs').onChange(x => set('hide inputs', x, x => getObj().hideInputs(x)))
-      gui_anim.add(params, 'i threads', 1, 16).onChange(x => set('i threads', Math.floor(x)))
-      gui_anim.add(params, 'j threads', 1, 16).onChange(x => set('j threads', Math.floor(x)))
-      gui_anim.add(params, 'k threads', 1, 16).onChange(x => set('k threads', Math.floor(x)))
+      addParam(gui_anim, 'hide inputs', x => getObj().hideInputs(x))
+      addIntParam(gui_anim, 'i threads', 1, 16)
+      addIntParam(gui_anim, 'j threads', 1, 16)
+      addIntParam(gui_anim, 'k threads', 1, 16)
 
       const gui_vis = gui.addFolder('vis')
-      gui_vis.add(params, 'legends').onChange(x => set('legends', x, x => getObj().setLegends(getParams())))
-      gui_vis.add(params, 'spotlight', 0, 10).onChange(x => set('spotlight', Math.floor(x), x => getObj().updateLabels(getParams())))
-      gui_vis.add(params, 'interior spotlight').onChange(x => set('interior spotlight', x, x => getObj().updateLabels(getParams())))
-      gui_vis.add(params, 'row guides').onChange(x => set('row guides', x, x => getObj().setRowGuides(x)))
-      gui_vis.add(params, 'flow guides').onChange(x => set('flow guides', x, x => getObj().setFlowGuide(x)))
+      addParam(gui_vis, 'legends', x => getObj().setLegends(getParams()))
+      addIntParam(gui_vis, 'spotlight', 0, 10, x => getObj().updateLabels(getParams()))
+      addParam(gui_vis, 'interior spotlight', x => getObj().updateLabels(getParams()))
+      addParam(gui_vis, 'row guides', x => getObj().setRowGuides(x))
+      addParam(gui_vis, 'flow guides', x => getObj().setFlowGuide(x))
 
       const gui_colors = gui.addFolder('colors and sizes')
-      gui_colors.add(params, 'sensitivity', sensitivities).onChange(x => set('sensitivity', x))
-      gui_colors.add(params, 'zero hue', 0.0, 1.0).onChange(x => set('zero hue', x))
-      gui_colors.add(params, 'min size', 0.0, 1.0).onChange(x => set('min size', x))
-      gui_colors.add(params, 'min light', 0.0, 1.0).onChange(x => set('min light', x))
-      gui_colors.add(params, 'max light', 0.0, 1.0).onChange(x => set('max light', x))
-      gui_colors.add(params, 'hue gap', 0.0, 1.0).onChange(x => set('hue gap', x))
-      gui_colors.add(params, 'hue spread', 0.0, 1.0).onChange(x => set('hue spread', x))
+      addChoiceParam(gui_colors, 'sensitivity', sensitivities)
+      addNumParam(gui_colors, 'zero hue', 0.0, 1.0)
+      addNumParam(gui_colors, 'min size', 0.0, 1.0)
+      addNumParam(gui_colors, 'min light', 0.0, 1.0)
+      addNumParam(gui_colors, 'max light', 0.0, 1.0)
+      addNumParam(gui_colors, 'hue gap', 0.0, 1.0)
+      addNumParam(gui_colors, 'hue spread', 0.0, 1.0)
     }
 
   </script>

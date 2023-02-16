@@ -487,7 +487,7 @@ export class Mat {
       this.label_group.clear()
     }
 
-    this.params.raycaster.params.Points.threshold = spotlight
+    this.params.raycaster.params.Points.threshold = spotlight / 2
     this.params.raycaster.intersectObject(this.points).forEach(x => {
       const index = x.index
       const i = Math.floor(index / this.w)
