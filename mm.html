@@ -41,9 +41,9 @@
     const epilog_funcs = ['none', 'x/J', 'x/sqrt(J)', 'softmax(x/sqrt(J))', 'tanh(x)', 'relu(x)', 'layernorm']
     const sensitivities = ['local', 'global']
     const anim_algs = ['none', 'dotprod (row major)', 'dotprod (col major)', 'axpy', 'vmprod', 'mvprod', 'vvprod']
-    const x_orientations = ['left', 'right']
-    const y_orientations = ['up', 'down']
-    const z_orientations = ['front', 'back']
+    const [x_placements, x_directions] = [['left', 'right'], ['leftward', 'rightward']]
+    const [y_placements, y_directions] = [['top', 'bottom'], ['upward', 'downward']]
+    const [z_placements, z_directions] = [['front', 'back'], ['forward', 'backward']]
 
     const params = {
       // shape
@@ -58,7 +58,7 @@
       'left sparsity': 0,
       'left name': 'X',
       'left placement': 'left',
-      'left direction': 'left',
+      'left direction': 'leftward',
       // right arg
       'right init': 'cols',
       'right min': -1,
@@ -66,12 +66,12 @@
       'right sparsity': 0,
       'right name': 'Y',
       'right placement': 'up',
-      'right direction': 'up',
+      'right direction': 'upward',
       // result
       epilog: 'none',
       'result name': 'XY',
       'result placement': 'front',
-      'result direction': 'front',
+      'result direction': 'forward',
       // animation
       alg: 'none',
       speed: 5,
@@ -320,8 +320,8 @@
       addNumParam(gui_left, 'left max', 0.0, 1.0)
       addNumParam(gui_left, 'left sparsity', 0.0, 1.0)
       addParam(gui_left, 'left name', _ => getObj().setLegends(getParams()))
-      addChoiceParam(gui_left, 'left placement', x_orientations, _ => getObj().place(getParams()))
-      addChoiceParam(gui_left, 'left direction', x_orientations, _ => getObj().place(getParams()))
+      addChoiceParam(gui_left, 'left placement', x_placements, _ => getObj().place(getParams()))
+      addChoiceParam(gui_left, 'left direction', x_directions, _ => getObj().place(getParams()))
 
       const gui_right = gui_data.addFolder('right')
       addChoiceParam(gui_right, 'right init', init_funcs)
@@ -329,14 +329,14 @@
       addNumParam(gui_right, 'right max', 0.0, 1.0)
       addNumParam(gui_right, 'right sparsity', 0.0, 1.0)
       addParam(gui_right, 'right name', _ => getObj().setLegends(getParams()))
-      addChoiceParam(gui_right, 'right placement', y_orientations, _ => getObj().place(getParams()))
-      addChoiceParam(gui_right, 'right direction', y_orientations, _ => getObj().place(getParams()))
+      addChoiceParam(gui_right, 'right placement', y_placements, _ => getObj().place(getParams()))
+      addChoiceParam(gui_right, 'right direction', y_directions, _ => getObj().place(getParams()))
 
       const gui_result = gui_data.addFolder('result')
       addChoiceParam(gui_result, 'epilog', epilog_funcs)
       addParam(gui_result, 'result name', _ => getObj().setLegends(getParams()))
-      addChoiceParam(gui_result, 'result placement', z_orientations, _ => getObj().place(getParams()))
-      addChoiceParam(gui_result, 'result direction', z_orientations, _ => getObj().place(getParams()))
+      addChoiceParam(gui_result, 'result placement', z_placements, _ => getObj().place(getParams()))
+      addChoiceParam(gui_result, 'result direction', z_directions, _ => getObj().place(getParams()))
 
       const gui_anim = gui.addFolder('animation')
       addChoiceParam(gui_anim, 'alg', anim_algs)

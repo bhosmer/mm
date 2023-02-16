@@ -633,15 +633,15 @@ export class MatMul {
       return
     }
     this.left.initVis()
-    this.left.group.rotation.y = Math.PI / 2
+    if (this.params['left direction'] == 'leftward') {
+      this.left.group.position.z = 0
+      this.left.group.rotation.y = Math.PI / 2
+    } else {
+      this.left.group.position.z = this.D - 1
+      this.left.group.rotation.y = -Math.PI / 2
+    }
+    this.left.group.position.x = this.params['left placement'] == 'left' ? -1 : this.W
     this.left.group.rotation.z = Math.PI
-    if (this.params.left_rot) {
-      Object.keys(this.params.left_rot).map(k => this.left.group.rotation[k] += this.params.left_rot[k])
-    }
-    this.left.group.position.x = -1
-    if (this.params.left_pos) {
-      Object.keys(this.params.left_pos).map(k => this.left.group.position[k] += this.params.left_pos[k])
-    }
     this.left.setRowGuides()
     this.setLeftLegends()
     this.group.add(this.left.group)
@@ -653,13 +653,7 @@ export class MatMul {
     }
     this.right.initVis()
     this.right.group.rotation.x = Math.PI / 2
-    if (this.params.right_rot) {
-      Object.keys(this.params.right_rot).map(k => this.right.group.rotation[k] += this.params.right_rot[k])
-    }
-    this.right.group.position.y = 1
-    if (this.params.right_pos) {
-      Object.keys(this.params.right_pos).map(k => this.right.group.position[k] += this.params.right_pos[k])
-    }
+    this.right.group.position.y = this.params['right placement'] == 'top' ? 1 : -this.H
     this.right.setRowGuides()
     this.setRightLegends()
     this.group.add(this.right.group)
@@ -668,16 +662,19 @@ export class MatMul {
   initResultVis() {
     this.result.initVis()
     this.result.group.rotation.x = Math.PI
-    if (this.params.result_rot) {
-      Object.keys(this.params.result_rot).map(k => this.result.group.rotation[k] += this.params.result_rot[k])
-    }
-    this.result.group.position.z = this.D
-    if (this.params.result_pos) {
-      Object.keys(this.params.result_pos).map(k => this.result.group.position[k] += this.params.result_pos[k])
-    }
+    this.result.group.position.z = this.params['result placement'] == 'front' ? this.D : -1
     this.result.setRowGuides()
     this.setResultLegends()
     this.group.add(this.result.group)
+  }
+
+  place(params = undefined) {
+    if (params) {
+      util.updateProps(this.params, params,
+        ['left placement', 'left direction', 'right placement', 'right direction', 'result placement']
+      )
+    }
+    this.initVis()
   }
 
   updateLabels(params = undefined) {
@@ -696,8 +693,6 @@ export class MatMul {
   }
 
   setPosition() {
-    // center cube on 0,0,0 if no pos given
-    // note: don't save into params
     const pos = this.params.pos ? this.params.pos :
       new THREE.Vector3(-(this.W - 1) / 2, (this.H - 1) / 2, -(this.D - 1) / 2)
     this.group.position.x = pos.x

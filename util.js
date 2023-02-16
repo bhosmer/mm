@@ -203,8 +203,10 @@ export function locate(y, x) {
 // misc object utils
 //
 
-export function updateProps(obj, donor) {
-  Object.entries(donor).map(([k, v]) => obj[k] = v)
+export function updateProps(obj, donor, props = undefined) {
+  props = props || Object.keys(donor)
+  props.map(k => obj[k] = donor[k])
+  // Object.entries(donor).map(([k, v]) => obj[k] = v)
 }
 
 export function syncProp(obj, k, v) {
