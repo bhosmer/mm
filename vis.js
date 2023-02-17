@@ -746,11 +746,19 @@ export class MatMul {
     this.result.setRowGuides(enabled)
   }
 
+  getPlacementInfo() {
+    return {
+      left: this.params['left placement'] == 'right',
+      right: this.params['right placement'] == 'top',
+      result: this.params['result placement'] == 'front'
+    }
+  }
+
   setFlowGuide(enabled) {
     enabled = util.syncProp(this.params, 'flow guides', enabled)
     if (enabled) {
       if (!this.flow_guide_group) {
-        this.flow_guide_group = util.flowGuide(this.H, this.D, this.W)
+        this.flow_guide_group = util.flowGuide(this.H, this.D, this.W, this.getPlacementInfo())
         this.group.add(this.flow_guide_group)
       }
     } else {

@@ -202,14 +202,14 @@
 
       let cam_changing = false
       let label_update_pending = false
-      const postLabelUpdate = (t = 5) => {
+      const postLabelUpdate = _ => {
         if (!label_update_pending) {
           label_update_pending = true
           setTimeout(function () {
             raycaster.setFromCamera(pointer, camera)
             getObj().updateLabels()
             label_update_pending = false
-          }, t);
+          }, 5);
         }
       }
 
@@ -222,7 +222,7 @@
 
       orbit.addEventListener('end', _ => {
         cam_changing = false
-        postLabelUpdate(0)
+        postLabelUpdate()
       })
 
       orbit.addEventListener('change', function () {

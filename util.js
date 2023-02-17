@@ -143,8 +143,9 @@ const MMGUIDE_MATERIAL = new THREE.RawShaderMaterial({
   transparent: true
 });
 
-// TODO will need to be parameterized on orientation
-export function flowGuide(h, d, w) {
+export function flowGuide(h, d, w, placement) {
+  const dir = mapProps(placement, b => b ? 1 : -1)
+
   const colors = [
     179, 127, 199, 50,
     21, 138, 192, 163,
@@ -153,29 +154,32 @@ export function flowGuide(h, d, w) {
   const color_attr = new THREE.Uint8BufferAttribute(colors, 4)
   color_attr.normalized = true
 
+  const group = new THREE.Group()
+
   const left_positions = [
-    0.0, 0.0, 0.190983005625 * d,
-    -0.5 * w, 0.0, 0.0,
-    0.0, 0.0, 0.5 * d,
+    dir.left * w / 2, 0.0, -0.190983005625 * d,
+    dir.left * w / 2, 0.0, 0.190983005625 * d,
+    0.0, 0.0, dir.result * 0.5 * d,
   ]
+
   const left_geometry = new THREE.BufferGeometry()
   left_geometry.setAttribute('position', new THREE.Float32BufferAttribute(left_positions, 3))
   left_geometry.setAttribute('color', color_attr)
   const left = new THREE.Mesh(left_geometry, MMGUIDE_MATERIAL)
+  group.add(left);
 
   const right_positions = [
-    0.0, 0.0, 0.190983005625 * d,
-    0.0, 0.5 * h, 0.0,
-    0.0, 0.0, 0.5 * d,
+    0.190983005625 * h, dir.right * h / 2, 0.0,
+    -0.190983005625 * h, dir.right * h / 2, 0.0,
+    0.0, 0.0, dir.result * 0.5 * d,
   ]
+
   const right_geometry = new THREE.BufferGeometry()
   right_geometry.setAttribute('position', new THREE.Float32BufferAttribute(right_positions, 3))
   right_geometry.setAttribute('color', color_attr)
   const right = new THREE.Mesh(right_geometry, MMGUIDE_MATERIAL)
-
-  const group = new THREE.Group()
-  group.add(left);
   group.add(right);
+
   group.position.x = center(w - 1)
   group.position.y = -center(h - 1)
   group.position.z = center(d - 1)
@@ -215,4 +219,8 @@ export function syncProp(obj, k, v) {
   }
   obj[k] = v
   return v
+}
+
+export function mapProps(obj, f, init = {}) {
+  return Object.entries(obj).reduce((acc, [k, v]) => ({ ...acc, [k]: f(v) }), init)
 }
