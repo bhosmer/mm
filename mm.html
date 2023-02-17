@@ -79,10 +79,10 @@
       'k threads': 1,
       // sizes and colors
       sensitivity: 'global',
-      'zero hue': 0.77,
       'min size': 0.15,
       'min light': 0.25,
       'max light': 0.6,
+      'zero hue': 0.77,
       'hue gap': 0.2,
       'hue spread': 0.01,
       // viz
@@ -353,10 +353,10 @@
 
       const gui_colors = gui.addFolder('colors and sizes')
       addChoiceParam(gui_colors, 'sensitivity', sensitivities)
-      addNumParam(gui_colors, 'zero hue', 0.0, 1.0)
       addNumParam(gui_colors, 'min size', 0.0, 1.0)
       addNumParam(gui_colors, 'min light', 0.0, 1.0)
       addNumParam(gui_colors, 'max light', 0.0, 1.0)
+      addNumParam(gui_colors, 'zero hue', 0.0, 1.0)
       addNumParam(gui_colors, 'hue gap', 0.0, 1.0)
       addNumParam(gui_colors, 'hue spread', 0.0, 1.0)
     }

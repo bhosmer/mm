@@ -401,7 +401,7 @@ export class Mat {
       name_color: 0xccccff,
       name_size: sa_geo / 2,
       dim_color: 0x00aaff,
-      dim_size: sa_geo / 6,
+      dim_size: sa_geo / 8,
     }
   }
 
@@ -656,7 +656,7 @@ export class MatMul {
       this.right.group.position.z = 0
       this.right.group.rotation.x = Math.PI / 2
     } else {
-      this.right.group.position.z = this.H - 1
+      this.right.group.position.z = this.D - 1
       this.right.group.rotation.x = -Math.PI / 2
     }
     this.right.group.position.y = this.params['right placement'] == 'top' ? 1 : -this.H
