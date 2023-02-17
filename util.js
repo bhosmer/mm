@@ -75,7 +75,7 @@ export function rowGuide(h, w, trunc = true, rdenom = 16, cdenom = 16) {
   const draw = (i0, j0, i1, j1) => {
     const start = new THREE.Vector3(j0, i0, 0);
     const end = new THREE.Vector3(j1, i1, 0);
-    color.setScalar(0.25 + 0.75 * (h - i0) * (w - j0) / n)
+    color.setScalar((h - i0) * (w - j0) / n)
     group.add(lineSeg(start, end, color))
   }
 

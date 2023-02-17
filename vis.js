@@ -487,7 +487,7 @@ export class Mat {
       this.label_group.clear()
     }
 
-    this.params.raycaster.params.Points.threshold = spotlight / 2
+    this.params.raycaster.params.Points.threshold = spotlight
     this.params.raycaster.intersectObject(this.points).forEach(x => {
       const index = x.index
       const i = Math.floor(index / this.w)
@@ -652,7 +652,13 @@ export class MatMul {
       return
     }
     this.right.initVis()
-    this.right.group.rotation.x = Math.PI / 2
+    if (this.params['left direction'] == 'leftward') {
+      this.right.group.position.z = 0
+      this.right.group.rotation.x = Math.PI / 2
+    } else {
+      this.right.group.position.z = this.H - 1
+      this.right.group.rotation.x = -Math.PI / 2
+    }
     this.right.group.position.y = this.params['right placement'] == 'top' ? 1 : -this.H
     this.right.setRowGuides()
     this.setRightLegends()
@@ -661,8 +667,8 @@ export class MatMul {
 
   initResultVis() {
     this.result.initVis()
-    this.result.group.rotation.x = Math.PI
     this.result.group.position.z = this.params['result placement'] == 'front' ? this.D : -1
+    this.result.group.rotation.x = Math.PI
     this.result.setRowGuides()
     this.setResultLegends()
     this.group.add(this.result.group)
