@@ -87,11 +87,11 @@
       'hue spread': 0.01,
       // viz
       legends: true,
-      spotlight: 3,
-      'interior spotlight': false,
+      spotlight: 1,
       'row guides': false,
       'flow guides': false,
       winding: 'left hand rule',
+      'interior spotlight': false,
       // set from orbit control
       xcam: -init_dims.i * 2,
       ycam: init_dims.j * 2,
@@ -346,10 +346,10 @@
       const gui_vis = gui.addFolder('vis')
       addParam(gui_vis, 'legends', x => getObj().setLegends(getParams()))
       addIntParam(gui_vis, 'spotlight', 0, 10, x => getObj().updateLabels(getParams()))
-      addParam(gui_vis, 'interior spotlight', x => getObj().updateLabels(getParams()))
       addParam(gui_vis, 'row guides', x => getObj().setRowGuides(x))
       addParam(gui_vis, 'flow guides', x => getObj().setFlowGuide(x))
       addChoiceParam(gui_vis, 'winding', winding_rules)
+      addParam(gui_vis, 'interior spotlight', x => getObj().updateLabels(getParams()))
 
       const gui_colors = gui.addFolder('colors and sizes')
       addChoiceParam(gui_colors, 'sensitivity', sensitivities)
