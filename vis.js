@@ -633,7 +633,7 @@ export class MatMul {
       return
     }
     this.left.initVis()
-    if (this.params['left direction'] == 'leftward') {
+    if (this.params.winding == 'left hand rule') {
       this.left.group.position.z = 0
       this.left.group.rotation.y = Math.PI / 2
     } else {
@@ -652,7 +652,7 @@ export class MatMul {
       return
     }
     this.right.initVis()
-    if (this.params['left direction'] == 'leftward') {
+    if (this.params.winding == 'left hand rule') {
       this.right.group.position.z = 0
       this.right.group.rotation.x = Math.PI / 2
     } else {
@@ -676,9 +676,8 @@ export class MatMul {
 
   place(params = undefined) {
     if (params) {
-      util.updateProps(this.params, params,
-        ['left placement', 'left direction', 'right placement', 'right direction', 'result placement']
-      )
+      const props = ['winding', 'left placement', 'right placement', 'result placement']
+      util.updateProps(this.params, params, props)
     }
     this.initVis()
   }

@@ -41,7 +41,8 @@
     const epilog_funcs = ['none', 'x/J', 'x/sqrt(J)', 'softmax(x/sqrt(J))', 'tanh(x)', 'relu(x)', 'layernorm']
     const sensitivities = ['local', 'global']
     const anim_algs = ['none', 'dotprod (row major)', 'dotprod (col major)', 'axpy', 'vmprod', 'mvprod', 'vvprod']
-    const [x_placements, x_directions] = [['left', 'right'], ['leftward', 'rightward']]
+    const winding_rules = ['left hand rule', 'right hand rule']
+    const x_placements = ['left', 'right']
     const y_placements = ['top', 'bottom']
     const z_placements = ['front', 'back']
 
@@ -57,7 +58,6 @@
       'left max': 1,
       'left sparsity': 0,
       'left name': 'X',
-      'left direction': 'leftward',
       'left placement': 'left',
       // right arg
       'right init': 'cols',
@@ -65,7 +65,7 @@
       'right max': 1,
       'right sparsity': 0,
       'right name': 'Y',
-      'right placement': 'up',
+      'right placement': 'top',
       // result
       epilog: 'none',
       'result name': 'XY',
@@ -91,7 +91,7 @@
       'interior spotlight': false,
       'row guides': false,
       'flow guides': false,
-      'arcball': false,
+      winding: 'left hand rule',
       // set from orbit control
       xcam: -init_dims.i * 2,
       ycam: init_dims.j * 2,
@@ -318,7 +318,6 @@
       addNumParam(gui_left, 'left max', 0.0, 1.0)
       addNumParam(gui_left, 'left sparsity', 0.0, 1.0)
       addParam(gui_left, 'left name', _ => getObj().setLegends(getParams()))
-      addChoiceParam(gui_left, 'left direction', x_directions, _ => getObj().place(getParams()))
       addChoiceParam(gui_left, 'left placement', x_placements, _ => getObj().place(getParams()))
 
       const gui_right = gui_data.addFolder('right')
@@ -350,6 +349,7 @@
       addParam(gui_vis, 'interior spotlight', x => getObj().updateLabels(getParams()))
       addParam(gui_vis, 'row guides', x => getObj().setRowGuides(x))
       addParam(gui_vis, 'flow guides', x => getObj().setFlowGuide(x))
+      addChoiceParam(gui_vis, 'winding', winding_rules)
 
       const gui_colors = gui.addFolder('colors and sizes')
       addChoiceParam(gui_colors, 'sensitivity', sensitivities)
