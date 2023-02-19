@@ -41,7 +41,7 @@
     const epilog_funcs = ['none', 'x/J', 'x/sqrt(J)', 'softmax(x/sqrt(J))', 'tanh(x)', 'relu(x)', 'layernorm']
     const sensitivities = ['local', 'global']
     const anim_algs = ['none', 'dotprod (row major)', 'dotprod (col major)', 'axpy', 'vmprod', 'mvprod', 'vvprod']
-    const winding_rules = ['left hand rule', 'right hand rule']
+    const orientations = ['left to right', 'right to left']
     const x_placements = ['left', 'right']
     const y_placements = ['top', 'bottom']
     const z_placements = ['front', 'back']
@@ -51,6 +51,7 @@
       I: init_dims.i,
       J: init_dims.j,
       K: init_dims.k,
+      'edge orientation': 'left to right',
       // data
       // left arg
       'left init': 'rows',
@@ -90,13 +91,12 @@
       spotlight: 1,
       'row guides': false,
       'flow guides': false,
-      winding: 'left hand rule',
       'interior spotlight': false,
       // set from orbit control
       xcam: -init_dims.i * 2,
       ycam: init_dims.j * 2,
       zcam: init_dims.k * 2,
-    };
+    }
 
     // update URL with param changes
 
@@ -167,6 +167,10 @@
     function init() {
       const scene = new THREE.Scene()
 
+      // temp
+      let axes = util.axes(window)
+      scene.add(axes)
+
       // load params from url
       util.updateFromSearchParams(params, new URL(window.location).searchParams)
 
@@ -183,7 +187,21 @@
         if (obj) {
           scene.remove(obj.group)
         }
-        obj = new vis.MatMul(getParams())
+
+        // obj = new vis.MatMul(getParams())
+
+        const left_mm = { ...getParams(), 'left name': "LL", 'right name': "LR", 'result name': "L" }
+        // obj = new vis.MatMul({ ...getParams(), left_mm })
+
+        const right_mm = { ...getParams(), 'left name': "RL", 'right name': "RR", 'result name': "R" }
+        // obj = new vis.MatMul({ ...getParams(), right_mm })
+
+        obj = new vis.MatMul({ ...getParams(), left_mm, right_mm })
+
+        // obj.group.rotation.x = Math.PI
+
+        // const { x, y, z } = obj.getCenter()
+        // util.updateProps(obj.group.position, { x: -x, y, z })
         scene.add(obj.group)
       }
       initObj()
@@ -309,6 +327,7 @@
       addIntParam(gui_shape, 'I', 1, 256)
       addIntParam(gui_shape, 'J', 1, 256)
       addIntParam(gui_shape, 'K', 1, 256)
+      addChoiceParam(gui_shape, 'edge orientation', orientations)
 
       const gui_data = gui.addFolder('data')
 
@@ -348,7 +367,6 @@
       addIntParam(gui_vis, 'spotlight', 0, 10, x => getObj().updateLabels(getParams()))
       addParam(gui_vis, 'row guides', x => getObj().setRowGuides(x))
       addParam(gui_vis, 'flow guides', x => getObj().setFlowGuide(x))
-      addChoiceParam(gui_vis, 'winding', winding_rules)
       addParam(gui_vis, 'interior spotlight', x => getObj().updateLabels(getParams()))
 
       const gui_colors = gui.addFolder('colors and sizes')

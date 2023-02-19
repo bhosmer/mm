@@ -256,14 +256,12 @@ export class Mat {
     this.params = { ...params }
 
     this.data = data
-    this.h = data.h
-    this.w = data.w
+    this.H = data.h
+    this.D = 0
+    this.W = data.w
     this.absmax = this.data.absmax()
-    // this.absmin = this.data.absmin()
 
-    this.points = emptyPoints(this.h, this.w)
-    this.group = new THREE.Group()
-    this.group.add(this.points)
+    this.points = emptyPoints(this.H, this.W)
 
     if (init_vis) {
       this.initVis()
@@ -271,8 +269,8 @@ export class Mat {
   }
 
   initVis(r = undefined, c = undefined, size = undefined, color = undefined) {
-    const [rstart, rend] = toRange(r, this.h)
-    const [cstart, cend] = toRange(c, this.w)
+    const [rstart, rend] = toRange(r, this.H)
+    const [cstart, cend] = toRange(c, this.W)
     size = size || this.sizeFromData.bind(this)
     color = color || this.colorFromData.bind(this)
     for (let i = rstart; i < rend; i++) {
@@ -283,6 +281,21 @@ export class Mat {
         this.checkLabel(i, j, x)
       }
     }
+    // if (r === undefined && c === undefined) {
+    this.setPosition()
+    // }
+  }
+
+  setPosition() {
+    this.inner_group = new THREE.Group()
+    this.inner_group.add(this.points)
+    util.updateProps(this.inner_group.position, { x: 1, y: 1 })
+    this.group = new THREE.Group()
+    this.group.add(this.inner_group)
+    // this.group.position.x = 1
+    // this.group.position.y = 1
+    // util.updateProps(this.group.rotation, { x: Math.PI })
+    // util.updateProps(this.group.position, { x: -(this.W - 1) / 2, y: (this.H - 1) / 2 })
   }
 
   sizeFromData(x) {
@@ -299,7 +312,7 @@ export class Mat {
     const size = zsize + (ELEM_SIZE - zsize) * Math.cbrt(vol)
 
     if (absx > absmax || size < 0 || size > ELEM_SIZE || isNaN(size)) {
-      throw Error(`HEY size ${size} absx ${absx} absmax ${absmax} zsize ${zsize} sens ${local_sens}`)
+      throw Error(`HEY x ${x} size ${size} absx ${absx} absmax ${absmax} zsize ${zsize} sens ${local_sens}`)
     }
 
     return size
@@ -325,6 +338,10 @@ export class Mat {
     return new THREE.Color().setHSL(hue, 1.0, light)
   }
 
+  getAbsmax() {
+    return this.absmax
+  }
+
   getGlobalAbsmax() {
     return this.params.getGlobalAbsmax ? this.params.getGlobalAbsmax() : this.absmax
   }
@@ -338,8 +355,8 @@ export class Mat {
   }
 
   getData(i, j) {
-    if (i >= this.h || j >= this.w) {
-      throw Error(`HEY i ${i} >= this.h ${this.h} || j ${j} >= this.w ${this.w}`)
+    if (i >= this.H || j >= this.W) {
+      throw Error(`HEY i ${i} >= this.H ${this.H} || j ${j} >= this.W ${this.W}`)
     }
     return this.data.get(i, j)
   }
@@ -381,22 +398,25 @@ export class Mat {
   }
 
   setRowGuides(enabled = undefined) {
+    console.log(`HEY Mat.setRowGuides(${enabled}) this.params['row guides'] ${this.params['row guides']} this.row_guide_group ${this.row_guide_group}`)
     enabled = util.syncProp(this.params, 'row guides', enabled)
     if (enabled) {
       if (!this.row_guide_group) {
-        this.row_guide_group = util.rowGuide(this.h, this.w)
-        this.group.add(this.row_guide_group)
+        this.row_guide_group = util.rowGuide(this.H, this.W)
+        this.inner_group.add(this.row_guide_group)
       }
     } else {
       if (this.row_guide_group) {
-        this.group.remove(this.row_guide_group)
+        this.inner_group.remove(this.row_guide_group)
         this.row_guide_group = undefined
       }
     }
   }
 
+  setFlowGuide(enabled) { }
+
   getLegendTextProps() {
-    const sa_geo = Math.cbrt(Math.max(5, this.h) * Math.max(this.w, 5))
+    const sa_geo = Math.cbrt(Math.max(5, this.H) * Math.max(this.W, 5))
     return {
       name_color: 0xccccff,
       name_size: sa_geo / 2,
@@ -408,7 +428,7 @@ export class Mat {
   setLegends(enabled, props) {
     if (enabled) {
       if (this.legends_group) {
-        this.group.remove(this.legends_group)
+        this.inner_group.remove(this.legends_group)
         this.legends_group.clear()
       }
       this.legends_group = new THREE.Group()
@@ -418,35 +438,35 @@ export class Mat {
         const { h, w } = util.bbhw(name.geometry)
         name.geometry.rotateZ(Math.PI)
         name.geometry.rotateY(Math.PI)
-        name.geometry.translate(util.center(this.w - 1, w), h + util.center(this.h - 1, h), -(1 + h / 2))
+        name.geometry.translate(util.center(this.W - 1, w), h + util.center(this.H - 1, h), -(1 + h / 2))
         this.legends_group.add(name)
       }
       if (props.height) {
-        const height = this.params.getText(`${props.height} = ${this.h}`, props.dim_color, props.dim_size)
+        const height = this.params.getText(`${props.height} = ${this.H}`, props.dim_color, props.dim_size)
         const { h, w } = util.bbhw(height.geometry)
         height.geometry.rotateX(Math.PI)
         const zrot = (props.hleft ? -1 : 1) * Math.PI / 2
         height.geometry.rotateZ(zrot)
         const spacer = 0.5
-        const xoff = props.hleft ? -h * 1 - spacer : this.w - 1 + h + spacer
-        const yoff = props.hleft ? w + util.center(this.h - 1, w) : util.center(this.h - 1, w)
+        const xoff = props.hleft ? -h * 1 - spacer : this.W - 1 + h + spacer
+        const yoff = props.hleft ? w + util.center(this.H - 1, w) : util.center(this.H - 1, w)
         height.geometry.translate(xoff, yoff, 0)
         this.legends_group.add(height)
       }
       if (props.width) {
-        const width = this.params.getText(`${props.width} = ${this.w}`, props.dim_color, props.dim_size)
+        const width = this.params.getText(`${props.width} = ${this.W}`, props.dim_color, props.dim_size)
         const { h, w } = util.bbhw(width.geometry)
         width.geometry.rotateX(Math.PI)
         const spacer = 0.5
-        const xoff = util.center(this.w - 1, w)
-        const yoff = props.wtop ? -h * 1 - spacer : this.h - 1 + h * 1.5 + spacer
+        const xoff = util.center(this.W - 1, w)
+        const yoff = props.wtop ? -h * 1 - spacer : this.H - 1 + h * 1.5 + spacer
         width.geometry.translate(xoff, yoff, 0)
         this.legends_group.add(width)
       }
-      this.group.add(this.legends_group)
+      this.inner_group.add(this.legends_group)
     } else {
       if (this.legends_group) {
-        this.group.remove(this.legends_group)
+        this.inner_group.remove(this.legends_group)
         this.legends_group.clear()
         this.legends_group = undefined
       }
@@ -473,7 +493,7 @@ export class Mat {
     if (spotlight == 0) {
       if (this.label_group) {
         this.label_group.clear()
-        this.group.remove(this.label_group)
+        this.inner_group.remove(this.label_group)
         this.label_group = undefined
       }
       return
@@ -481,7 +501,7 @@ export class Mat {
 
     if (!this.label_group) {
       this.label_group = new THREE.Group()
-      this.group.add(this.label_group)
+      this.inner_group.add(this.label_group)
       this.label_cache = []
     } else {
       this.label_group.clear()
@@ -490,8 +510,8 @@ export class Mat {
     this.params.raycaster.params.Points.threshold = spotlight
     this.params.raycaster.intersectObject(this.points).forEach(x => {
       const index = x.index
-      const i = Math.floor(index / this.w)
-      const j = index % this.w
+      const i = Math.floor(index / this.W)
+      const j = index % this.W
       if (!this.isHidden(i, j)) {
         const x = this.getData(i, j)
         if (x != 0) { // declutter
@@ -518,7 +538,7 @@ export class Mat {
 
 export class MatMul {
 
-  constructor(params) {
+  constructor(params, init_vis = true) {
     this.params = { ...params }
     this.group = new THREE.Group()
 
@@ -530,7 +550,9 @@ export class MatMul {
     this.initRight()
     this.initResult()
 
-    this.initVis()
+    if (init_vis) {
+      this.initVis()
+    }
   }
 
   getChildParams() {
@@ -545,15 +567,19 @@ export class MatMul {
       this.left = this.params.extern_left
       return
     }
-    const data = this.params.left_data || (_ => {
-      const init = this.params['left init']
-      const min = this.params['left min']
-      const max = this.params['left max']
-      const sparsity = this.params['left sparsity']
-      const f = getInitFunc(init, min, max, sparsity)
-      return Array2D.fromInit(this.H, this.D, f)
-    })()
-    this.left = new Mat(data, this.getChildParams(), false)
+    if (this.params.left_mm) {
+      this.left = new MatMul(this.params.left_mm, false)
+    } else {
+      const data = this.params.left_data || (_ => {
+        const init = this.params['left init']
+        const min = this.params['left min']
+        const max = this.params['left max']
+        const sparsity = this.params['left sparsity']
+        const f = getInitFunc(init, min, max, sparsity)
+        return Array2D.fromInit(this.H, this.D, f)
+      })()
+      this.left = new Mat(data, this.getChildParams(), false)
+    }
   }
 
   initRight() {
@@ -564,15 +590,19 @@ export class MatMul {
       this.right = this.params.extern_right
       return
     }
-    const data = this.params.right_data || (_ => {
-      const name = this.params['right init']
-      const min = this.params['right min']
-      const max = this.params['right max']
-      const sparsity = this.params['right sparsity']
-      const f = getInitFunc(name, min, max, sparsity)
-      return Array2D.fromInit(this.D, this.W, f)
-    })()
-    this.right = new Mat(data, this.getChildParams(), false)
+    if (this.params.right_mm) {
+      this.right = new MatMul(this.params.right_mm, false)
+    } else {
+      const data = this.params.right_data || (_ => {
+        const name = this.params['right init']
+        const min = this.params['right min']
+        const max = this.params['right max']
+        const sparsity = this.params['right sparsity']
+        const f = getInitFunc(name, min, max, sparsity)
+        return Array2D.fromInit(this.D, this.W, f)
+      })()
+      this.right = new Mat(data, this.getChildParams(), false)
+    }
   }
 
   initResult() {
@@ -589,11 +619,12 @@ export class MatMul {
       minj = 0
     }
     if (maxj === undefined) {
-      maxj = this.left.data.w
+      maxj = this.D
     }
     let x = 0.0
     for (let j = minj; j < maxj; j++) {
-      x += this.left.data.get(i, j) * this.right.data.get(j, k)
+      // x += this.left.data.get(i, j) * this.right.data.get(j, k)
+      x += this.left.getData(i, j) * this.right.getData(j, k)
     }
     if (isNaN(x)) {
       console.log(`HEY dotprod_val(${i}, ${j}, ${minj}, ${maxj}) is NaN`)
@@ -606,6 +637,10 @@ export class MatMul {
             x
   }
 
+  getData(i, j) {
+    return this.result.getData(i, j)
+  }
+
   ijkmul(i, j, k) {
     return this.left.getData(i, j) * this.right.getData(j, k)
   }
@@ -614,6 +649,8 @@ export class MatMul {
     if (params) {
       this.params = { ...params }
     }
+
+    console.log(`HEY MatMul.initVis()`)
 
     this.group.clear()
     this.flow_guide_group = undefined
@@ -626,57 +663,114 @@ export class MatMul {
     this.initAnimation()
     this.setPosition()
     this.updateLabels()
+    this.setRowGuides()
+
+    console.log(`HEY MatMul.initVis() DONE`)
   }
 
   initLeftVis() {
     if (this.params.extern_left) {
       return
     }
+    console.log(`HEY MatMul.initLeftVis()`)
+
     this.left.initVis()
-    if (this.params.winding == 'left hand rule') {
-      this.left.group.position.z = 0
-      this.left.group.rotation.y = Math.PI / 2
-    } else {
-      this.left.group.position.z = this.D - 1
-      this.left.group.rotation.y = -Math.PI / 2
-    }
-    this.left.group.position.x = this.params['left placement'] == 'left' ? -1 : this.W
-    this.left.group.rotation.z = Math.PI
-    this.left.setRowGuides()
-    this.setLeftLegends()
+    const placement = this.getPlacementInfo()
+    // if (this.left.data) {
+    // this.left.group.position.x = ((this.W - 1) / 2 + 1) * placement.left
+    // this.left.group.position.z = (this.D - 1) / 2 * placement.orientation
+    // this.left.group.rotation.y = -Math.PI / 2 * placement.orientation
+    // }
+    // ---
+    // this.left.group.position.y = -1 * placement.orientation
+    // this.left.group.position.z = -this.D * placement.orientation
+    // ---
+    // this.left.group.position.x = -1
+    // this.left.group.position.z = -(this.D - 1) * placement.orientation
+    // ---
+    // l2r
+    // this.left.group.rotation.y = Math.PI / 2
+    // this.left.group.position.y = 1
+    // this.left.group.position.z = this.D
+
+    // from origin
+    this.left.group.rotation.y = -Math.PI / 2
+    // this.left.group.position.y = 1
+    // this.left.group.position.z = 1
+
+
     this.group.add(this.left.group)
+    // TODO push down
+    this.setLeftLegends()
+
+    console.log(`HEY MatMul.initLeftVis() DONE`)
   }
 
   initRightVis() {
     if (this.params.extern_right) {
       return
     }
+    console.log(`HEY MatMul.initRightVis()`)
+
     this.right.initVis()
-    if (this.params.winding == 'left hand rule') {
-      this.right.group.position.z = 0
-      this.right.group.rotation.x = Math.PI / 2
-    } else {
-      this.right.group.position.z = this.D - 1
-      this.right.group.rotation.x = -Math.PI / 2
-    }
-    this.right.group.position.y = this.params['right placement'] == 'top' ? 1 : -this.H
-    this.right.setRowGuides()
-    this.setRightLegends()
+    const placement = this.getPlacementInfo()
+    // this.right.group.position.y = ((this.H - 1) / 2 + 1 + (this.right.D + 1) / 2) * placement.right
+    // this.right.group.position.z = ((this.D - 1) / 2) * placement.orientation
+    // this.right.group.rotation.x = Math.PI / 2 * placement.orientation
+    // ---
+    // this.right.group.position.x = -1 * placement.orientation
+    // this.right.group.position.z = -this.D * placement.orientation
+    // ---
+    // this.right.group.position.y = -1
+    // this.right.group.position.z = -(this.D - 1) * placement.orientation
+    // ---
+    // l2r
+    // this.right.group.rotation.x = -Math.PI / 2
+    // this.right.group.position.x = 1
+    // this.right.group.position.z = this.D
+
+    // from origin
+    this.right.group.rotation.x = Math.PI / 2
+    // this.right.group.position.x = 1
+    // this.right.group.position.z = 1
+
+
     this.group.add(this.right.group)
+    // TODO push down 
+    this.setRightLegends()
+
+    console.log(`HEY MatMul.initRightVis() DONE`)
   }
 
   initResultVis() {
+    console.log(`HEY MatMul.initResultVis()`)
+
     this.result.initVis()
-    this.result.group.position.z = this.params['result placement'] == 'front' ? this.D : -1
-    this.result.group.rotation.x = Math.PI
-    this.result.setRowGuides()
-    this.setResultLegends()
+    const placement = this.getPlacementInfo()
+    // this.result.group.position.z = ((this.D - 1) / 2 + 1) * placement.result
+    // this.result.group.position.x = -1 * placement.orientation
+    // this.result.group.position.y = -1 * placement.orientation
+    // --- 
+    // this.result.group.position.z = -1
+    // --- 
+
+    // from origin
+    // this.result.group.position.x = 1
+    // this.result.group.position.y = 1
     this.group.add(this.result.group)
+    // TODO push down
+    this.setResultLegends()
+
+    console.log(`HEY MatMul.initResultVis() DONE`)
+  }
+
+  getCenter() {
+    return { x: (this.W - 1) / 2, y: (this.H - 1) / 2, z: (this.D - 1) / 2 }
   }
 
   place(params = undefined) {
     if (params) {
-      const props = ['winding', 'left placement', 'right placement', 'result placement']
+      const props = ['edge orientation', 'left placement', 'right placement', 'result placement']
       util.updateProps(this.params, params, props)
     }
     this.initVis()
@@ -698,19 +792,12 @@ export class MatMul {
   }
 
   setPosition() {
-    const pos = this.params.pos ? this.params.pos :
-      new THREE.Vector3(-(this.W - 1) / 2, (this.H - 1) / 2, -(this.D - 1) / 2)
-    this.group.position.x = pos.x
-    this.group.position.y = pos.y
-    this.group.position.z = pos.z
-    const rot = this.params.rot ? this.params.rot : new THREE.Vector3(0, 0, 0)
-    this.group.rotation.x = rot.x
-    this.group.rotation.y = rot.y
-    this.group.rotation.z = rot.z
+    // const pos = { x: -(this.W - 1) / 2, y: (this.H - 1) / 2, z: -(this.D - 1) / 2 }
+    // util.updateProps(this.group.position, pos)
   }
 
   getAbsmax() {
-    return Math.max(this.left.absmax, this.right.absmax, this.result.absmax)
+    return Math.max(this.left.getAbsmax(), this.right.getAbsmax(), this.result.getAbsmax())
   }
 
   getGlobalAbsmax() {
@@ -736,21 +823,30 @@ export class MatMul {
   }
 
   setRowGuides(enabled) {
+    console.log(`HEY MatMul.setRowGuides(${enabled}) this.params['row guides'] ${this.params['row guides']}`)
     enabled = util.syncProp(this.params, 'row guides', enabled)
-    if (!this.params.extern_left) {
-      this.left.setRowGuides(enabled)
-    }
-    if (!this.params.extern_right) {
-      this.right.setRowGuides(enabled)
-    }
+
+    console.log(`HEY this.left.setRowGuides(${enabled})`)
+    this.left.setRowGuides(enabled)
+    console.log(`HEY this.left.setRowGuides(${enabled}) DONE`)
+
+    console.log(`HEY this.right.setRowGuides(${enabled})`)
+    this.right.setRowGuides(enabled)
+    console.log(`HEY this.right.setRowGuides(${enabled}) DONE`)
+
+    console.log(`HEY this.result.setRowGuides(${enabled})`)
     this.result.setRowGuides(enabled)
+    console.log(`HEY this.result.setRowGuides(${enabled}) DONE`)
+
+    console.log(`HEY MatMul.setRowGuides(${enabled}) DONE`)
   }
 
   getPlacementInfo() {
     return {
-      left: this.params['left placement'] == 'right',
-      right: this.params['right placement'] == 'top',
-      result: this.params['result placement'] == 'front'
+      left: this.params['left placement'] == 'right' ? 1 : -1,
+      right: this.params['right placement'] == 'top' ? 1 : -1,
+      result: this.params['result placement'] == 'front' ? 1 : -1,
+      orientation: this.params['edge orientation'] == 'right to left' ? 1 : -1
     }
   }
 
@@ -767,6 +863,8 @@ export class MatMul {
         this.flow_guide_group = undefined
       }
     }
+    this.left.setFlowGuide(enabled)
+    this.right.setFlowGuide(enabled)
   }
 
   setLeftLegends() {
@@ -1121,9 +1219,7 @@ export class MatMul {
       }
 
       // update intermediates
-      // util.updateProps(vvpgroup.position, { x: curk, z: curj })
       this.grid('ijk', ({ start: i }, { start: j, extent: jx }, { start: k, extent: kx }) => {
-        // const vvp = vvps[i * nj * nk + j * nk + k]
         const vvp = vvps[[i, j, k]]
         if (curj < jx && curk < kx) {
           util.updateProps(vvp.group.position, { x: k + curk, z: j + curj })

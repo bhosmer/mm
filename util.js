@@ -64,7 +64,7 @@ export function axes() {
 }
 
 // row guide lines
-export function rowGuide(h, w, trunc = true, rdenom = 16, cdenom = 16) {
+export function rowGuide(h, w, trunc = true, rdenom = 8, cdenom = 32) {
   const rstride = trunc ? Math.max(1, Math.floor(h / rdenom)) : h / rdenom
   const cstride = trunc ? Math.max(1, Math.floor(w / cdenom)) : w / cdenom
   const n = h * w
@@ -75,7 +75,8 @@ export function rowGuide(h, w, trunc = true, rdenom = 16, cdenom = 16) {
   const draw = (i0, j0, i1, j1) => {
     const start = new THREE.Vector3(j0, i0, 0);
     const end = new THREE.Vector3(j1, i1, 0);
-    color.setScalar((h - i0) * (w - j0) / n)
+    const dist = i0 * j0 / n
+    color.setHSL(1.0, 0.0, 1.0 - Math.sqrt(dist) / 2)
     group.add(lineSeg(start, end, color))
   }
 
@@ -95,94 +96,61 @@ export function rowGuide(h, w, trunc = true, rdenom = 16, cdenom = 16) {
 
 // https://threejs.org/examples/#webgl_buffergeometry_rawshader
 const MMGUIDE_MATERIAL = new THREE.RawShaderMaterial({
-  uniforms: {
-    time: { value: 1.0 }
-  },
-
   vertexShader: `
   precision mediump float;
   precision mediump int;
-
   uniform mat4 modelViewMatrix; // optional
   uniform mat4 projectionMatrix; // optional
-
   attribute vec3 position;
   attribute vec4 color;
-
   varying vec3 vPosition;
   varying vec4 vColor;
-
   void main()	{
-
     vPosition = position;
     vColor = color;
-
     gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
-
   }`,
-
   fragmentShader: `
   precision mediump float;
   precision mediump int;
-
-  uniform float time;
-
   varying vec3 vPosition;
   varying vec4 vColor;
-
   void main()	{
-
     vec4 color = vec4( vColor );
-    color.r += sin( (vPosition.x + time) * 0.03 ) * 0.5;
-
     gl_FragColor = color;
-
   }`,
-
   side: THREE.DoubleSide,
   transparent: true
 });
 
-export function flowGuide(h, d, w, placement) {
-  const dir = mapProps(placement, b => b ? 1 : -1)
-
-  const colors = [
-    179, 127, 199, 50,
-    21, 138, 192, 163,
-    134, 156, 249, 107,
-  ]
-  const color_attr = new THREE.Uint8BufferAttribute(colors, 4)
-  color_attr.normalized = true
-
+export function flowGuide(h, d, w) {
   const group = new THREE.Group()
 
-  const left_positions = [
-    dir.left * w / 2, 0.0, -0.190983005625 * d,
-    dir.left * w / 2, 0.0, 0.190983005625 * d,
-    0.0, 0.0, dir.result * 0.5 * d,
-  ]
+  const color_attr = new THREE.Uint8BufferAttribute([
+    128, 160, 200, 132,
+    128, 165, 200, 132,
+    128, 170, 255, 255,
+  ], 4)
+  color_attr.normalized = true
 
   const left_geometry = new THREE.BufferGeometry()
-  left_geometry.setAttribute('position', new THREE.Float32BufferAttribute(left_positions, 3))
+  left_geometry.setAttribute('position', new THREE.Float32BufferAttribute([
+    h / 3, (h + 1) / 2, (d + 1) / 2,
+    w / 2, (h + 1) / 2, (d + 1) / 2,
+    w / 2, (h + 1) / 2, 1,
+  ], 3))
   left_geometry.setAttribute('color', color_attr)
-  const left = new THREE.Mesh(left_geometry, MMGUIDE_MATERIAL)
-  group.add(left);
-
-  const right_positions = [
-    0.190983005625 * h, dir.right * h / 2, 0.0,
-    -0.190983005625 * h, dir.right * h / 2, 0.0,
-    0.0, 0.0, dir.result * 0.5 * d,
-  ]
+  group.add(new THREE.Mesh(left_geometry, MMGUIDE_MATERIAL));
 
   const right_geometry = new THREE.BufferGeometry()
-  right_geometry.setAttribute('position', new THREE.Float32BufferAttribute(right_positions, 3))
+  right_geometry.setAttribute('position', new THREE.Float32BufferAttribute([
+    (w + 1) / 2, h / 3, (d + 1) / 2,
+    (w + 1) / 2, h / 2, (d + 1) / 2,
+    (w + 1) / 2, h / 2, 1,
+  ], 3))
   right_geometry.setAttribute('color', color_attr)
-  const right = new THREE.Mesh(right_geometry, MMGUIDE_MATERIAL)
-  group.add(right);
+  group.add(new THREE.Mesh(right_geometry, MMGUIDE_MATERIAL));
 
-  group.position.x = center(w - 1)
-  group.position.y = -center(h - 1)
-  group.position.z = center(d - 1)
   return group
 }
 
@@ -207,14 +175,12 @@ export function locate(y, x) {
 // misc object utils
 //
 
-export function updateProps(obj, donor, props = undefined) {
-  props = props || Object.keys(donor)
-  props.map(k => obj[k] = donor[k])
-  // Object.entries(donor).map(([k, v]) => obj[k] = v)
+export function updateProps(obj, donor) {
+  Object.entries(donor).map(([k, v]) => obj[k] = v)
 }
 
 export function syncProp(obj, k, v) {
-  if (v == undefined) {
+  if (v === undefined) {
     return obj[k]
   }
   obj[k] = v
