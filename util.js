@@ -76,7 +76,7 @@ export function rowGuide(h, w, trunc = true, rdenom = 8, cdenom = 32) {
     const start = new THREE.Vector3(j0, i0, 0);
     const end = new THREE.Vector3(j1, i1, 0);
     const dist = i0 * j0 / n
-    color.setHSL(1.0, 0.0, 1.0 - Math.sqrt(dist) / 2)
+    color.setHSL(1.0, 0.0, (1.0 - dist) ** 2)
     group.add(lineSeg(start, end, color))
   }
 

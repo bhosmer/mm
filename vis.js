@@ -516,7 +516,7 @@ export class Mat {
         if (x != 0) { // declutter
           let label = this.label_cache[index]
           if (!label) {
-            const fsiz = 0.175 - Math.log(1 + x / 10000)
+            const fsiz = 0.16 - 0.01 * Math.log10(Math.floor(1 + Math.abs(x)))
             label = this.params.getText(`${x.toFixed(4)}`, 0xffffff, fsiz)
             label.value = x
             label.geometry.rotateX(Math.PI)
@@ -554,8 +554,9 @@ export class MatMul {
     }
   }
 
-  getChildParams() {
-    return { ...this.params, getGlobalAbsmax: this.getGlobalAbsmax.bind(this) }
+  getChildParams(params = undefined) {
+    params = params || this.params
+    return { ...params, getGlobalAbsmax: this.getGlobalAbsmax.bind(this) }
   }
 
   initLeft() {
@@ -567,7 +568,7 @@ export class MatMul {
       return
     }
     if (this.params.left_mm) {
-      this.left = new MatMul(this.params.left_mm, false)
+      this.left = new MatMul(this.getChildParams(this.params.left_mm), false)
     } else {
       const data = this.params.left_data || (_ => {
         const init = this.params['left init']
@@ -590,7 +591,7 @@ export class MatMul {
       return
     }
     if (this.params.right_mm) {
-      this.right = new MatMul(this.params.right_mm, false)
+      this.right = new MatMul(this.getChildParams(this.params.right_mm), false)
     } else {
       const data = this.params.right_data || (_ => {
         const name = this.params['right init']
