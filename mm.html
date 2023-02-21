@@ -188,20 +188,53 @@
           scene.remove(obj.group)
         }
 
+        // L @ R
         // obj = new vis.MatMul(getParams())
 
-        const left_mm = { ...getParams(), 'left name': "LL", 'right name': "LR", 'result name': "L" }
-        // obj = new vis.MatMul({ ...getParams(), left_mm })
+        // (LL @ LR) @ R
+        // const l = { ...getParams(), 'left name': "LL", 'right name': "LR", 'result name': "L" }
+        // obj = new vis.MatMul({ ...getParams(), left_mm: l })
 
-        const right_mm = { ...getParams(), 'left name': "RL", 'right name': "RR", 'result name': "R" }
-        // obj = new vis.MatMul({ ...getParams(), right_mm })
+        // L @ (RL @ RR)
+        // const r = { ...getParams(), 'left name': "RL", 'right name': "RR", 'result name': "R" }
+        // obj = new vis.MatMul({ ...getParams(), right_mm: r })
 
-        obj = new vis.MatMul({ ...getParams(), left_mm, right_mm })
+        // ((LLL @ LLR) @ LR) @ R
+        // const ll = { ...getParams(), 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
+        // const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", 'result name': "L" }
+        // obj = new vis.MatMul({ ...getParams(), left_mm: l })
 
-        // obj.group.rotation.x = Math.PI
+        // (LL @ (LRL @ LRR)) @ R
+        // const lr = { ...getParams(), 'left name': "LRL", 'right name': "LRR", 'result name': "LR" }
+        // const l = { ...getParams(), right_mm: lr, 'left name': "LL", 'right name': "LR", 'result name': "L" }
+        // obj = new vis.MatMul({ ...getParams(), left_mm: l })
 
-        // const { x, y, z } = obj.getCenter()
-        // util.updateProps(obj.group.position, { x: -x, y, z })
+        // ((LLL @ LLR) @ (LRL @ LRR)) @ R
+        // const ll = { ...getParams(), 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
+        // const lr = { ...getParams(), 'left name': "LRL", 'right name': "LRR", 'result name': "LR" }
+        // const l = { ...getParams(), left_mm: ll, right_mm: lr, 'left name': "LL", 'right name': "LR", 'result name': "L" }
+        // obj = new vis.MatMul({ ...getParams(), left_mm: l })
+
+        // (((in @ wQ) @ (wK.t @ in.t)) @ (in @ wV)) @ wO
+        const q = { ...getParams(), 'left name': "in", 'right name': "wQ", 'result name': "Q" }
+        const kt = { ...getParams(), 'left name': "wK.t", 'right name': "in.t", 'result name': "K.t" }
+        const attn = { ...getParams(), left_mm: q, right_mm: kt, 'left name': "Q", 'right name': "Kt", 'result name': "attn" }
+        const v = { ...getParams(), 'left name': "in", 'right name': "wV", 'result name': "V" }
+        const out = { ...getParams(), left_mm: attn, right_mm: v, 'left name': "attn", 'right name': "V", 'result name': "out" }
+        obj = new vis.MatMul({ ...getParams(), left_mm: out, 'right name': 'wO', 'result name': 'out2' })
+
+        // L @ (RL @ RR)
+        // const r = { ...getParams(), 'left name': "RL", 'right name': "RR", 'result name': "R" }
+        // obj = new vis.MatMul({ ...getParams(), right_mm: r })
+
+        // (LL @ LR) @ (RL @ RR)
+        // const l = { ...getParams(), 'left name': "LL", 'right name': "LR", 'result name': "L" }
+        // const r = { ...getParams(), 'left name': "RL", 'right name': "RR", 'result name': "R" }
+        // obj = new vis.MatMul({ ...getParams(), left_mm: l, right_mm: r })
+
+        // need this
+        obj.group.rotation.x = Math.PI
+
         scene.add(obj.group)
       }
       initObj()

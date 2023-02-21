@@ -123,7 +123,7 @@ const MMGUIDE_MATERIAL = new THREE.RawShaderMaterial({
   transparent: true
 });
 
-export function flowGuide(h, d, w) {
+export function flowGuide(h, d, w, placement) {
   const group = new THREE.Group()
 
   const color_attr = new THREE.Uint8BufferAttribute([
@@ -133,20 +133,24 @@ export function flowGuide(h, d, w) {
   ], 4)
   color_attr.normalized = true
 
+  const place = (n, p, x) => p == 1 ? x : n - x
+  const place_left = x => place(w + 1, placement.left, x)
+  const place_right = x => place(h + 1, placement.right, x)
+
   const left_geometry = new THREE.BufferGeometry()
   left_geometry.setAttribute('position', new THREE.Float32BufferAttribute([
-    h / 3, (h + 1) / 2, (d + 1) / 2,
-    w / 2, (h + 1) / 2, (d + 1) / 2,
-    w / 2, (h + 1) / 2, 1,
+    place_left(w / 3), (h + 1) / 2, (d + 1) / 2,
+    place_left(w / 2), (h + 1) / 2, (d + 1) / 2,
+    place_left(w / 2), (h + 1) / 2, 1,
   ], 3))
   left_geometry.setAttribute('color', color_attr)
   group.add(new THREE.Mesh(left_geometry, MMGUIDE_MATERIAL));
 
   const right_geometry = new THREE.BufferGeometry()
   right_geometry.setAttribute('position', new THREE.Float32BufferAttribute([
-    (w + 1) / 2, h / 3, (d + 1) / 2,
-    (w + 1) / 2, h / 2, (d + 1) / 2,
-    (w + 1) / 2, h / 2, 1,
+    (w + 1) / 2, place_right(h / 3), (d + 1) / 2,
+    (w + 1) / 2, place_right(h / 2), (d + 1) / 2,
+    (w + 1) / 2, place_right(h / 2), 1,
   ], 3))
   right_geometry.setAttribute('color', color_attr)
   group.add(new THREE.Mesh(right_geometry, MMGUIDE_MATERIAL));

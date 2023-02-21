@@ -398,7 +398,6 @@ export class Mat {
   }
 
   setRowGuides(enabled = undefined) {
-    console.log(`HEY Mat.setRowGuides(${enabled}) this.params['row guides'] ${this.params['row guides']} this.row_guide_group ${this.row_guide_group}`)
     enabled = util.syncProp(this.params, 'row guides', enabled)
     if (enabled) {
       if (!this.row_guide_group) {
@@ -650,8 +649,6 @@ export class MatMul {
       this.params = { ...params }
     }
 
-    console.log(`HEY MatMul.initVis()`)
-
     this.group.clear()
     this.flow_guide_group = undefined
 
@@ -664,18 +661,23 @@ export class MatMul {
     this.setPosition()
     this.updateLabels()
     this.setRowGuides()
-
-    console.log(`HEY MatMul.initVis() DONE`)
   }
 
   initLeftVis() {
     if (this.params.extern_left) {
       return
     }
-    console.log(`HEY MatMul.initLeftVis()`)
 
+    if (this.params['left placement'] == 'left') {
+      this.left.params['left placement'] = 'right'
+      this.left.params['right placement'] = 'bottom'
+    }
+    // if (this.params['right placement'] == 'top') {
+    //   this.left.params['right placement'] = 'bottom'
+    // }
     this.left.initVis()
-    const placement = this.getPlacementInfo()
+
+    // const placement = this.getPlacementInfo()
     // if (this.left.data) {
     // this.left.group.position.x = ((this.W - 1) / 2 + 1) * placement.left
     // this.left.group.position.z = (this.D - 1) / 2 * placement.orientation
@@ -693,27 +695,32 @@ export class MatMul {
     // this.left.group.position.y = 1
     // this.left.group.position.z = this.D
 
-    // from origin
-    this.left.group.rotation.y = -Math.PI / 2
-    // this.left.group.position.y = 1
-    // this.left.group.position.z = 1
-
+    if (this.params['left placement'] == 'right') {
+      this.left.group.position.x = this.W + 1
+      this.left.group.position.z = this.D + 1
+      this.left.group.rotation.y = Math.PI / 2
+    } else {
+      this.left.group.rotation.y = -Math.PI / 2
+    }
 
     this.group.add(this.left.group)
+
     // TODO push down
     this.setLeftLegends()
-
-    console.log(`HEY MatMul.initLeftVis() DONE`)
   }
 
   initRightVis() {
     if (this.params.extern_right) {
       return
     }
-    console.log(`HEY MatMul.initRightVis()`)
+
+    if (this.params['right placement'] == 'top') {
+      this.right.params['left placement'] = 'right'
+      this.right.params['right placement'] = 'bottom'
+    }
 
     this.right.initVis()
-    const placement = this.getPlacementInfo()
+    // const placement = this.getPlacementInfo()
     // this.right.group.position.y = ((this.H - 1) / 2 + 1 + (this.right.D + 1) / 2) * placement.right
     // this.right.group.position.z = ((this.D - 1) / 2) * placement.orientation
     // this.right.group.rotation.x = Math.PI / 2 * placement.orientation
@@ -729,24 +736,23 @@ export class MatMul {
     // this.right.group.position.x = 1
     // this.right.group.position.z = this.D
 
-    // from origin
-    this.right.group.rotation.x = Math.PI / 2
-    // this.right.group.position.x = 1
-    // this.right.group.position.z = 1
-
+    if (this.params['right placement'] == 'bottom') {
+      this.right.group.position.y = this.H + 1
+      this.right.group.position.z = this.D + 1
+      this.right.group.rotation.x = -Math.PI / 2
+    } else {
+      this.right.group.rotation.x = Math.PI / 2
+    }
 
     this.group.add(this.right.group)
+
     // TODO push down 
     this.setRightLegends()
-
-    console.log(`HEY MatMul.initRightVis() DONE`)
   }
 
   initResultVis() {
-    console.log(`HEY MatMul.initResultVis()`)
-
     this.result.initVis()
-    const placement = this.getPlacementInfo()
+    // const placement = this.getPlacementInfo()
     // this.result.group.position.z = ((this.D - 1) / 2 + 1) * placement.result
     // this.result.group.position.x = -1 * placement.orientation
     // this.result.group.position.y = -1 * placement.orientation
@@ -754,14 +760,10 @@ export class MatMul {
     // this.result.group.position.z = -1
     // --- 
 
-    // from origin
-    // this.result.group.position.x = 1
-    // this.result.group.position.y = 1
     this.group.add(this.result.group)
+
     // TODO push down
     this.setResultLegends()
-
-    console.log(`HEY MatMul.initResultVis() DONE`)
   }
 
   getCenter() {
@@ -823,27 +825,15 @@ export class MatMul {
   }
 
   setRowGuides(enabled) {
-    console.log(`HEY MatMul.setRowGuides(${enabled}) this.params['row guides'] ${this.params['row guides']}`)
     enabled = util.syncProp(this.params, 'row guides', enabled)
-
-    console.log(`HEY this.left.setRowGuides(${enabled})`)
     this.left.setRowGuides(enabled)
-    console.log(`HEY this.left.setRowGuides(${enabled}) DONE`)
-
-    console.log(`HEY this.right.setRowGuides(${enabled})`)
     this.right.setRowGuides(enabled)
-    console.log(`HEY this.right.setRowGuides(${enabled}) DONE`)
-
-    console.log(`HEY this.result.setRowGuides(${enabled})`)
     this.result.setRowGuides(enabled)
-    console.log(`HEY this.result.setRowGuides(${enabled}) DONE`)
-
-    console.log(`HEY MatMul.setRowGuides(${enabled}) DONE`)
   }
 
   getPlacementInfo() {
     return {
-      left: this.params['left placement'] == 'right' ? 1 : -1,
+      left: this.params['left placement'] == 'left' ? 1 : -1,
       right: this.params['right placement'] == 'top' ? 1 : -1,
       result: this.params['result placement'] == 'front' ? 1 : -1,
       orientation: this.params['edge orientation'] == 'right to left' ? 1 : -1
