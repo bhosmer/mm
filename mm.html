@@ -209,24 +209,29 @@
         // const l = { ...getParams(), right_mm: lr, 'left name': "LL", 'right name': "LR", 'result name': "L" }
         // obj = new vis.MatMul({ ...getParams(), left_mm: l })
 
-        // (LL @ LR) @ (RL @ RR)
-        const l = { ...getParams(), 'left name': "LL", 'right name': "LR", 'result name': "L" }
-        const r = { ...getParams(), 'left name': "RL", 'right name': "RR", 'result name': "R" }
-        obj = new vis.MatMul({ ...getParams(), left_mm: l, right_mm: r })
-
         // ((LLL @ LLR) @ (LRL @ LRR)) @ R
         // const ll = { ...getParams(), 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
         // const lr = { ...getParams(), 'left name': "LRL", 'right name': "LRR", 'result name': "LR" }
         // const l = { ...getParams(), left_mm: ll, right_mm: lr, 'left name': "LL", 'right name': "LR", 'result name': "L" }
         // obj = new vis.MatMul({ ...getParams(), left_mm: l })
 
-        // (((in @ wQ) @ (wK.t @ in.t)) @ (in @ wV)) @ wO
-        // const q = { ...getParams(), 'left name': "in", 'right name': "wQ", 'result name': "Q" }
-        // const kt = { ...getParams(), 'left name': "wK.t", 'right name': "in.t", 'result name': "K.t" }
-        // const attn = { ...getParams(), left_mm: q, right_mm: kt, 'left name': "Q", 'right name': "Kt", 'result name': "attn" }
-        // const v = { ...getParams(), 'left name': "in", 'right name': "wV", 'result name': "V" }
-        // const out = { ...getParams(), left_mm: attn, right_mm: v, 'left name': "attn", 'right name': "V", 'result name': "out" }
-        // obj = new vis.MatMul({ ...getParams(), left_mm: out, 'right name': 'wO', 'result name': 'out2' })
+        // mha
+        // (in @ wQ) @ (wK.t @ in.t) @ (in @ wV) @ wO
+        // const q = { ...getParams(), I: 64, J: 128, K: 32, 'left name': "in", 'right name': "wQ", 'result name': "Q" }
+        // const kt = { ...getParams(), I: 32, J: 128, K: 64, 'left name': "wK.t", 'right name': "in.t", 'result name': "K.t" }
+        // const attn = { ...getParams(), I: 64, J: 32, K: 64, left_mm: q, right_mm: kt, 'left name': "Q", 'right name': "Kt", 'result name': "attn" }
+        // const v = { ...getParams(), I: 64, J: 128, K: 32, 'left name': "in", 'right name': "wV", 'result name': "V" }
+        // const out = { ...getParams(), I: 64, J: 64, K: 32, left_mm: attn, right_mm: v, 'left name': "attn", 'right name': "V", 'result name': "out" }
+        // obj = new vis.MatMul({ ...getParams(), I: 64, J: 32, K: 128, left_mm: out, 'right name': 'wO', 'result name': 'out2' })
+
+        // mhs reassociated (worse)
+        // (in @ wQ) @ (wK.t @ in.t) @ ((in @ wV) @ wO)
+        // const q = { ...getParams(), I: 64, J: 128, K: 32, 'left name': "in", 'right name': "wQ", 'result name': "Q" }
+        // const kt = { ...getParams(), I: 32, J: 128, K: 64, 'left name': "wK.t", 'right name': "in.t", 'result name': "K.t" }
+        // const attn = { ...getParams(), I: 64, J: 32, K: 64, left_mm: q, right_mm: kt, 'left name': "Q", 'right name': "Kt", 'result name': "attn" }
+        // const v = { ...getParams(), I: 64, J: 128, K: 32, 'left name': "in", 'right name': "wV", 'result name': "V" }
+        // const out = { ...getParams(), I: 64, J: 32, K: 128, left_mm: v, 'right name': "wO", 'result name': "out" }
+        // obj = new vis.MatMul({ ...getParams(), I: 64, J: 64, K: 128, left_mm: attn, right_mm: out, 'result name': 'out2' })
 
         // (((LLLL @ LLLR) @ LLR) @ LR) @ R
         // const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", 'result name': "LLL" }
@@ -268,6 +273,23 @@
         // const rr = { ...getParams(), right_mm: rrr, 'left name': "RRL", 'right name': "RRR", 'result name': "RR" }
         // const r = { ...getParams(), left_mm: rl, right_mm: rr, 'left name': "RL", 'right name': "RR", 'result name': "R" }
         // obj = new vis.MatMul({ ...getParams(), left_mm: l, right_mm: r })
+
+        // --- both sides at every level ---
+        // (LL @ LR) @ (RL @ RR)
+        // const l = { ...getParams(), 'left name': "LL", 'right name': "LR", 'result name': "L" }
+        // const r = { ...getParams(), 'left name': "RL", 'right name': "RR", 'result name': "R" }
+        // obj = new vis.MatMul({ ...getParams(), left_mm: l, right_mm: r })
+
+        // ((LLL @ LLR) @ (LRL @ LRR)) @ ((RLL @ RLR) @ (RRL @ RRR))
+        const ll = { ...getParams(), 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
+        const lr = { ...getParams(), 'left name': "LRL", 'right name': "LRR", 'result name': "LR" }
+        const l = { ...getParams(), left_mm: ll, right_mm: lr, 'result name': "L" }
+        const rl = { ...getParams(), 'left name': "RLL", 'right name': "RLR", 'result name': "RL" }
+        const rr = { ...getParams(), 'left name': "RRL", 'right name': "RRR", 'result name': "RR" }
+        const r = { ...getParams(), left_mm: rl, right_mm: rr, 'result name': "R" }
+        obj = new vis.MatMul({ ...getParams(), left_mm: l, right_mm: r })
+
+
 
         // need this
         obj.group.rotation.x = Math.PI
