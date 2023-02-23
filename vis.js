@@ -619,7 +619,7 @@ export class MatMul {
       x += this.left.getData(i, j) * this.right.getData(j, k)
     }
     if (isNaN(x)) {
-      console.log(`HEY dotprod_val(${i}, ${j}, ${minj}, ${maxj}) is NaN`)
+      console.log(`HEY dotprod_val(${i}, ${k}, ${minj}, ${maxj}) is NaN`)
     }
     const epi = this.params.epilog
     return epi == 'x/J' ? x / this.D :
@@ -654,34 +654,25 @@ export class MatMul {
     }
 
     // nice layout 
-    // if (this.params['right placement'] == 'top') {
-    //   this.right.params['left placement'] = 'right'
-    //   this.right.params['right placement'] = 'bottom'
-    // }
-
-    // spacious layout
-    if (this.params.right_mm) {
-      if (this.params['right placement'] == 'top') {
-        this.left.params['right placement'] = 'bottom'
-        // console.log(`HEY ${this.params['result name']} right placement == top, setting left ${this.leftName()}'s right placement to bottom`)
-
-        this.right.params['left placement'] = 'right'
-
-        // decollide #2
-        // this.right.params['right placement'] = 'bottom'
-        // this.right.params['right placement'] = 'top'
-      }
-      if (this.params['left placement'] == 'right') {
-        this.right.params['right placement'] = 'bottom'
-        this.right.params['left placement'] = 'left'
-      }
-      if (this.params['right placement'] == 'bottom') {
-        // this.right.params['left placement'] = 'right'
-        // this.right.params['right placement'] = 'top'
-        this.right.params['right placement'] = 'top'
-      }
+    if (this.params['right placement'] == 'top') {
+      this.right.params['left placement'] = 'right'
+      this.right.params['right placement'] = 'bottom'
     }
 
+    // spacious layout
+    // if (this.params.right_mm) {
+    //   if (this.params['right placement'] == 'top') {
+    //     this.left.params['right placement'] = 'bottom'
+    //     this.right.params['left placement'] = 'right'
+    //   }
+    //   if (this.params['left placement'] == 'right') {
+    //     this.right.params['right placement'] = 'bottom'
+    //     this.right.params['left placement'] = 'left'
+    //   }
+    //   if (this.params['right placement'] == 'bottom') {
+    //     this.right.params['right placement'] = 'top'
+    //   }
+    // }
 
     this.initLeftVis()
     this.initRightVis()
@@ -703,26 +694,7 @@ export class MatMul {
   }
 
   initLeftVis() {
-    // console.log(`HEY ${this.params['result name']} initLeftVis left ${this.leftName()}`)
     this.left.initVis()
-
-    // const placement = this.getPlacementInfo()
-    // if (this.left.data) {
-    // this.left.group.position.x = ((this.W - 1) / 2 + 1) * placement.left
-    // this.left.group.position.z = (this.D - 1) / 2 * placement.orientation
-    // this.left.group.rotation.y = -Math.PI / 2 * placement.orientation
-    // }
-    // ---
-    // this.left.group.position.y = -1 * placement.orientation
-    // this.left.group.position.z = -this.D * placement.orientation
-    // ---
-    // this.left.group.position.x = -1
-    // this.left.group.position.z = -(this.D - 1) * placement.orientation
-    // ---
-    // l2r
-    // this.left.group.rotation.y = Math.PI / 2
-    // this.left.group.position.y = 1
-    // this.left.group.position.z = this.D
 
     if (this.params['left placement'] == 'right') {
       this.left.group.position.x = this.W + 1
@@ -739,23 +711,7 @@ export class MatMul {
   }
 
   initRightVis() {
-    // console.log(`HEY ${this.params['result name']} initRightVis right ${this.rightName()}`)
     this.right.initVis()
-    // const placement = this.getPlacementInfo()
-    // this.right.group.position.y = ((this.H - 1) / 2 + 1 + (this.right.D + 1) / 2) * placement.right
-    // this.right.group.position.z = ((this.D - 1) / 2) * placement.orientation
-    // this.right.group.rotation.x = Math.PI / 2 * placement.orientation
-    // ---
-    // this.right.group.position.x = -1 * placement.orientation
-    // this.right.group.position.z = -this.D * placement.orientation
-    // ---
-    // this.right.group.position.y = -1
-    // this.right.group.position.z = -(this.D - 1) * placement.orientation
-    // ---
-    // l2r
-    // this.right.group.rotation.x = -Math.PI / 2
-    // this.right.group.position.x = 1
-    // this.right.group.position.z = this.D
 
     if (this.params['right placement'] == 'bottom') {
       this.right.group.position.y = this.H + 1
@@ -773,14 +729,6 @@ export class MatMul {
 
   initResultVis() {
     this.result.initVis()
-    // const placement = this.getPlacementInfo()
-    // this.result.group.position.z = ((this.D - 1) / 2 + 1) * placement.result
-    // this.result.group.position.x = -1 * placement.orientation
-    // this.result.group.position.y = -1 * placement.orientation
-    // --- 
-    // this.result.group.position.z = -1
-    // --- 
-
     this.group.add(this.result.group)
 
     // TODO push down

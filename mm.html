@@ -335,6 +335,25 @@
         // const r = { ...getParams(), 'left name': "RL", right_mm: rr, 'result name': "R" }
         // obj = new vis.MatMul({ ...getParams(), left_mm: l, right_mm: r })
 
+        const fix_shape = params => {
+          const f = (p, i, j, k) => {
+            if (j === undefined) {
+              j = p.J
+            }
+            if (p.left_mm) {
+              f(p.left_mm, i, undefined, j)
+            }
+            if (p.right_mm) {
+              f(p.right_mm, j, undefined, k)
+            }
+            p.I = i
+            p.J = j
+            p.K = k
+          }
+          f(params, params.I, params.J, params.K)
+          return params
+        }
+
         // ((LLL @ LLR) @ (LRL @ LRR)) @ ((RLL @ RLR) @ (RRL @ RRR))
         // symmetrical, one level back from collision, i.e. this is
         // the deepest symmetrical tree we can lay out the nice way without collisions
@@ -344,7 +363,7 @@
         const rl = { ...getParams(), 'left name': "RLL", 'right name': "RLR", 'result name': "RL" }
         const rr = { ...getParams(), 'left name': "RRL", 'right name': "RRR", 'result name': "RR" }
         const r = { ...getParams(), left_mm: rl, right_mm: rr, 'result name': "R" }
-        obj = new vis.MatMul({ ...getParams(), left_mm: l, right_mm: r })
+        obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
 
         // TODO FIX
         // (((LLLL @ LLLR) @ (LLRL @ LLRR)) @ ((LRLL @ LRLR) @ (LRRL @ LRRR))) @ 
