@@ -563,10 +563,6 @@ export class MatMul {
     if (this.left) {
       this.group.remove(this.left.group)
     }
-    if (this.params.extern_left) {
-      this.left = this.params.extern_left
-      return
-    }
     if (this.params.left_mm) {
       this.left = new MatMul(this.getChildParams(this.params.left_mm), false)
     } else {
@@ -585,10 +581,6 @@ export class MatMul {
   initRight() {
     if (this.right) {
       this.group.remove(this.right.group)
-    }
-    if (this.params.extern_right) {
-      this.right = this.params.extern_right
-      return
     }
     if (this.params.right_mm) {
       this.right = new MatMul(this.getChildParams(this.params.right_mm), false)
@@ -653,6 +645,44 @@ export class MatMul {
     this.group.clear()
     this.flow_guide_group = undefined
 
+    // used in both layouts
+    if (this.params.left_mm) {
+      if (this.params['left placement'] == 'left') {
+        this.left.params['left placement'] = 'right'
+        this.left.params['right placement'] = 'bottom'
+      }
+    }
+
+    // nice layout 
+    // if (this.params['right placement'] == 'top') {
+    //   this.right.params['left placement'] = 'right'
+    //   this.right.params['right placement'] = 'bottom'
+    // }
+
+    // spacious layout
+    if (this.params.right_mm) {
+      if (this.params['right placement'] == 'top') {
+        this.left.params['right placement'] = 'bottom'
+        // console.log(`HEY ${this.params['result name']} right placement == top, setting left ${this.leftName()}'s right placement to bottom`)
+
+        this.right.params['left placement'] = 'right'
+
+        // decollide #2
+        // this.right.params['right placement'] = 'bottom'
+        // this.right.params['right placement'] = 'top'
+      }
+      if (this.params['left placement'] == 'right') {
+        this.right.params['right placement'] = 'bottom'
+        this.right.params['left placement'] = 'left'
+      }
+      if (this.params['right placement'] == 'bottom') {
+        // this.right.params['left placement'] = 'right'
+        // this.right.params['right placement'] = 'top'
+        this.right.params['right placement'] = 'top'
+      }
+    }
+
+
     this.initLeftVis()
     this.initRightVis()
     this.initResultVis()
@@ -664,18 +694,16 @@ export class MatMul {
     this.setRowGuides()
   }
 
-  initLeftVis() {
-    if (this.params.extern_left) {
-      return
-    }
+  leftName() {
+    return this.params.left_mm ? this.left.params['result name'] : this.params['left name']
+  }
 
-    if (this.params['left placement'] == 'left') {
-      this.left.params['left placement'] = 'right'
-      this.left.params['right placement'] = 'bottom'
-    }
-    // if (this.params['right placement'] == 'top') {
-    //   this.left.params['right placement'] = 'bottom'
-    // }
+  rightName() {
+    return this.params.right_mm ? this.right.params['result name'] : this.params['right name']
+  }
+
+  initLeftVis() {
+    // console.log(`HEY ${this.params['result name']} initLeftVis left ${this.leftName()}`)
     this.left.initVis()
 
     // const placement = this.getPlacementInfo()
@@ -711,15 +739,7 @@ export class MatMul {
   }
 
   initRightVis() {
-    if (this.params.extern_right) {
-      return
-    }
-
-    if (this.params['right placement'] == 'top') {
-      this.right.params['left placement'] = 'right'
-      this.right.params['right placement'] = 'bottom'
-    }
-
+    // console.log(`HEY ${this.params['result name']} initRightVis right ${this.rightName()}`)
     this.right.initVis()
     // const placement = this.getPlacementInfo()
     // this.right.group.position.y = ((this.H - 1) / 2 + 1 + (this.right.D + 1) / 2) * placement.right
@@ -896,12 +916,8 @@ export class MatMul {
 
   setLegends(params) {
     util.updateProps(this.params, params)
-    if (!this.params.extern_left) {
-      this.setLeftLegends()
-    }
-    if (!this.params.extern_right) {
-      this.setRightLegends()
-    }
+    this.setLeftLegends()
+    this.setRightLegends()
     this.setResultLegends()
   }
 

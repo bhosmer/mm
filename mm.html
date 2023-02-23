@@ -224,7 +224,7 @@
         // const out = { ...getParams(), I: 64, J: 64, K: 32, left_mm: attn, right_mm: v, 'left name': "attn", 'right name': "V", 'result name': "out" }
         // obj = new vis.MatMul({ ...getParams(), I: 64, J: 32, K: 128, left_mm: out, 'right name': 'wO', 'result name': 'out2' })
 
-        // mhs reassociated (worse)
+        // mha reassociated (worse)
         // (in @ wQ) @ (wK.t @ in.t) @ ((in @ wV) @ wO)
         // const q = { ...getParams(), I: 64, J: 128, K: 32, 'left name': "in", 'right name': "wQ", 'result name': "Q" }
         // const kt = { ...getParams(), I: 32, J: 128, K: 64, 'left name': "wK.t", 'right name': "in.t", 'result name': "K.t" }
@@ -245,7 +245,22 @@
         // const r = { ...getParams(), right_mm: rr, 'left name': "RL", 'right name': "RR", 'result name': "R" }
         // obj = new vis.MatMul({ ...getParams(), right_mm: r })
 
-        // ((LLL @ LLR) @ LR) @ (RL @ (RRL @ (RRL @ RRR))
+        // L @ ((RLL @ RLR) @ (RRL @ (RRRL @ RRRR)))
+        // const rl = { ...getParams(), 'left name': "RLL", 'right name': "RLR", 'result name': "RL" }
+        // const rrr = { ...getParams(), 'left name': "RRRL", 'right name': "RRRR", 'result name': "RRR" }
+        // const rr = { ...getParams(), right_mm: rrr, 'left name': "RRL", 'right name': "RRR", 'result name': "RR" }
+        // const r = { ...getParams(), left_mm: rl, right_mm: rr, 'left name': "RL", 'right name': "RR", 'result name': "R" }
+        // obj = new vis.MatMul({ ...getParams(), right_mm: r })
+
+        // ((LLL @ LLR) @ LR) @ (RL @ (RRL @ RRR))
+        // two adjacent panes problem, RL and RRL
+        // const ll = { ...getParams(), 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
+        // const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", 'result name': "L" }
+        // const rr = { ...getParams(), 'left name': "RRL", 'right name': "RRR", 'result name': "RR" }
+        // const r = { ...getParams(), right_mm: rr, 'left name': "RL", 'right name': "RR", 'result name': "R" }
+        // obj = new vis.MatMul({ ...getParams(), left_mm: l, right_mm: r })
+
+        // ((LLL @ LLR) @ LR) @ (RL @ (RRL @ (RRRL @ RRRR))
         // ...collision
         // const llr = { ...getParams(), 'left name': "LLRL", 'right name': "LLRR", 'result name': "LLR" }
         // const ll = { ...getParams(), right_mm: llr, 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
@@ -274,13 +289,55 @@
         // const r = { ...getParams(), left_mm: rl, right_mm: rr, 'left name': "RL", 'right name': "RR", 'result name': "R" }
         // obj = new vis.MatMul({ ...getParams(), left_mm: l, right_mm: r })
 
-        // --- both sides at every level ---
+        // somebody needs to use -z, but can it be done without violating the in/out rule?
         // (LL @ LR) @ (RL @ RR)
         // const l = { ...getParams(), 'left name': "LL", 'right name': "LR", 'result name': "L" }
         // const r = { ...getParams(), 'left name': "RL", 'right name': "RR", 'result name': "R" }
         // obj = new vis.MatMul({ ...getParams(), left_mm: l, right_mm: r })
 
         // ((LLL @ LLR) @ (LRL @ LRR)) @ ((RLL @ RLR) @ (RRL @ RRR))
+        // const ll = { ...getParams(), 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
+        // const lr = { ...getParams(), 'left name': "LRL", 'right name': "LRR", 'result name': "LR" }
+        // const l = { ...getParams(), left_mm: ll, right_mm: lr, 'result name': "L" }
+        // const rl = { ...getParams(), 'left name': "RLL", 'right name': "RLR", 'result name': "RL" }
+        // const rr = { ...getParams(), 'left name': "RRL", 'right name': "RRR", 'result name': "RR" }
+        // const r = { ...getParams(), left_mm: rl, right_mm: rr, 'result name': "R" }
+        // obj = new vis.MatMul({ ...getParams(), left_mm: l, right_mm: r })
+
+        // (((LLLL @ LLLR) @ (LLRL @ LLRR)) @ ((LRLL @ LRLR) @ (LRRL @ LRRR))) @ 
+        //  (((RLLL @ RLLR) @ (RLRL @ RLRR)) @ ((RRLL @ RRLR) @ (RRRL @ RRRR)))
+        // first symmetrical tree with collision (4 levels)
+        // RRL and its arguments, LLR and its arguments share a cube
+        // const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", 'result name': "LLL" }
+        // const llr = { ...getParams(), 'left name': "LLRL", 'right name': "LLRR", 'result name': "LLR" }
+        // const ll = { ...getParams(), left_mm: lll, right_mm: llr, 'result name': "LL" }
+        // const lrl = { ...getParams(), 'left name': "LRLL", 'right name': "LRLR", 'result name': "LRL" }
+        // const lrr = { ...getParams(), 'left name': "LRRL", 'right name': "LRRR", 'result name': "LRR" }
+        // const lr = { ...getParams(), left_mm: lrl, right_mm: lrr, 'result name': "LR" }
+        // const l = { ...getParams(), left_mm: ll, right_mm: lr, 'result name': "L" }
+        // const rll = { ...getParams(), 'left name': "RLLL", 'right name': "RLLR", 'result name': "RLL" }
+        // const rlr = { ...getParams(), 'left name': "RLRL", 'right name': "RLRR", 'result name': "RLR" }
+        // const rl = { ...getParams(), left_mm: rll, right_mm: rlr, 'result name': "RL" }
+        // const rrl = { ...getParams(), 'left name': "RRLL", 'right name': "RRLR", 'result name': "RRL" }
+        // const rrr = { ...getParams(), 'left name': "RRRL", 'right name': "RRRR", 'result name': "RRR" }
+        // const rr = { ...getParams(), left_mm: rrl, right_mm: rrr, 'result name': "RR" }
+        // const r = { ...getParams(), left_mm: rl, right_mm: rr, 'left name': "RL", 'right name': "RR", 'result name': "R" }
+        // obj = new vis.MatMul({ ...getParams(), left_mm: l, right_mm: r })
+
+        // ((LLL @ (LLRL @ LLRR)) @ LR) @ (RL @ ((RRLL @ RRLR) @ RRR))
+        // minimal collision - same as above but all other subtrees pruned
+        // LLR and its arguments, RRL and its arguments share a cube
+        // const llr = { ...getParams(), 'left name': "LLRL", 'right name': "LLRR", 'result name': "LLR" }
+        // const ll = { ...getParams(), 'left name': "LLL", right_mm: llr, 'result name': "LL" }
+        // const l = { ...getParams(), left_mm: ll, 'right name': "LR", 'result name': "L" }
+        // const rrl = { ...getParams(), 'left name': "RRLL", 'right name': "RRLR", 'result name': "RRL" }
+        // const rr = { ...getParams(), left_mm: rrl, 'right name': "RRR", 'result name': "RR" }
+        // const r = { ...getParams(), 'left name': "RL", right_mm: rr, 'result name': "R" }
+        // obj = new vis.MatMul({ ...getParams(), left_mm: l, right_mm: r })
+
+        // ((LLL @ LLR) @ (LRL @ LRR)) @ ((RLL @ RLR) @ (RRL @ RRR))
+        // symmetrical, one level back from collision, i.e. this is
+        // the deepest symmetrical tree we can lay out the nice way without collisions
         const ll = { ...getParams(), 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
         const lr = { ...getParams(), 'left name': "LRL", 'right name': "LRR", 'result name': "LR" }
         const l = { ...getParams(), left_mm: ll, right_mm: lr, 'result name': "L" }
@@ -288,6 +345,28 @@
         const rr = { ...getParams(), 'left name': "RRL", 'right name': "RRR", 'result name': "RR" }
         const r = { ...getParams(), left_mm: rl, right_mm: rr, 'result name': "R" }
         obj = new vis.MatMul({ ...getParams(), left_mm: l, right_mm: r })
+
+        // TODO FIX
+        // (((LLLL @ LLLR) @ (LLRL @ LLRR)) @ ((LRLL @ LRLR) @ (LRRL @ LRRR))) @ 
+        //  (((RLLL @ RLLR) @ (RLRL @ RLRR)) @ ((RRLL @ RRLR) @ (RRRL @ RRRR)))
+        // TODO FIX
+        // 4 levels - RRL/LLR collision + stuff trying to run into XY
+        // const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", 'result name': "LLL" }
+        // const ll = { ...getParams(), left_mm: lll, 'right name': "LLR", 'result name': "LL" }
+        // const lrlr = { ...getParams(), 'left name': "LRLRL", 'right name': "LRLRR", 'result name': "LRLR" }
+        // const lrl = { ...getParams(), 'left name': "LRLL", right_mm: lrlr, 'result name': "LRL" }
+        // const lrr = { ...getParams(), 'left name': "LRRL", 'right name': "LRRR", 'result name': "LRR" }
+        // const lr = { ...getParams(), left_mm: lrl, right_mm: lrr, 'result name': "LR" }
+        // const l = { ...getParams(), left_mm: ll, right_mm: lr, 'result name': "L" }
+        // const rll = { ...getParams(), 'left name': "RLLL", 'right name': "RLLR", 'result name': "RLL" }
+        // const rlrl = { ...getParams(), 'left name': "RLRLL", 'right name': "RLRLR", 'result name': "RLRL" }
+        // const rlr = { ...getParams(), left_mm: rlrl, 'right name': "RLRR", 'result name': "RLR" }
+        // const rl = { ...getParams(), left_mm: rll, right_mm: rlr, 'result name': "RL" }
+        // const rrl = { ...getParams(), 'left name': "RRLL", 'right name': "RRLR", 'result name': "RRL" }
+        // const rrr = { ...getParams(), 'left name': "RRRL", 'right name': "RRRR", 'result name': "RRR" }
+        // const rr = { ...getParams(), left_mm: rrl, right_mm: rrr, 'result name': "RR" }
+        // const r = { ...getParams(), left_mm: rl, right_mm: rr, 'left name': "RL", 'right name': "RR", 'result name': "R" }
+        // obj = new vis.MatMul({ ...getParams(), left_mm: l, right_mm: r })
 
 
 
