@@ -36,7 +36,6 @@ const COLOR_ATTR = new THREE.Uint8BufferAttribute([
 ], 4)
 COLOR_ATTR.normalized = true
 
-
 //
 // reading/writing params
 //
@@ -101,6 +100,13 @@ export function axes() {
 }
 
 // row guide lines
+const CORNER_ATTR = new THREE.Uint8BufferAttribute([
+  128, 170, 255, 224,
+  128, 160, 200, 224,
+  128, 165, 200, 224,
+], 4)
+CORNER_ATTR.normalized = true
+
 export function rowGuide(h, w) {
   const rstride = Math.max(1, Math.floor(h / 8))
   const n = h * w
@@ -111,8 +117,7 @@ export function rowGuide(h, w) {
   const draw = (i0, j0, i1, j1) => {
     const start = new THREE.Vector3(j0, i0, 0);
     const end = new THREE.Vector3(j1, i1, 0);
-    const dist = i0 * j0 / n
-    color.setHSL(1.0, 0.0, 1.0)
+    color.setHSL(1.0, 0.0, (h - i0) / h)
     group.add(lineSeg(start, end, color))
   }
 
@@ -127,7 +132,7 @@ export function rowGuide(h, w) {
     w / 8, 0, 0.5,
     0, h / 8, 0.5,
   ], 3))
-  corner_geo.setAttribute('color', COLOR_ATTR)
+  corner_geo.setAttribute('color', CORNER_ATTR)
   group.add(new THREE.Mesh(corner_geo, MMGUIDE_MATERIAL));
 
   return group
