@@ -101,16 +101,14 @@ export function axes() {
 
 // row guide lines
 const CORNER_ATTR = new THREE.Uint8BufferAttribute([
-  128, 170, 255, 224,
-  128, 160, 200, 224,
-  128, 165, 200, 224,
+  128, 170, 255, 160,
+  128, 160, 200, 160,
+  128, 165, 200, 160,
 ], 4)
 CORNER_ATTR.normalized = true
 
 export function rowGuide(h, w) {
   const rstride = Math.max(1, Math.floor(h / 8))
-  const n = h * w
-
   const group = new THREE.Group()
   const color = new THREE.Color()
 
@@ -129,8 +127,8 @@ export function rowGuide(h, w) {
   const corner_geo = new THREE.BufferGeometry()
   corner_geo.setAttribute('position', new THREE.Float32BufferAttribute([
     0, 0, 0.5,
-    w / 8, 0, 0.5,
-    0, h / 8, 0.5,
+    Math.floor(w / 4), 0, 0.5,
+    0, rstride * 2, 0.5,
   ], 3))
   corner_geo.setAttribute('color', CORNER_ATTR)
   group.add(new THREE.Mesh(corner_geo, MMGUIDE_MATERIAL));
