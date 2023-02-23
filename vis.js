@@ -654,25 +654,25 @@ export class MatMul {
     }
 
     // nice layout 
-    if (this.params['right placement'] == 'top') {
-      this.right.params['left placement'] = 'right'
-      this.right.params['right placement'] = 'bottom'
-    }
+    // if (this.params['right placement'] == 'top') {
+    //   this.right.params['left placement'] = 'right'
+    //   this.right.params['right placement'] = 'bottom'
+    // }
 
     // spacious layout
-    // if (this.params.right_mm) {
-    //   if (this.params['right placement'] == 'top') {
-    //     this.left.params['right placement'] = 'bottom'
-    //     this.right.params['left placement'] = 'right'
-    //   }
-    //   if (this.params['left placement'] == 'right') {
-    //     this.right.params['right placement'] = 'bottom'
-    //     this.right.params['left placement'] = 'left'
-    //   }
-    //   if (this.params['right placement'] == 'bottom') {
-    //     this.right.params['right placement'] = 'top'
-    //   }
-    // }
+    if (this.params.right_mm) {
+      if (this.params['right placement'] == 'top') {
+        this.left.params['right placement'] = 'bottom'
+        this.right.params['left placement'] = 'right'
+      }
+      if (this.params['left placement'] == 'right') {
+        this.right.params['right placement'] = 'bottom'
+        this.right.params['left placement'] = 'left'
+      }
+      if (this.params['right placement'] == 'bottom') {
+        this.right.params['right placement'] = 'top'
+      }
+    }
 
     this.initLeftVis()
     this.initRightVis()
