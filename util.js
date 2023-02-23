@@ -1,5 +1,42 @@
 import * as THREE from 'three'
 
+// https://threejs.org/examples/#webgl_buffergeometry_rawshader
+const MMGUIDE_MATERIAL = new THREE.RawShaderMaterial({
+  vertexShader: `
+  precision mediump float;
+  precision mediump int;
+  uniform mat4 modelViewMatrix; // optional
+  uniform mat4 projectionMatrix; // optional
+  attribute vec3 position;
+  attribute vec4 color;
+  varying vec3 vPosition;
+  varying vec4 vColor;
+  void main()	{
+    vPosition = position;
+    vColor = color;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+  }`,
+  fragmentShader: `
+  precision mediump float;
+  precision mediump int;
+  varying vec3 vPosition;
+  varying vec4 vColor;
+  void main()	{
+    vec4 color = vec4( vColor );
+    gl_FragColor = color;
+  }`,
+  side: THREE.DoubleSide,
+  transparent: true
+});
+
+const COLOR_ATTR = new THREE.Uint8BufferAttribute([
+  128, 160, 200, 132,
+  128, 165, 200, 132,
+  128, 170, 255, 255,
+], 4)
+COLOR_ATTR.normalized = true
+
+
 //
 // reading/writing params
 //
@@ -64,9 +101,8 @@ export function axes() {
 }
 
 // row guide lines
-export function rowGuide(h, w, trunc = true, rdenom = 8, cdenom = 32) {
-  const rstride = trunc ? Math.max(1, Math.floor(h / rdenom)) : h / rdenom
-  const cstride = trunc ? Math.max(1, Math.floor(w / cdenom)) : w / cdenom
+export function rowGuide(h, w) {
+  const rstride = Math.max(1, Math.floor(h / 8))
   const n = h * w
 
   const group = new THREE.Group()
@@ -76,16 +112,23 @@ export function rowGuide(h, w, trunc = true, rdenom = 8, cdenom = 32) {
     const start = new THREE.Vector3(j0, i0, 0);
     const end = new THREE.Vector3(j1, i1, 0);
     const dist = i0 * j0 / n
-    color.setHSL(1.0, 0.0, (1.0 - dist) ** 2)
+    color.setHSL(1.0, 0.0, 1.0)
     group.add(lineSeg(start, end, color))
   }
 
   for (let i = 0; i < h; i += rstride) {
     draw(i, 0, Math.min(i + rstride, h - 1), 0)
-    for (let j = 0; j < w; j += cstride) {
-      draw(i, j, i, Math.min(j + cstride, w - 1))
-    }
+    draw(i, 0, i, w - 1)
   }
+
+  const corner_geo = new THREE.BufferGeometry()
+  corner_geo.setAttribute('position', new THREE.Float32BufferAttribute([
+    0, 0, 0.5,
+    w / 8, 0, 0.5,
+    0, h / 8, 0.5,
+  ], 3))
+  corner_geo.setAttribute('color', COLOR_ATTR)
+  group.add(new THREE.Mesh(corner_geo, MMGUIDE_MATERIAL));
 
   return group
 }
@@ -94,44 +137,8 @@ export function rowGuide(h, w, trunc = true, rdenom = 8, cdenom = 32) {
 // mm flow guide chevron
 // 
 
-// https://threejs.org/examples/#webgl_buffergeometry_rawshader
-const MMGUIDE_MATERIAL = new THREE.RawShaderMaterial({
-  vertexShader: `
-  precision mediump float;
-  precision mediump int;
-  uniform mat4 modelViewMatrix; // optional
-  uniform mat4 projectionMatrix; // optional
-  attribute vec3 position;
-  attribute vec4 color;
-  varying vec3 vPosition;
-  varying vec4 vColor;
-  void main()	{
-    vPosition = position;
-    vColor = color;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
-  }`,
-  fragmentShader: `
-  precision mediump float;
-  precision mediump int;
-  varying vec3 vPosition;
-  varying vec4 vColor;
-  void main()	{
-    vec4 color = vec4( vColor );
-    gl_FragColor = color;
-  }`,
-  side: THREE.DoubleSide,
-  transparent: true
-});
-
 export function flowGuide(h, d, w, placement) {
   const group = new THREE.Group()
-
-  const color_attr = new THREE.Uint8BufferAttribute([
-    128, 160, 200, 132,
-    128, 165, 200, 132,
-    128, 170, 255, 255,
-  ], 4)
-  color_attr.normalized = true
 
   const place = (n, p, x) => p == 1 ? x : n - x
   const place_left = x => place(w + 1, placement.left, x)
@@ -143,7 +150,7 @@ export function flowGuide(h, d, w, placement) {
     place_left(w / 2), (h + 1) / 2, (d + 1) / 2,
     place_left(w / 2), (h + 1) / 2, 1,
   ], 3))
-  left_geometry.setAttribute('color', color_attr)
+  left_geometry.setAttribute('color', COLOR_ATTR)
   group.add(new THREE.Mesh(left_geometry, MMGUIDE_MATERIAL));
 
   const right_geometry = new THREE.BufferGeometry()
@@ -152,7 +159,7 @@ export function flowGuide(h, d, w, placement) {
     (w + 1) / 2, place_right(h / 2), (d + 1) / 2,
     (w + 1) / 2, place_right(h / 2), 1,
   ], 3))
-  right_geometry.setAttribute('color', color_attr)
+  right_geometry.setAttribute('color', COLOR_ATTR)
   group.add(new THREE.Mesh(right_geometry, MMGUIDE_MATERIAL));
 
   return group
