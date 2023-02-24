@@ -51,7 +51,6 @@
       I: init_dims.i,
       J: init_dims.j,
       K: init_dims.k,
-      'edge orientation': 'left to right',
       // data
       // left arg
       'left init': 'rows',
@@ -59,18 +58,15 @@
       'left max': 1,
       'left sparsity': 0,
       'left name': 'X',
-      'left placement': 'left',
       // right arg
       'right init': 'cols',
       'right min': -1,
       'right max': 1,
       'right sparsity': 0,
       'right name': 'Y',
-      'right placement': 'top',
       // result
       epilog: 'none',
       'result name': 'XY',
-      'result placement': 'front',
       // animation
       alg: 'none',
       speed: 5,
@@ -78,7 +74,19 @@
       'i threads': 1,
       'j threads': 1,
       'k threads': 1,
-      // sizes and colors
+      // layout
+      gap: 3,
+      'edge orientation': 'left to right',
+      'left placement': 'left',
+      'right placement': 'top',
+      'result placement': 'front',
+      // viz      
+      legends: true,
+      spotlight: 1,
+      'row guides': false,
+      'flow guides': false,
+      'interior spotlight': false,
+      // colors and sizes
       sensitivity: 'global',
       'min size': 0.15,
       'min light': 0.25,
@@ -86,12 +94,6 @@
       'zero hue': 0.77,
       'hue gap': 0.2,
       'hue spread': 0.01,
-      // viz
-      legends: true,
-      spotlight: 1,
-      'row guides': false,
-      'flow guides': false,
-      'interior spotlight': false,
       // set from orbit control
       xcam: -init_dims.i * 2,
       ycam: init_dims.j * 2,
@@ -225,9 +227,9 @@
 
         // (LL @ LR) @ (RL @ RR)
         // spacious: repro 1
-        const l = { ...getParams(), 'left name': "LL", 'right name': "LR", 'result name': "L" }
-        const r = { ...getParams(), 'left name': "RL", 'right name': "RR", 'result name': "R" }
-        obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
+        // const l = { ...getParams(), 'left name': "LL", 'right name': "LR", 'result name': "L" }
+        // const r = { ...getParams(), 'left name': "RL", 'right name': "RR", 'result name': "R" }
+        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
 
         // 3 levels
 
@@ -460,12 +462,12 @@
         // spacious: repro 1 in.t
         // note: could actually get away with all-right-at-bottom here... good example of where collision
         // detection would help UX, like to gray out layout options that collide
-        // const q = { ...getParams(), I: 64, J: 128, K: 32, 'left name': "in", 'right name': "wQ", 'result name': "Q" }
-        // const kt = { ...getParams(), I: 32, J: 128, K: 64, 'left name': "wK.t", 'right name': "in.t", 'result name': "K.t" }
-        // const attn = { ...getParams(), I: 64, J: 32, K: 64, left_mm: q, right_mm: kt, 'left name': "Q", 'right name': "Kt", 'result name': "attn" }
-        // const v = { ...getParams(), I: 64, J: 128, K: 32, 'left name': "in", 'right name': "wV", 'result name': "V" }
-        // const out = { ...getParams(), I: 64, J: 64, K: 32, left_mm: attn, right_mm: v, 'left name': "attn", 'right name': "V", 'result name': "out" }
-        // obj = new vis.MatMul({ ...getParams(), I: 64, J: 32, K: 128, left_mm: out, 'right name': 'wO', 'result name': 'out2' })
+        const q = { ...getParams(), I: 64, J: 128, K: 32, 'left name': "in", 'right name': "wQ", 'result name': "Q" }
+        const kt = { ...getParams(), I: 32, J: 128, K: 64, 'left name': "wK.t", 'right name': "in.t", 'result name': "K.t" }
+        const attn = { ...getParams(), I: 64, J: 32, K: 64, left_mm: q, right_mm: kt, 'left name': "Q", 'right name': "Kt", 'result name': "attn" }
+        const v = { ...getParams(), I: 64, J: 128, K: 32, 'left name': "in", 'right name': "wV", 'result name': "V" }
+        const out = { ...getParams(), I: 64, J: 64, K: 32, left_mm: attn, right_mm: v, 'left name': "attn", 'right name': "V", 'result name': "out" }
+        obj = new vis.MatMul({ ...getParams(), I: 64, J: 32, K: 128, left_mm: out, 'right name': 'wO', 'result name': 'out2' })
 
         // mha reassociated (worse)
         // ((in @ wQ) @ (wK.t @ in.t)) @ ((in @ wV) @ wO)
@@ -605,7 +607,6 @@
       addIntParam(gui_shape, 'I', 1, 128)
       addIntParam(gui_shape, 'J', 1, 128)
       addIntParam(gui_shape, 'K', 1, 128)
-      addChoiceParam(gui_shape, 'edge orientation', orientations)
 
       const gui_data = gui.addFolder('data')
 
@@ -615,7 +616,6 @@
       addNumParam(gui_left, 'left max', 0.0, 1.0)
       addNumParam(gui_left, 'left sparsity', 0.0, 1.0)
       addParam(gui_left, 'left name', _ => getObj().setLegends(getParams()))
-      addChoiceParam(gui_left, 'left placement', x_placements, _ => getObj().place(getParams()))
 
       const gui_right = gui_data.addFolder('right')
       addChoiceParam(gui_right, 'right init', init_funcs)
@@ -623,12 +623,10 @@
       addNumParam(gui_right, 'right max', 0.0, 1.0)
       addNumParam(gui_right, 'right sparsity', 0.0, 1.0)
       addParam(gui_right, 'right name', _ => getObj().setLegends(getParams()))
-      addChoiceParam(gui_right, 'right placement', y_placements, _ => getObj().place(getParams()))
 
       const gui_result = gui_data.addFolder('result')
       addChoiceParam(gui_result, 'epilog', epilog_funcs)
       addParam(gui_result, 'result name', _ => getObj().setLegends(getParams()))
-      addChoiceParam(gui_result, 'result placement', z_placements, _ => getObj().place(getParams()))
 
       const gui_anim = gui.addFolder('animation')
       addChoiceParam(gui_anim, 'alg', anim_algs)
@@ -639,6 +637,13 @@
       addIntParam(gui_anim, 'i threads', 1, 16)
       addIntParam(gui_anim, 'j threads', 1, 16)
       addIntParam(gui_anim, 'k threads', 1, 16)
+
+      const gui_layout = gui.addFolder('layout')
+      addIntParam(gui_layout, 'gap', 1, 25)
+      addChoiceParam(gui_layout, 'edge orientation', orientations)
+      addChoiceParam(gui_layout, 'left placement', x_placements, _ => getObj().place(getParams()))
+      addChoiceParam(gui_layout, 'right placement', y_placements, _ => getObj().place(getParams()))
+      addChoiceParam(gui_layout, 'result placement', z_placements, _ => getObj().place(getParams()))
 
       const gui_vis = gui.addFolder('vis')
       addParam(gui_vis, 'legends', x => getObj().setLegends(getParams()))

@@ -289,13 +289,10 @@ export class Mat {
   setPosition() {
     this.inner_group = new THREE.Group()
     this.inner_group.add(this.points)
-    util.updateProps(this.inner_group.position, { x: 1, y: 1 })
+    const gap = this.params.gap
+    util.updateProps(this.inner_group.position, { x: gap, y: gap })
     this.group = new THREE.Group()
     this.group.add(this.inner_group)
-    // this.group.position.x = 1
-    // this.group.position.y = 1
-    // util.updateProps(this.group.rotation, { x: Math.PI })
-    // util.updateProps(this.group.position, { x: -(this.W - 1) / 2, y: (this.H - 1) / 2 })
   }
 
   sizeFromData(x) {
@@ -654,25 +651,25 @@ export class MatMul {
     }
 
     // nice layout 
-    // if (this.params['right placement'] == 'top') {
-    //   this.right.params['left placement'] = 'right'
-    //   this.right.params['right placement'] = 'bottom'
-    // }
+    if (this.params['right placement'] == 'top') {
+      this.right.params['left placement'] = 'right'
+      this.right.params['right placement'] = 'bottom'
+    }
 
     // spacious layout
-    if (this.params.right_mm) {
-      if (this.params['right placement'] == 'top') {
-        this.left.params['right placement'] = 'bottom'
-        this.right.params['left placement'] = 'right'
-      }
-      if (this.params['left placement'] == 'right') {
-        this.right.params['right placement'] = 'bottom'
-        this.right.params['left placement'] = 'left'
-      }
-      if (this.params['right placement'] == 'bottom') {
-        this.right.params['right placement'] = 'top'
-      }
-    }
+    // if (this.params.right_mm) {
+    //   if (this.params['right placement'] == 'top') {
+    //     this.left.params['right placement'] = 'bottom'
+    //     this.right.params['left placement'] = 'right'
+    //   }
+    //   if (this.params['left placement'] == 'right') {
+    //     this.right.params['right placement'] = 'bottom'
+    //     this.right.params['left placement'] = 'left'
+    //   }
+    //   if (this.params['right placement'] == 'bottom') {
+    //     this.right.params['right placement'] = 'top'
+    //   }
+    // }
 
     this.initLeftVis()
     this.initRightVis()
@@ -697,8 +694,8 @@ export class MatMul {
     this.left.initVis()
 
     if (this.params['left placement'] == 'right') {
-      this.left.group.position.x = this.W + 1
-      this.left.group.position.z = this.D + 1
+      this.left.group.position.x = this.W + 2 * this.params.gap - 1
+      this.left.group.position.z = this.D + 2 * this.params.gap - 1
       this.left.group.rotation.y = Math.PI / 2
     } else {
       this.left.group.rotation.y = -Math.PI / 2
@@ -714,8 +711,8 @@ export class MatMul {
     this.right.initVis()
 
     if (this.params['right placement'] == 'bottom') {
-      this.right.group.position.y = this.H + 1
-      this.right.group.position.z = this.D + 1
+      this.right.group.position.y = this.H + 2 * this.params.gap - 1
+      this.right.group.position.z = this.D + 2 * this.params.gap - 1
       this.right.group.rotation.x = -Math.PI / 2
     } else {
       this.right.group.rotation.x = Math.PI / 2
@@ -805,7 +802,8 @@ export class MatMul {
       left: this.params['left placement'] == 'left' ? 1 : -1,
       right: this.params['right placement'] == 'top' ? 1 : -1,
       result: this.params['result placement'] == 'front' ? 1 : -1,
-      orientation: this.params['edge orientation'] == 'right to left' ? 1 : -1
+      orientation: this.params['edge orientation'] == 'right to left' ? 1 : -1,
+      gap: this.params.gap,
     }
   }
 
