@@ -225,9 +225,9 @@
 
         // (LL @ LR) @ (RL @ RR)
         // spacious: repro 1
-        // const l = { ...getParams(), 'left name': "LL", 'right name': "LR", 'result name': "L" }
-        // const r = { ...getParams(), 'left name': "RL", 'right name': "RR", 'result name': "R" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
+        const l = { ...getParams(), 'left name': "LL", 'right name': "LR", 'result name': "L" }
+        const r = { ...getParams(), 'left name': "RL", 'right name': "RR", 'result name': "R" }
+        obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
 
         // 3 levels
 
@@ -341,6 +341,7 @@
         // note here (and elsewhere) that flipping leaf inputs around is only trivial when 
         // BOTH inputs are leaves. otherwise will require reorientating the other, non-leaf
         // input, which will cascade down one side of its subtree
+        // spacious: repro 3
         // const rrr = { ...getParams(), 'left name': "RRRL", 'right name': "RRRR", 'result name': "RRR" }
         // const rr = { ...getParams(), right_mm: rrr, 'left name': "RRL", 'right name': "RRR", 'result name': "RR" }
         // const r = { ...getParams(), right_mm: rr, 'left name': "RL", 'right name': "RR", 'result name': "R" }
@@ -349,14 +350,14 @@
         // (((LLLL @ LLLR) @ LLR) @ LR) @ (RL @ (RRL @ (RRRL @ RRRR)))
         // pair of long paths... non-alternating layout is still an option
         // (nice alternating layout is about to collide)
-        // spacious: repro 3, RRRL should be on other side
-        const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", 'result name': "LLL" }
-        const ll = { ...getParams(), left_mm: lll, 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
-        const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", 'result name': "L" }
-        const rrr = { ...getParams(), 'left name': "RRRL", 'right name': "RRRR", 'result name': "RRR" }
-        const rr = { ...getParams(), right_mm: rrr, 'left name': "RRL", 'right name': "RRR", 'result name': "RR" }
-        const r = { ...getParams(), right_mm: rr, 'left name': "RL", 'right name': "RR", 'result name': "R" }
-        obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
+        // spacious: @@@ repro 3, RRRL should be on other side @@@
+        // const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", 'result name': "LLL" }
+        // const ll = { ...getParams(), left_mm: lll, 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
+        // const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", 'result name': "L" }
+        // const rrr = { ...getParams(), 'left name': "RRRL", 'right name': "RRRR", 'result name': "RRR" }
+        // const rr = { ...getParams(), right_mm: rrr, 'left name': "RRL", 'right name': "RRR", 'result name': "RR" }
+        // const r = { ...getParams(), right_mm: rr, 'left name': "RL", 'right name': "RR", 'result name': "R" }
+        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
 
         // ---
 
@@ -400,6 +401,7 @@
         //  (((RLLL @ RLLR) @ (RLRL @ RLRR)) @ ((RRLL @ RRLR) @ (RRRL @ RRRR)))
         // first symmetrical tree with collision (4 levels)
         // RRL and its arguments, LLR and its arguments share a cube
+        // spacious: repro 3, maybe more
         // const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", 'result name': "LLL" }
         // const llr = { ...getParams(), 'left name': "LLRL", 'right name': "LLRR", 'result name': "LLR" }
         // const ll = { ...getParams(), left_mm: lll, right_mm: llr, 'result name': "LL" }
@@ -427,11 +429,13 @@
         // const r = { ...getParams(), 'left name': "RL", right_mm: rr, 'result name': "R" }
         // obj = new vis.MatMul({ ...getParams(), left_mm: l, right_mm: r })
 
-        // TODO FIX
-        // (((LLLL @ LLLR) @ (LLRL @ LLRR)) @ ((LRLL @ LRLR) @ (LRRL @ LRRR))) @ 
-        //  (((RLLL @ RLLR) @ (RLRL @ RLRR)) @ ((RRLL @ RRLR) @ (RRRL @ RRRR)))
-        // TODO FIX
-        // 4 levels - RRL/LLR collision + stuff trying to run into XY
+        // (((LLLL @ LLLR) @ (LLRL @ LLRR)) @ ((LRLL @ (LRLRL @ LRLRR)) @ (LRRL @ LRRR))) @ 
+        //  (((RLLL @ RLLR) @ ((RLRLR @ RLRLL) @ RLRR)) @ ((RRLL @ RRLR) @ (RRRL @ RRRR)))
+        // 4 levels - RRL/LLR collision + 5-level paths that reach around in front of root
+        // in nice layout and will collide if anything is added.
+        // also good example of where z always coming towards you breaks down a little in 
+        // nice (although it's still very legible as a ~2d surface)
+        // spacious: repro 3 and maybe more
         // const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", 'result name': "LLL" }
         // const ll = { ...getParams(), left_mm: lll, 'right name': "LLR", 'result name': "LL" }
         // const lrlr = { ...getParams(), 'left name': "LRLRL", 'right name': "LRLRR", 'result name': "LRLR" }
@@ -447,13 +451,15 @@
         // const rrr = { ...getParams(), 'left name': "RRRL", 'right name': "RRRR", 'result name': "RRR" }
         // const rr = { ...getParams(), left_mm: rrl, right_mm: rrr, 'result name': "RR" }
         // const r = { ...getParams(), left_mm: rl, right_mm: rr, 'left name': "RL", 'right name': "RR", 'result name': "R" }
-        // obj = new vis.MatMul({ ...getParams(), left_mm: l, right_mm: r })
+        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
 
         // ---
 
         // mha
         // (((in @ wQ) @ (wK.t @ in.t)) @ (in @ wV)) @ wO
-        // spacious: orientation prob at in.t
+        // spacious: repro 1 in.t
+        // note: could actually get away with all-right-at-bottom here... good example of where collision
+        // detection would help UX, like to gray out layout options that collide
         // const q = { ...getParams(), I: 64, J: 128, K: 32, 'left name': "in", 'right name': "wQ", 'result name': "Q" }
         // const kt = { ...getParams(), I: 32, J: 128, K: 64, 'left name': "wK.t", 'right name': "in.t", 'result name': "K.t" }
         // const attn = { ...getParams(), I: 64, J: 32, K: 64, left_mm: q, right_mm: kt, 'left name': "Q", 'right name': "Kt", 'result name': "attn" }
