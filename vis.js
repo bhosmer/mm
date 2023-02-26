@@ -430,9 +430,9 @@ export class Mat {
       this.legends_group = new THREE.Group()
       props = { ...this.getLegendTextProps(), ...props }
       if (props.name) {
-        // const suf = ` (${this.params.tag})`
-        const suf = ` (${this.params.depth},${this.params.max_depth},${this.params.height})`
-        // const suf = ''
+        let suf = ''
+        suf += ` (${this.params.tag})`
+        suf += ` (${this.params.depth},${this.params.max_depth},${this.params.height})`
         const name = this.params.getText(props.name + suf, props.name_color, props.name_size)
         const { h, w } = util.bbhw(name.geometry)
         name.geometry.rotateZ(Math.PI)
@@ -646,9 +646,12 @@ export class MatMul {
     }
 
     this.group.clear()
+    // @@@ WRONG @@@
+    // util.updateProps(this.group.position, { x: 0, y: 0, z: 0 })
+    // util.updateProps(this.group.rotation, { x: 0, y: 0, z: 0 })
+    // @@@
     this.flow_guide_group = undefined
 
-    // used in both layouts
     if (this.params.left_mm) {
       if (this.params['left placement'] == 'left') {
         this.left.params['left placement'] = 'right'
@@ -656,26 +659,12 @@ export class MatMul {
       }
     }
 
-    // nice layout 
-    if (this.params['right placement'] == 'top') {
-      this.right.params['left placement'] = 'right'
-      this.right.params['right placement'] = 'bottom'
+    if (this.params.right_mm) {
+      if (this.params['right placement'] == 'top') {
+        this.right.params['left placement'] = 'right'
+        this.right.params['right placement'] = 'bottom'
+      }
     }
-
-    // spacious layout
-    // if (this.params.right_mm) {
-    //   if (this.params['right placement'] == 'top') {
-    //     this.left.params['right placement'] = 'bottom'
-    //     this.right.params['left placement'] = 'right'
-    //   }
-    //   if (this.params['left placement'] == 'right') {
-    //     this.right.params['right placement'] = 'bottom'
-    //     this.right.params['left placement'] = 'left'
-    //   }
-    //   if (this.params['right placement'] == 'bottom') {
-    //     this.right.params['right placement'] = 'top'
-    //   }
-    // }
 
     this.initLeftVis()
     this.initRightVis()
@@ -688,38 +677,26 @@ export class MatMul {
     this.setRowGuides()
   }
 
-  leftName() {
-    return this.params.left_mm ? this.left.params['result name'] : this.params['left name']
-  }
-
-  rightName() {
-    return this.params.right_mm ? this.right.params['result name'] : this.params['right name']
-  }
-
   getScatter() {
-    const h = Math.min(this.left.params.height, this.right.params.height)
+    // const h = Math.min(this.left.params.height, this.right.params.height)
+    const h = Math.max(this.left.params.height, this.right.params.height)
     return h * this.params.scatter
     // return this.params.height * this.params.scatter
   }
-
-  // getRightScatter() {
-  //   const h = 1 + Math.min(this.left.params.height, this.right.params.height)
-  //   return h * this.params.scatter
-  //   // return this.params.height * this.params.scatter
-  // }
 
   initLeftVis() {
     this.left.params.tag = 'l'
     this.left.initVis()
     const gap = this.params.gap
     if (this.params['left placement'] == 'right') {
-      this.left.group.position.x = this.W + 2 * gap - 1
+      this.left.group.position.x = this.W + 2 * gap - 1 + this.getScatter()
       this.left.group.position.z = this.D + 2 * gap - 1
       this.left.group.rotation.y = Math.PI / 2
-      this.left.group.position.x += this.getScatter()
     } else {
       this.left.group.rotation.y = -Math.PI / 2
-      this.left.group.position.x -= this.getScatter()
+      // util.updateProps(this.left.group.rotation, { x: 0, y: -Math.PI / 2, z: 0 })
+      this.left.group.position.x = -this.getScatter()
+      // util.updateProps(this.left.group.position, { x: -this.getScatter(), y: 0, z: 0 })
     }
 
 
@@ -734,13 +711,12 @@ export class MatMul {
     this.right.initVis()
     const gap = this.params.gap
     if (this.params['right placement'] == 'bottom') {
-      this.right.group.position.y = this.H + 2 * gap - 1
+      this.right.group.position.y = this.H + 2 * gap - 1 + this.getScatter()
       this.right.group.position.z = this.D + 2 * gap - 1
       this.right.group.rotation.x = -Math.PI / 2
-      this.right.group.position.y += this.getScatter()
     } else {
       this.right.group.rotation.x = Math.PI / 2
-      this.right.group.position.y -= this.getScatter()
+      this.right.group.position.y = -this.getScatter()
     }
 
 

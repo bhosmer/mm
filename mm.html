@@ -211,7 +211,7 @@
             p.J = j
             p.K = k
           }
-          f(params, params.I, params.J, params.K, 1)
+          f(params, params.I, params.J, params.K, 0)
           return params
         }
 
@@ -358,6 +358,7 @@
         // pair of long paths... non-alternating layout is still an option
         // (nice alternating layout is about to collide)
         // spacious: @@@ repro 3, RRRL should be on other side @@@
+        // @@@ depth issue?
         // const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", 'result name': "LLL" }
         // const ll = { ...getParams(), left_mm: lll, 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
         // const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", 'result name': "L" }
@@ -645,8 +646,8 @@
       addIntParam(gui_anim, 'k threads', 1, 16)
 
       const gui_layout = gui.addFolder('layout')
-      addIntParam(gui_layout, 'gap', 1, 25)
-      addIntParam(gui_layout, 'scatter', 0, 32)
+      addIntParam(gui_layout, 'gap', 1, 32)
+      addIntParam(gui_layout, 'scatter', 0, 64)
       addChoiceParam(gui_layout, 'edge orientation', orientations)
       addChoiceParam(gui_layout, 'left placement', x_placements, _ => getObj().place(getParams()))
       addChoiceParam(gui_layout, 'right placement', y_placements, _ => getObj().place(getParams()))
