@@ -430,7 +430,10 @@ export class Mat {
       this.legends_group = new THREE.Group()
       props = { ...this.getLegendTextProps(), ...props }
       if (props.name) {
-        const name = this.params.getText(props.name, props.name_color, props.name_size)
+        // const suf = ` (${this.params.tag})`
+        const suf = ` (${this.params.depth},${this.params.max_depth},${this.params.height})`
+        // const suf = ''
+        const name = this.params.getText(props.name + suf, props.name_color, props.name_size)
         const { h, w } = util.bbhw(name.geometry)
         name.geometry.rotateZ(Math.PI)
         name.geometry.rotateY(Math.PI)
@@ -513,7 +516,7 @@ export class Mat {
         if (x != 0) { // declutter
           let label = this.label_cache[index]
           if (!label) {
-            const fsiz = 0.16 - 0.01 * Math.log10(Math.floor(1 + Math.abs(x)))
+            const fsiz = 0.16 - 0.008 * Math.log10(Math.floor(1 + Math.abs(x)))
             label = this.params.getText(`${x.toFixed(4)}`, 0xffffff, fsiz)
             label.value = x
             label.geometry.rotateX(Math.PI)
@@ -553,7 +556,10 @@ export class MatMul {
 
   getChildParams(params = undefined) {
     params = params || this.params
-    return { ...params, getGlobalAbsmax: this.getGlobalAbsmax.bind(this) }
+    return {
+      ...params,
+      getGlobalAbsmax: this.getGlobalAbsmax.bind(this)
+    }
   }
 
   initLeft() {
@@ -690,16 +696,32 @@ export class MatMul {
     return this.params.right_mm ? this.right.params['result name'] : this.params['right name']
   }
 
-  initLeftVis() {
-    this.left.initVis()
+  getScatter() {
+    const h = Math.min(this.left.params.height, this.right.params.height)
+    return h * this.params.scatter
+    // return this.params.height * this.params.scatter
+  }
 
+  // getRightScatter() {
+  //   const h = 1 + Math.min(this.left.params.height, this.right.params.height)
+  //   return h * this.params.scatter
+  //   // return this.params.height * this.params.scatter
+  // }
+
+  initLeftVis() {
+    this.left.params.tag = 'l'
+    this.left.initVis()
+    const gap = this.params.gap
     if (this.params['left placement'] == 'right') {
-      this.left.group.position.x = this.W + 2 * this.params.gap - 1
-      this.left.group.position.z = this.D + 2 * this.params.gap - 1
+      this.left.group.position.x = this.W + 2 * gap - 1
+      this.left.group.position.z = this.D + 2 * gap - 1
       this.left.group.rotation.y = Math.PI / 2
+      this.left.group.position.x += this.getScatter()
     } else {
       this.left.group.rotation.y = -Math.PI / 2
+      this.left.group.position.x -= this.getScatter()
     }
+
 
     this.group.add(this.left.group)
 
@@ -708,15 +730,19 @@ export class MatMul {
   }
 
   initRightVis() {
+    this.right.params.tag = 'r'
     this.right.initVis()
-
+    const gap = this.params.gap
     if (this.params['right placement'] == 'bottom') {
-      this.right.group.position.y = this.H + 2 * this.params.gap - 1
-      this.right.group.position.z = this.D + 2 * this.params.gap - 1
+      this.right.group.position.y = this.H + 2 * gap - 1
+      this.right.group.position.z = this.D + 2 * gap - 1
       this.right.group.rotation.x = -Math.PI / 2
+      this.right.group.position.y += this.getScatter()
     } else {
       this.right.group.rotation.x = Math.PI / 2
+      this.right.group.position.y -= this.getScatter()
     }
+
 
     this.group.add(this.right.group)
 
@@ -725,6 +751,7 @@ export class MatMul {
   }
 
   initResultVis() {
+    this.result.params.tag = '@'
     this.result.initVis()
     this.group.add(this.result.group)
 
@@ -804,6 +831,7 @@ export class MatMul {
       result: this.params['result placement'] == 'front' ? 1 : -1,
       orientation: this.params['edge orientation'] == 'right to left' ? 1 : -1,
       gap: this.params.gap,
+      scatter: this.getScatter(),
     }
   }
 
