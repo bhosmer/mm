@@ -76,7 +76,9 @@
       'k threads': 1,
       // layout
       gap: 3,
-      scatter: 0,
+      'scatter distance': 0,
+      'scatter min height': 3,
+      'balanced scatter': false,
       'edge orientation': 'left to right',
       'left placement': 'left',
       'right placement': 'top',
@@ -120,8 +122,7 @@
     }
 
     // note: everything is kicked off from this handler 
-    // bc I'm too lazy to find out the right way to make
-    // everything async/await
+    // bc I'm too lazy to make things async in here
 
     let getText
     const loader = new FontLoader();
@@ -142,11 +143,15 @@
       animate()
     })
 
+    // camera
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 5, 10000);
+    const pointer = new THREE.Vector2(0, 0)
+
     // raycaster, used for spotlight intersections
     const raycaster = new THREE.Raycaster()
     raycaster.far = 128
-    raycaster.params.Points.threshold = 2.5
-    const pointer = new THREE.Vector2(0, 0)
+    raycaster.params.Points.threshold = 0
+    raycaster.setFromCamera(pointer, camera)
 
     // object params plus context
     function getParams() {
@@ -177,8 +182,7 @@
       // load params from url
       util.updateFromSearchParams(params, new URL(window.location).searchParams)
 
-      // camera
-      const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 5, 10000);
+      // set camera position
       camera.position.set(params.xcam, params.ycam, params.zcam)
 
       let obj
@@ -192,12 +196,14 @@
         }
 
         // temp: takes root shape and adjusts children so nothing blows up
+        // TODO transfer depth stuff to MatMul init
         const fix_shape = params => {
           const f = (p, i, j, k, d) => {
             if (j === undefined) {
               j = p.J
             }
-            p.depth = p.max_depth = d
+            p.depth = d
+            p.max_depth = d + 1
             if (p.left_mm) {
               f(p.left_mm, i, undefined, j, d + 1)
               p.max_depth = p.left_mm.max_depth
@@ -369,6 +375,18 @@
 
         // ---
 
+        // (LL @ LR) @ ((RLL @ RLR) @ ((RRLL @ RRLR) @ ((RRRLL @ RRRLR) @ RRRR)))
+        // const l = { ...getParams(), 'left name': "LL", 'right name': "LR", 'result name': "L" }
+        // const rrrl = { ...getParams(), 'left name': "RRRLL", 'right name': "RRRLR", 'result name': "RRRL" }
+        // const rrr = { ...getParams(), left_mm: rrrl, 'right name': "RRRR", 'result name': "RRR" }
+        // const rrl = { ...getParams(), 'left name': "RRLL", 'right name': "RRLR", 'result name': "RRL" }
+        // const rr = { ...getParams(), left_mm: rrl, right_mm: rrr, 'result name': "RR" }
+        // const rl = { ...getParams(), 'left name': "RLL", 'right name': "RLR", 'result name': "RL" }
+        // const r = { ...getParams(), right_mm: rr, left_mm: rl, 'result name': "R" }
+        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
+
+        // ---
+
         // L @ ((RLL @ RLR) @ (RRL @ (RRRL @ RRRR)))
         // const rl = { ...getParams(), 'left name': "RLL", 'right name': "RLR", 'result name': "RL" }
         // const rrr = { ...getParams(), 'left name': "RRRL", 'right name': "RRRR", 'result name': "RRR" }
@@ -383,7 +401,7 @@
         // const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", 'result name': "L" }
         // const rr = { ...getParams(), 'left name': "RRL", 'right name': "RRR", 'result name': "RR" }
         // const r = { ...getParams(), right_mm: rr, 'left name': "RL", 'right name': "RR", 'result name': "R" }
-        // obj = new vis.MatMul({ ...getParams(), left_mm: l, right_mm: r })
+        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
 
         // (((LLLL @ LLLR) @ LLR) @ LR) @ (RL @ (RRL @ (RRRL @ RRRR)))
         // const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", 'result name': "LLL" }
@@ -435,7 +453,7 @@
         // const rrl = { ...getParams(), 'left name': "RRLL", 'right name': "RRLR", 'result name': "RRL" }
         // const rr = { ...getParams(), left_mm: rrl, 'right name': "RRR", 'result name': "RR" }
         // const r = { ...getParams(), 'left name': "RL", right_mm: rr, 'result name': "R" }
-        // obj = new vis.MatMul({ ...getParams(), left_mm: l, right_mm: r })
+        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
 
         // (((LLLL @ LLLR) @ (LLRL @ LLRR)) @ ((LRLL @ (LRLRL @ LRLRR)) @ (LRRL @ LRRR))) @ 
         //  (((RLLL @ RLLR) @ ((RLRLR @ RLRLL) @ RLRR)) @ ((RRLL @ RRLR) @ (RRRL @ RRRR)))
@@ -484,7 +502,7 @@
         // const attn = { ...getParams(), I: 64, J: 32, K: 64, left_mm: q, right_mm: kt, 'left name': "Q", 'right name': "Kt", 'result name': "attn" }
         // const v = { ...getParams(), I: 64, J: 128, K: 32, 'left name': "in", 'right name': "wV", 'result name': "V" }
         // const out = { ...getParams(), I: 64, J: 32, K: 128, left_mm: v, 'right name': "wO", 'result name': "out" }
-        // obj = new vis.MatMul({ ...getParams(), I: 64, J: 64, K: 128, left_mm: attn, right_mm: out, 'result name': 'out2' })
+        // obj = new vis.MatMul(fix_shape({ ...getParams(), I: 64, J: 64, K: 128, left_mm: attn, right_mm: out, 'result name': 'out2' }))
 
         // need this
         obj.group.rotation.x = Math.PI
@@ -647,7 +665,9 @@
 
       const gui_layout = gui.addFolder('layout')
       addIntParam(gui_layout, 'gap', 1, 32)
-      addIntParam(gui_layout, 'scatter', 0, 64)
+      addIntParam(gui_layout, 'scatter distance', 0, 128)
+      addIntParam(gui_layout, 'scatter min height', 0, 8)
+      addParam(gui_layout, 'balanced scatter')
       addChoiceParam(gui_layout, 'edge orientation', orientations)
       addChoiceParam(gui_layout, 'left placement', x_placements, _ => getObj().place(getParams()))
       addChoiceParam(gui_layout, 'right placement', y_placements, _ => getObj().place(getParams()))

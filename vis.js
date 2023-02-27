@@ -404,6 +404,7 @@ export class Mat {
     } else {
       if (this.row_guide_group) {
         this.inner_group.remove(this.row_guide_group)
+        this.row_guide_group.clear()
         this.row_guide_group = undefined
       }
     }
@@ -431,8 +432,8 @@ export class Mat {
       props = { ...this.getLegendTextProps(), ...props }
       if (props.name) {
         let suf = ''
-        suf += ` (${this.params.tag})`
-        suf += ` (${this.params.depth},${this.params.max_depth},${this.params.height})`
+        // suf += ` (${this.params.tag})`
+        // suf += ` (${this.params.depth},${this.params.max_depth},${this.params.height})`
         const name = this.params.getText(props.name + suf, props.name_color, props.name_size)
         const { h, w } = util.bbhw(name.geometry)
         name.geometry.rotateZ(Math.PI)
@@ -483,11 +484,7 @@ export class Mat {
   }
 
   updateLabels(spotlight = undefined) {
-    if (spotlight != undefined) {
-      this.params.spotlight = spotlight
-    } else {
-      spotlight = this.params.spotlight
-    }
+    spotlight = util.syncProp(this.params, 'spotlight', spotlight)
 
     if (spotlight == 0) {
       if (this.label_group) {
@@ -507,7 +504,8 @@ export class Mat {
     }
 
     this.params.raycaster.params.Points.threshold = spotlight
-    this.params.raycaster.intersectObject(this.points).forEach(x => {
+    const intersects = this.params.raycaster.intersectObject(this.points)
+    intersects.forEach(x => {
       const index = x.index
       const i = Math.floor(index / this.W)
       const j = index % this.W
@@ -538,8 +536,8 @@ export class Mat {
 export class MatMul {
 
   constructor(params, init_vis = true) {
-    this.params = { ...params }
     this.group = new THREE.Group()
+    this.params = { ...params }
 
     this.H = params.I
     this.D = params.J
@@ -554,20 +552,25 @@ export class MatMul {
     }
   }
 
-  getChildParams(params = undefined) {
-    params = params || this.params
+  prepChildParams(params) {
+    params.getGlobalAbsmax = this.getGlobalAbsmax.bind(this)
+    return params
+  }
+
+  getLeafParams() {
+    // TODO transfer only what's needed from parent
     return {
-      ...params,
-      getGlobalAbsmax: this.getGlobalAbsmax.bind(this)
+      ...this.params,
+      getGlobalAbsmax: this.getGlobalAbsmax.bind(this),
+      depth: this.params.depth + 1,
+      max_depth: this.params.depth + 1,
+      height: 0,
     }
   }
 
   initLeft() {
-    if (this.left) {
-      this.group.remove(this.left.group)
-    }
     if (this.params.left_mm) {
-      this.left = new MatMul(this.getChildParams(this.params.left_mm), false)
+      this.left = new MatMul(this.prepChildParams(this.params.left_mm), false)
     } else {
       const data = this.params.left_data || (_ => {
         const init = this.params['left init']
@@ -577,16 +580,13 @@ export class MatMul {
         const f = getInitFunc(init, min, max, sparsity)
         return Array2D.fromInit(this.H, this.D, f)
       })()
-      this.left = new Mat(data, this.getChildParams(), false)
+      this.left = new Mat(data, this.getLeafParams(), false)
     }
   }
 
   initRight() {
-    if (this.right) {
-      this.group.remove(this.right.group)
-    }
     if (this.params.right_mm) {
-      this.right = new MatMul(this.getChildParams(this.params.right_mm), false)
+      this.right = new MatMul(this.prepChildParams(this.params.right_mm), false)
     } else {
       const data = this.params.right_data || (_ => {
         const name = this.params['right init']
@@ -596,17 +596,18 @@ export class MatMul {
         const f = getInitFunc(name, min, max, sparsity)
         return Array2D.fromInit(this.D, this.W, f)
       })()
-      this.right = new Mat(data, this.getChildParams(), false)
+      this.right = new Mat(data, this.getLeafParams(), false)
     }
   }
 
   initResult() {
-    if (this.result) {
-      this.group.remove(this.result.group)
-    }
     const result_init = (i, j) => this.dotprod_val(i, j)
     const data = Array2D.fromInit(this.H, this.W, result_init, this.params.epilog)
-    this.result = new Mat(data, this.getChildParams(), false)
+    const params = this.getLeafParams()
+    params.height = this.params.height
+    params.depth = this.params.depth
+    params.max_depth = this.params.max_depth
+    this.result = new Mat(data, params, false)
   }
 
   dotprod_val(i, k, minj = undefined, maxj = undefined) {
@@ -673,32 +674,46 @@ export class MatMul {
     this.setFlowGuide()
     this.initAnimation()
     this.setPosition()
-    this.updateLabels()
     this.setRowGuides()
   }
 
+  scatterFromHeight(h) {
+    const scatter = Math.sqrt(Math.max(0, h - this.params['scatter min height'] + 1))
+    return this.params['scatter distance'] * scatter
+  }
+
+  getLeftScatter() {
+    return this.params['balanced scatter'] ?
+      this.getScatter() :
+      this.scatterFromHeight(this.left.params.height)
+  }
+
+  getRightScatter() {
+    return this.params['balanced scatter'] ?
+      this.getScatter() :
+      this.scatterFromHeight(this.right.params.height)
+  }
+
   getScatter() {
-    // const h = Math.min(this.left.params.height, this.right.params.height)
-    const h = Math.max(this.left.params.height, this.right.params.height)
-    return h * this.params.scatter
-    // return this.params.height * this.params.scatter
+    const h = Math.min(this.left.params.height, this.right.params.height)
+    return this.scatterFromHeight(h)
   }
 
   initLeftVis() {
+    if (this.left) {
+      this.group.remove(this.left.group)
+    }
     this.left.params.tag = 'l'
     this.left.initVis()
     const gap = this.params.gap
     if (this.params['left placement'] == 'right') {
-      this.left.group.position.x = this.W + 2 * gap - 1 + this.getScatter()
+      this.left.group.position.x = this.W + 2 * gap - 1 + this.getLeftScatter()
       this.left.group.position.z = this.D + 2 * gap - 1
       this.left.group.rotation.y = Math.PI / 2
     } else {
       this.left.group.rotation.y = -Math.PI / 2
-      // util.updateProps(this.left.group.rotation, { x: 0, y: -Math.PI / 2, z: 0 })
-      this.left.group.position.x = -this.getScatter()
-      // util.updateProps(this.left.group.position, { x: -this.getScatter(), y: 0, z: 0 })
+      this.left.group.position.x = -this.getLeftScatter()
     }
-
 
     this.group.add(this.left.group)
 
@@ -707,16 +722,19 @@ export class MatMul {
   }
 
   initRightVis() {
+    if (this.right) {
+      this.group.remove(this.right.group)
+    }
     this.right.params.tag = 'r'
     this.right.initVis()
     const gap = this.params.gap
     if (this.params['right placement'] == 'bottom') {
-      this.right.group.position.y = this.H + 2 * gap - 1 + this.getScatter()
+      this.right.group.position.y = this.H + 2 * gap - 1 + this.getRightScatter()
       this.right.group.position.z = this.D + 2 * gap - 1
       this.right.group.rotation.x = -Math.PI / 2
     } else {
       this.right.group.rotation.x = Math.PI / 2
-      this.right.group.position.y = -this.getScatter()
+      this.right.group.position.y = -this.getRightScatter()
     }
 
 
@@ -727,6 +745,9 @@ export class MatMul {
   }
 
   initResultVis() {
+    if (this.result) {
+      this.group.remove(this.result.group)
+    }
     this.result.params.tag = '@'
     this.result.initVis()
     this.group.add(this.result.group)
@@ -807,7 +828,8 @@ export class MatMul {
       result: this.params['result placement'] == 'front' ? 1 : -1,
       orientation: this.params['edge orientation'] == 'right to left' ? 1 : -1,
       gap: this.params.gap,
-      scatter: this.getScatter(),
+      left_scatter: this.getLeftScatter(),
+      right_scatter: this.getRightScatter(),
     }
   }
 
@@ -929,7 +951,7 @@ export class MatMul {
   }
 
   getAnimMatParams() {
-    return { ...this.getChildParams(), stretch_absmax: true }
+    return { ...this.prepChildParams(), stretch_absmax: true }
   }
 
   getAnimResultMats() {
