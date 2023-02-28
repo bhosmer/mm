@@ -281,18 +281,14 @@ export class Mat {
         this.checkLabel(i, j, x)
       }
     }
-    // if (r === undefined && c === undefined) {
-    this.setPosition()
-    // }
-  }
-
-  setPosition() {
-    this.inner_group = new THREE.Group()
-    this.inner_group.add(this.points)
-    const gap = this.params.gap
-    util.updateProps(this.inner_group.position, { x: gap, y: gap })
-    this.group = new THREE.Group()
-    this.group.add(this.inner_group)
+    if (r === undefined && c === undefined) {
+      this.inner_group = new THREE.Group()
+      this.inner_group.add(this.points)
+      const gap = this.params.gap
+      util.updateProps(this.inner_group.position, { x: gap, y: gap })
+      this.group = new THREE.Group()
+      this.group.add(this.inner_group)
+    }
   }
 
   sizeFromData(x) {
@@ -432,8 +428,8 @@ export class Mat {
       props = { ...this.getLegendTextProps(), ...props }
       if (props.name) {
         let suf = ''
-        // suf += ` (${this.params.tag})`
         // suf += ` (${this.params.depth},${this.params.max_depth},${this.params.height})`
+        suf += ` (${this.params.count})`
         const name = this.params.getText(props.name + suf, props.name_color, props.name_size)
         const { h, w } = util.bbhw(name.geometry)
         name.geometry.rotateZ(Math.PI)
@@ -565,6 +561,7 @@ export class MatMul {
       depth: this.params.depth + 1,
       max_depth: this.params.depth + 1,
       height: 0,
+      count: 1,
     }
   }
 
@@ -607,6 +604,7 @@ export class MatMul {
     params.height = this.params.height
     params.depth = this.params.depth
     params.max_depth = this.params.max_depth
+    params.count = this.params.count
     this.result = new Mat(data, params, false)
   }
 
@@ -647,10 +645,6 @@ export class MatMul {
     }
 
     this.group.clear()
-    // @@@ WRONG @@@
-    // util.updateProps(this.group.position, { x: 0, y: 0, z: 0 })
-    // util.updateProps(this.group.rotation, { x: 0, y: 0, z: 0 })
-    // @@@
     this.flow_guide_group = undefined
 
     if (this.params.left_mm) {
@@ -673,29 +667,32 @@ export class MatMul {
 
     this.setFlowGuide()
     this.initAnimation()
-    this.setPosition()
     this.setRowGuides()
   }
 
   scatterFromHeight(h) {
-    const scatter = Math.sqrt(Math.max(0, h - this.params['scatter min height'] + 1))
-    return this.params['scatter distance'] * scatter
+    // const factor = Math.sqrt(Math.max(0, h - this.params['scatter min count']))
+    const factor = h >= this.params['scatter min count'] ? 1 : 0
+    return this.params['scatter distance'] * factor
   }
 
   getLeftScatter() {
     return this.params['balanced scatter'] ?
       this.getScatter() :
-      this.scatterFromHeight(this.left.params.height)
+      this.scatterFromHeight(this.left.params.count)
+    // this.scatterFromHeight(this.left.params.height)
   }
 
   getRightScatter() {
     return this.params['balanced scatter'] ?
       this.getScatter() :
-      this.scatterFromHeight(this.right.params.height)
+      this.scatterFromHeight(this.right.params.count)
+    // this.scatterFromHeight(this.right.params.height)
   }
 
   getScatter() {
-    const h = Math.min(this.left.params.height, this.right.params.height)
+    const h = Math.min(this.left.params.count, this.right.params.count)
+    // const h = Math.min(this.left.params.height, this.right.params.height)
     return this.scatterFromHeight(h)
   }
 
@@ -703,7 +700,6 @@ export class MatMul {
     if (this.left) {
       this.group.remove(this.left.group)
     }
-    this.left.params.tag = 'l'
     this.left.initVis()
     const gap = this.params.gap
     if (this.params['left placement'] == 'right') {
@@ -725,7 +721,6 @@ export class MatMul {
     if (this.right) {
       this.group.remove(this.right.group)
     }
-    this.right.params.tag = 'r'
     this.right.initVis()
     const gap = this.params.gap
     if (this.params['right placement'] == 'bottom') {
@@ -748,20 +743,11 @@ export class MatMul {
     if (this.result) {
       this.group.remove(this.result.group)
     }
-    this.result.params.tag = '@'
     this.result.initVis()
     this.group.add(this.result.group)
 
     // TODO push down
     this.setResultLegends()
-  }
-
-  place(params = undefined) {
-    if (params) {
-      const props = ['edge orientation', 'left placement', 'right placement', 'result placement']
-      util.updateProps(this.params, params, props)
-    }
-    this.initVis()
   }
 
   updateLabels(params = undefined) {
@@ -777,11 +763,6 @@ export class MatMul {
 
     const interior_spotlight = this.params['interior spotlight'] ? spotlight : 0
     this.anim_mats.map(m => m.updateLabels(interior_spotlight))
-  }
-
-  setPosition() {
-    // const pos = { x: -(this.W - 1) / 2, y: (this.H - 1) / 2, z: -(this.D - 1) / 2 }
-    // util.updateProps(this.group.position, pos)
   }
 
   center() {

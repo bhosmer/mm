@@ -77,7 +77,7 @@
       // layout
       gap: 3,
       'scatter distance': 0,
-      'scatter min height': 3,
+      'scatter min count': 3,
       'balanced scatter': false,
       'edge orientation': 'left to right',
       'left placement': 'left',
@@ -202,15 +202,22 @@
             if (j === undefined) {
               j = p.J
             }
+            p.count = 1
             p.depth = d
             p.max_depth = d + 1
             if (p.left_mm) {
               f(p.left_mm, i, undefined, j, d + 1)
               p.max_depth = p.left_mm.max_depth
+              p.count += p.left_mm.count
+            } else {
+              p.count += 1
             }
             if (p.right_mm) {
               f(p.right_mm, j, undefined, k, d + 1)
               p.max_depth = Math.max(p.right_mm.max_depth, p.max_depth)
+              p.count += p.right_mm.count
+            } else {
+              p.count += 1
             }
             p.height = p.max_depth - p.depth
             p.I = i
@@ -345,10 +352,10 @@
         // long paths at extremes
 
         // (((LLLL @ LLLR) @ LLR) @ LR) @ R
-        // const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", 'result name': "LLL" }
-        // const ll = { ...getParams(), left_mm: lll, 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
-        // const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", 'result name': "L" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
+        const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", 'result name': "LLL" }
+        const ll = { ...getParams(), left_mm: lll, 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
+        const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", 'result name': "L" }
+        obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
 
         // L @ (RL @ (RRL @ (RRRL @ RRRR)))
         // note here (and elsewhere) that flipping leaf inputs around is only trivial when 
@@ -376,14 +383,14 @@
         // ---
 
         // (LL @ LR) @ ((RLL @ RLR) @ ((RRLL @ RRLR) @ ((RRRLL @ RRRLR) @ RRRR)))
-        const l = { ...getParams(), 'left name': "LL", 'right name': "LR", 'result name': "L" }
-        const rrrl = { ...getParams(), 'left name': "RRRLL", 'right name': "RRRLR", 'result name': "RRRL" }
-        const rrr = { ...getParams(), left_mm: rrrl, 'right name': "RRRR", 'result name': "RRR" }
-        const rrl = { ...getParams(), 'left name': "RRLL", 'right name': "RRLR", 'result name': "RRL" }
-        const rr = { ...getParams(), left_mm: rrl, right_mm: rrr, 'result name': "RR" }
-        const rl = { ...getParams(), 'left name': "RLL", 'right name': "RLR", 'result name': "RL" }
-        const r = { ...getParams(), right_mm: rr, left_mm: rl, 'result name': "R" }
-        obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
+        // const l = { ...getParams(), 'left name': "LL", 'right name': "LR", 'result name': "L" }
+        // const rrrl = { ...getParams(), 'left name': "RRRLL", 'right name': "RRRLR", 'result name': "RRRL" }
+        // const rrr = { ...getParams(), left_mm: rrrl, 'right name': "RRRR", 'result name': "RRR" }
+        // const rrl = { ...getParams(), 'left name': "RRLL", 'right name': "RRLR", 'result name': "RRL" }
+        // const rr = { ...getParams(), left_mm: rrl, right_mm: rrr, 'result name': "RR" }
+        // const rl = { ...getParams(), 'left name': "RLL", 'right name': "RLR", 'result name': "RL" }
+        // const r = { ...getParams(), right_mm: rr, left_mm: rl, 'result name': "R" }
+        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
 
         // ---
 
@@ -667,13 +674,13 @@
 
       const gui_layout = gui.addFolder('layout')
       addIntParam(gui_layout, 'gap', 1, 32)
-      addIntParam(gui_layout, 'scatter distance', 0, 128)
-      addIntParam(gui_layout, 'scatter min height', 0, 8)
+      addIntParam(gui_layout, 'scatter distance', 0, 64)
+      addIntParam(gui_layout, 'scatter min count', 0, 16)
       addParam(gui_layout, 'balanced scatter')
       addChoiceParam(gui_layout, 'edge orientation', orientations)
-      addChoiceParam(gui_layout, 'left placement', x_placements, _ => getObj().place(getParams()))
-      addChoiceParam(gui_layout, 'right placement', y_placements, _ => getObj().place(getParams()))
-      addChoiceParam(gui_layout, 'result placement', z_placements, _ => getObj().place(getParams()))
+      addChoiceParam(gui_layout, 'left placement', x_placements)
+      addChoiceParam(gui_layout, 'right placement', y_placements)
+      addChoiceParam(gui_layout, 'result placement', z_placements)
 
       const gui_vis = gui.addFolder('vis')
       addParam(gui_vis, 'legends', x => getObj().setLegends(getParams()))
