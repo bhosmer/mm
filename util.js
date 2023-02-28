@@ -173,8 +173,8 @@ export function locate(y, x) {
 // misc object utils
 //
 
-export function updateProps(obj, donor) {
-  Object.entries(donor).map(([k, v]) => obj[k] = v)
+export function updateProps(obj, donor, f = (_, v) => v) {
+  Object.entries(donor).map(([k, v]) => obj[k] = f(k, v))
 }
 
 export function syncProp(obj, k, v) {
@@ -183,8 +183,4 @@ export function syncProp(obj, k, v) {
   }
   obj[k] = v
   return v
-}
-
-export function mapProps(obj, f, init = {}) {
-  return Object.entries(obj).reduce((acc, [k, v]) => ({ ...acc, [k]: f(v) }), init)
 }

@@ -376,14 +376,14 @@
         // ---
 
         // (LL @ LR) @ ((RLL @ RLR) @ ((RRLL @ RRLR) @ ((RRRLL @ RRRLR) @ RRRR)))
-        // const l = { ...getParams(), 'left name': "LL", 'right name': "LR", 'result name': "L" }
-        // const rrrl = { ...getParams(), 'left name': "RRRLL", 'right name': "RRRLR", 'result name': "RRRL" }
-        // const rrr = { ...getParams(), left_mm: rrrl, 'right name': "RRRR", 'result name': "RRR" }
-        // const rrl = { ...getParams(), 'left name': "RRLL", 'right name': "RRLR", 'result name': "RRL" }
-        // const rr = { ...getParams(), left_mm: rrl, right_mm: rrr, 'result name': "RR" }
-        // const rl = { ...getParams(), 'left name': "RLL", 'right name': "RLR", 'result name': "RL" }
-        // const r = { ...getParams(), right_mm: rr, left_mm: rl, 'result name': "R" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
+        const l = { ...getParams(), 'left name': "LL", 'right name': "LR", 'result name': "L" }
+        const rrrl = { ...getParams(), 'left name': "RRRLL", 'right name': "RRRLR", 'result name': "RRRL" }
+        const rrr = { ...getParams(), left_mm: rrrl, 'right name': "RRRR", 'result name': "RRR" }
+        const rrl = { ...getParams(), 'left name': "RRLL", 'right name': "RRLR", 'result name': "RRL" }
+        const rr = { ...getParams(), left_mm: rrl, right_mm: rrr, 'result name': "RR" }
+        const rl = { ...getParams(), 'left name': "RLL", 'right name': "RLR", 'result name': "RL" }
+        const r = { ...getParams(), right_mm: rr, left_mm: rl, 'result name': "R" }
+        obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
 
         // ---
 
@@ -462,23 +462,23 @@
         // also good example of where z always coming towards you breaks down a little in 
         // nice (although it's still very legible as a ~2d surface)
         // spacious: repro 3 and maybe more
-        const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", 'result name': "LLL" }
-        const llr = { ...getParams(), 'left name': "LLRL", 'right name': "LLRR", 'result name': "LLR" }
-        const ll = { ...getParams(), left_mm: lll, right_mm: llr, 'result name': "LL" }
-        const lrlr = { ...getParams(), 'left name': "LRLRL", 'right name': "LRLRR", 'result name': "LRLR" }
-        const lrl = { ...getParams(), 'left name': "LRLL", right_mm: lrlr, 'result name': "LRL" }
-        const lrr = { ...getParams(), 'left name': "LRRL", 'right name': "LRRR", 'result name': "LRR" }
-        const lr = { ...getParams(), left_mm: lrl, right_mm: lrr, 'result name': "LR" }
-        const l = { ...getParams(), left_mm: ll, right_mm: lr, 'result name': "L" }
-        const rll = { ...getParams(), 'left name': "RLLL", 'right name': "RLLR", 'result name': "RLL" }
-        const rlrl = { ...getParams(), 'left name': "RLRLL", 'right name': "RLRLR", 'result name': "RLRL" }
-        const rlr = { ...getParams(), left_mm: rlrl, 'right name': "RLRR", 'result name': "RLR" }
-        const rl = { ...getParams(), left_mm: rll, right_mm: rlr, 'result name': "RL" }
-        const rrl = { ...getParams(), 'left name': "RRLL", 'right name': "RRLR", 'result name': "RRL" }
-        const rrr = { ...getParams(), 'left name': "RRRL", 'right name': "RRRR", 'result name': "RRR" }
-        const rr = { ...getParams(), left_mm: rrl, right_mm: rrr, 'result name': "RR" }
-        const r = { ...getParams(), left_mm: rl, right_mm: rr, 'left name': "RL", 'right name': "RR", 'result name': "R" }
-        obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
+        // const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", 'result name': "LLL" }
+        // const llr = { ...getParams(), 'left name': "LLRL", 'right name': "LLRR", 'result name': "LLR" }
+        // const ll = { ...getParams(), left_mm: lll, right_mm: llr, 'result name': "LL" }
+        // const lrlr = { ...getParams(), 'left name': "LRLRL", 'right name': "LRLRR", 'result name': "LRLR" }
+        // const lrl = { ...getParams(), 'left name': "LRLL", right_mm: lrlr, 'result name': "LRL" }
+        // const lrr = { ...getParams(), 'left name': "LRRL", 'right name': "LRRR", 'result name': "LRR" }
+        // const lr = { ...getParams(), left_mm: lrl, right_mm: lrr, 'result name': "LR" }
+        // const l = { ...getParams(), left_mm: ll, right_mm: lr, 'result name': "L" }
+        // const rll = { ...getParams(), 'left name': "RLLL", 'right name': "RLLR", 'result name': "RLL" }
+        // const rlrl = { ...getParams(), 'left name': "RLRLL", 'right name': "RLRLR", 'result name': "RLRL" }
+        // const rlr = { ...getParams(), left_mm: rlrl, 'right name': "RLRR", 'result name': "RLR" }
+        // const rl = { ...getParams(), left_mm: rll, right_mm: rlr, 'result name': "RL" }
+        // const rrl = { ...getParams(), 'left name': "RRLL", 'right name': "RRLR", 'result name': "RRL" }
+        // const rrr = { ...getParams(), 'left name': "RRRL", 'right name': "RRRR", 'result name': "RRR" }
+        // const rr = { ...getParams(), left_mm: rrl, right_mm: rrr, 'result name': "RR" }
+        // const r = { ...getParams(), left_mm: rl, right_mm: rr, 'left name': "RL", 'right name': "RR", 'result name': "R" }
+        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
 
         // ---
 
@@ -506,6 +506,8 @@
 
         // need this
         obj.group.rotation.x = Math.PI
+
+        obj.center()
 
         scene.add(obj.group)
       }

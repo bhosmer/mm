@@ -536,8 +536,8 @@ export class Mat {
 export class MatMul {
 
   constructor(params, init_vis = true) {
-    this.group = new THREE.Group()
     this.params = { ...params }
+    this.group = new THREE.Group()
 
     this.H = params.I
     this.D = params.J
@@ -756,10 +756,6 @@ export class MatMul {
     this.setResultLegends()
   }
 
-  getCenter() {
-    return { x: (this.W - 1) / 2, y: (this.H - 1) / 2, z: (this.D - 1) / 2 }
-  }
-
   place(params = undefined) {
     if (params) {
       const props = ['edge orientation', 'left placement', 'right placement', 'result placement']
@@ -786,6 +782,11 @@ export class MatMul {
   setPosition() {
     // const pos = { x: -(this.W - 1) / 2, y: (this.H - 1) / 2, z: -(this.D - 1) / 2 }
     // util.updateProps(this.group.position, pos)
+  }
+
+  center() {
+    const bb = new THREE.Box3().setFromObject(this.group)
+    Object.keys(this.group.position).forEach(k => this.group.position[k] = -(bb.max[k] + bb.min[k]) / 2)
   }
 
   getAbsmax() {
