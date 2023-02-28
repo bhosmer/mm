@@ -561,7 +561,7 @@ export class MatMul {
       depth: this.params.depth + 1,
       max_depth: this.params.depth + 1,
       height: 0,
-      count: 1,
+      count: 0,
     }
   }
 
@@ -671,9 +671,7 @@ export class MatMul {
   }
 
   scatterFromHeight(h) {
-    // const factor = Math.sqrt(Math.max(0, h - this.params['scatter min count']))
-    const factor = h >= this.params['scatter min count'] ? 1 : 0
-    return this.params['scatter distance'] * factor
+    return h >= this.params['scatter min count'] ? this.params['scatter distance'] ** 1.2 : 0
   }
 
   getLeftScatter() {
