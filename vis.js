@@ -670,28 +670,17 @@ export class MatMul {
     this.setRowGuides()
   }
 
-  scatterFromHeight(h) {
-    return h >= this.params['scatter min count'] ? this.params['scatter distance'] ** 1.2 : 0
+  scatterFromCount(count) {
+    const blast = (count >= this.params.molecule) ? count ** this.params.blast : 0
+    return this.params.scatter * blast
   }
 
   getLeftScatter() {
-    return this.params['balanced scatter'] ?
-      this.getScatter() :
-      this.scatterFromHeight(this.left.params.count)
-    // this.scatterFromHeight(this.left.params.height)
+    return this.scatterFromCount(this.left.params.count)
   }
 
   getRightScatter() {
-    return this.params['balanced scatter'] ?
-      this.getScatter() :
-      this.scatterFromHeight(this.right.params.count)
-    // this.scatterFromHeight(this.right.params.height)
-  }
-
-  getScatter() {
-    const h = Math.min(this.left.params.count, this.right.params.count)
-    // const h = Math.min(this.left.params.height, this.right.params.height)
-    return this.scatterFromHeight(h)
+    return this.scatterFromCount(this.right.params.count)
   }
 
   initLeftVis() {
