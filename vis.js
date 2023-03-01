@@ -684,8 +684,14 @@ export class MatMul {
     this.left.initVis()
 
     if (this.params.layout == 'inward spiral') {
-      this.left.group.rotation.y = -Math.PI / 2
-      this.left.group.position.x = -this.getLeftScatter()
+      if (this.params['left placement'] == 'left') {
+        this.left.group.rotation.y = -Math.PI / 2
+        this.left.group.position.x = -this.getLeftScatter()
+      } else {
+        this.left.group.rotation.y = Math.PI / 2
+        this.left.group.position.x = this.getExtent().x + this.getLeftScatter()
+        this.left.group.position.z = this.getExtent().z
+      }
     }
 
     // new
@@ -717,7 +723,11 @@ export class MatMul {
 
     if (this.params.layout == 'inward spiral') {
       this.right.group.rotation.x = Math.PI / 2
-      this.right.group.position.y = -this.getRightScatter()
+      if (this.params['right placement'] == 'top') {
+        this.right.group.position.y = -this.getRightScatter()
+      } else {
+        this.right.group.position.y = this.getExtent().y + this.getRightScatter()
+      }
     }
 
     // new
@@ -739,6 +749,10 @@ export class MatMul {
 
     // this.result.params.tag = this.params.convex ? 'x' : 'v'
     if (this.params.layout == 'inward spiral') {
+      // TODO remove
+      if (this.params['result placement'] == 'back') {
+        this.result.group.position.z = this.getExtent().z
+      }
     }
 
     // new
@@ -750,6 +764,36 @@ export class MatMul {
 
     // TODO push down
     this.setResultLegends()
+  }
+
+  getPlacementInfo() {
+    return {
+      left: this.params['left placement'] == 'left' ? 1 : -1,
+      right: this.params['right placement'] == 'top' ? 1 : -1,
+      result: this.params['result placement'] == 'front' ? 1 : -1,
+      gap: this.params.gap,
+      left_scatter: this.getLeftScatter(),
+      right_scatter: this.getRightScatter(),
+      // TODO should go once layouts
+      orientation: this.params['edge orientation'] == 'right to left' ? 1 : -1,
+    }
+  }
+
+  setFlowGuide(enabled) {
+    enabled = util.syncProp(this.params, 'flow guides', enabled)
+    if (enabled) {
+      if (!this.flow_guide_group) {
+        this.flow_guide_group = util.flowGuide(this.H, this.D, this.W, this.getPlacementInfo())
+        this.group.add(this.flow_guide_group)
+      }
+    } else {
+      if (this.flow_guide_group) {
+        this.group.remove(this.flow_guide_group)
+        this.flow_guide_group = undefined
+      }
+    }
+    this.left.setFlowGuide(enabled)
+    this.right.setFlowGuide(enabled)
   }
 
   scatterFromCount(count) {
@@ -820,35 +864,6 @@ export class MatMul {
     this.left.setRowGuides(enabled)
     this.right.setRowGuides(enabled)
     this.result.setRowGuides(enabled)
-  }
-
-  getPlacementInfo() {
-    return {
-      left: this.params['left placement'] == 'left' ? 1 : -1,
-      right: this.params['right placement'] == 'top' ? 1 : -1,
-      orientation: this.params['edge orientation'] == 'right to left' ? 1 : -1,
-      gap: this.params.gap,
-      left_scatter: this.getLeftScatter(),
-      right_scatter: this.getRightScatter(),
-      result: this.params['result placement'] == 'front' ? 1 : -1,
-    }
-  }
-
-  setFlowGuide(enabled) {
-    enabled = util.syncProp(this.params, 'flow guides', enabled)
-    if (enabled) {
-      if (!this.flow_guide_group) {
-        this.flow_guide_group = util.flowGuide(this.H, this.D, this.W, this.getPlacementInfo())
-        this.group.add(this.flow_guide_group)
-      }
-    } else {
-      if (this.flow_guide_group) {
-        this.group.remove(this.flow_guide_group)
-        this.flow_guide_group = undefined
-      }
-    }
-    this.left.setFlowGuide(enabled)
-    this.right.setFlowGuide(enabled)
   }
 
   setLeftLegends() {

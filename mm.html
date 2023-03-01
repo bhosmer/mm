@@ -346,12 +346,19 @@
         // const r = { ...getParams(), left_mm: rl, right_mm: rr, 'result name': "R" }
         // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
 
-        // 4 levels but not exhaustive - focusing on r, need to get to repro 3
+        // 4+ levels but not exhaustive - focusing on r, need to get to repro 3
 
         // long paths at extremes
 
         // (((LLLL @ LLLR) @ LLR) @ LR) @ R
-        const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", 'result name': "LLL" }
+        // const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", 'result name': "LLL" }
+        // const ll = { ...getParams(), left_mm: lll, 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
+        // const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", 'result name': "L" }
+        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
+
+        // (((LLLL @ LLLR) @ LLR) @ LR) @ R
+        const llll = { ...getParams(), 'left name': "LLLLL", 'right name': "LLLLR", 'result name': "LLLL" }
+        const lll = { ...getParams(), left_mm: llll, 'right name': "LLLR", 'result name': "LLL" }
         const ll = { ...getParams(), left_mm: lll, 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
         const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", 'result name': "L" }
         obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
@@ -511,7 +518,7 @@
         // obj = new vis.MatMul(fix_shape({ ...getParams(), I: 64, J: 64, K: 128, left_mm: attn, right_mm: out, 'result name': 'out2' }))
 
         obj.group.rotation.x = Math.PI
-        // obj.center()
+        obj.center()
 
         scene.add(obj.group)
       }
