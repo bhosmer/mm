@@ -441,7 +441,8 @@ export class Mat {
       if (props.name) {
         let suf = ''
         // suf += ` (${this.params.depth},${this.params.max_depth},${this.params.height})`
-        suf += ` (${this.params.count})`
+        // suf += ` (${this.params.count})`
+        suf += this.params.tag ? ` (${this.params.tag})` : ''
         const name = this.params.getText(props.name + suf, props.name_color, props.name_size)
         const { h, w } = util.bbhw(name.geometry)
         name.geometry.rotateZ(Math.PI)
@@ -652,6 +653,8 @@ export class MatMul {
   }
 
   initVis(params = undefined) {
+    console.log(`HEY initVis ${this.params['result name']}`)
+
     if (params) {
       this.params = { ...params }
     }
@@ -659,10 +662,12 @@ export class MatMul {
     this.group.clear()
     this.flow_guide_group = undefined
 
-    // new
-    if (this.params.left_mm) {
-      this.params.left_mm.convex = !this.params.convex
-    }
+    // new 
+    // zigzag
+    this.left.params.convex = !this.params.convex
+    // spiral
+    // this.left.params.convex = !this.params.convex
+
 
     // if (this.params.right_mm) {
     //   this.params.right_mm.convex = !this.params.convex
@@ -675,6 +680,8 @@ export class MatMul {
     this.setFlowGuide()
     this.initAnimation()
     this.setRowGuides()
+
+    console.log(`HEY /initVis ${this.params['result name']}`)
   }
 
   getExtent() {
@@ -695,11 +702,19 @@ export class MatMul {
     // this.left.group.rotation.y = -Math.PI / 2
 
     // new
+    // zigzag?
     this.left.group.rotation.y = Math.PI / 2
-    if (this.params.convex) {
-      this.left.group.position.x = -(this.left.getExtent().z + this.getLeftScatter())
-    }
+    this.left.group.position.x = -(this.left.getExtent().z + this.getLeftScatter())
     this.left.group.position.z = this.getExtent().z
+
+    // spiral?
+    // this.left.group.rotation.y = -Math.PI / 2
+    // // this.left.group.position.x = -(this.left.getExtent().z + this.getLeftScatter())
+    // // this.left.group.position.z = this.getExtent().z
+
+    if (this.params.convex) {
+    } else {
+    }
 
     this.group.add(this.left.group)
 
@@ -731,6 +746,7 @@ export class MatMul {
     if (this.result) {
       this.group.remove(this.result.group)
     }
+    this.result.params.tag = this.params.convex ? 'x' : 'v'
     this.result.initVis()
 
     // old

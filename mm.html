@@ -221,7 +221,7 @@
             p.K = k
           }
           f(params, params.I, params.J, params.K, 0)
-          params.convex = true
+          params.layout = true
           return params
         }
 
@@ -231,8 +231,8 @@
         // 2 levels
 
         // (LL @ LR) @ R
-        const l = { ...getParams(), 'left name': "LL", 'right name': "LR", 'result name': "L" }
-        obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
+        // const l = { ...getParams(), 'left name': "LL", 'right name': "LR", 'result name': "L" }
+        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
 
         // L @ (RL @ RR)
         // spacious: RL/RR not oriented properly, flip RR along horizontal axis (face front, RSU)
@@ -249,9 +249,9 @@
         // 3 levels
 
         // ((LLL @ LLR) @ LR) @ R
-        // const ll = { ...getParams(), 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
-        // const l = { ...getParams(), left_mm: ll, 'right name': "LR", 'result name': "L" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
+        const ll = { ...getParams(), 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
+        const l = { ...getParams(), left_mm: ll, 'right name': "LR", 'result name': "L" }
+        obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
 
         // (LL @ (LRL @ LRR)) @ R
         // spacious: here orientation is CORRECT. test any orientation fix against this
@@ -509,7 +509,7 @@
         // obj = new vis.MatMul(fix_shape({ ...getParams(), I: 64, J: 64, K: 128, left_mm: attn, right_mm: out, 'result name': 'out2' }))
 
         obj.group.rotation.x = Math.PI
-        obj.center()
+        // obj.center()
 
         scene.add(obj.group)
       }
