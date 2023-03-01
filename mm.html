@@ -41,10 +41,11 @@
     const epilog_funcs = ['none', 'x/J', 'x/sqrt(J)', 'softmax(x/sqrt(J))', 'tanh(x)', 'relu(x)', 'layernorm']
     const sensitivities = ['local', 'global']
     const anim_algs = ['none', 'dotprod (row major)', 'dotprod (col major)', 'axpy', 'vmprod', 'mvprod', 'vvprod']
-    const orientations = ['left to right', 'right to left']
+    const orientations = ['positive', 'negative']
     const x_placements = ['left', 'right']
     const y_placements = ['top', 'bottom']
     const z_placements = ['front', 'back']
+    const layouts = ['left spiral', 'right spiral']
 
     const params = {
       // shape
@@ -75,11 +76,12 @@
       'j threads': 1,
       'k threads': 1,
       // layout
+      'layout': 'left spiral',
       gap: 3,
       scatter: 0,
       molecule: 3,
       blast: 0,
-      'edge orientation': 'left to right',
+      'arg orientation': 'negative',
       'left placement': 'left',
       'right placement': 'top',
       'result placement': 'front',
@@ -206,13 +208,11 @@
             p.depth = d
             p.max_depth = d + 1
             if (p.left_mm) {
-              p.left_mm.layout = p.layout
               f(p.left_mm, i, undefined, j, d + 1)
               p.max_depth = p.left_mm.max_depth
               p.count += p.left_mm.count
             }
             if (p.right_mm) {
-              p.right_mm.layout = p.layout
               f(p.right_mm, j, undefined, k, d + 1)
               p.max_depth = Math.max(p.right_mm.max_depth, p.max_depth)
               p.count += p.right_mm.count
@@ -222,7 +222,6 @@
             p.J = j
             p.K = k
           }
-          params.layout = 'inward spiral'
           f(params, params.I, params.J, params.K, 0)
           return params
         }
@@ -239,8 +238,8 @@
         // L @ (RL @ RR)
         // spacious: RL/RR not oriented properly, flip RR along horizontal axis (face front, RSU)
         // @@@ repro 1: just RR @@@
-        const r = { ...getParams(), 'left name': "RL", 'right name': "RR", 'result name': "R" }
-        obj = new vis.MatMul(fix_shape({ ...getParams(), right_mm: r }))
+        // const r = { ...getParams(), 'left name': "RL", 'right name': "RR", 'result name': "R" }
+        // obj = new vis.MatMul(fix_shape({ ...getParams(), right_mm: r }))
 
         // (LL @ LR) @ (RL @ RR)
         // spacious: repro 1
@@ -351,10 +350,10 @@
         // long paths at extremes
 
         // (((LLLL @ LLLR) @ LLR) @ LR) @ R
-        // const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", 'result name': "LLL" }
-        // const ll = { ...getParams(), left_mm: lll, 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
-        // const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", 'result name': "L" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
+        const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", 'result name': "LLL" }
+        const ll = { ...getParams(), left_mm: lll, 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
+        const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", 'result name': "L" }
+        obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
 
         // (((LLLL @ LLLR) @ LLR) @ LR) @ R
         // const llll = { ...getParams(), 'left name': "LLLLL", 'right name': "LLLLR", 'result name': "LLLL" }
@@ -677,11 +676,12 @@
       addIntParam(gui_anim, 'k threads', 1, 16)
 
       const gui_layout = gui.addFolder('layout')
+      addChoiceParam(gui_layout, 'layout', layouts)
       addIntParam(gui_layout, 'gap', 1, 32)
       addIntParam(gui_layout, 'scatter', 0, 256)
       addIntParam(gui_layout, 'molecule', 1, 8)
       addNumParam(gui_layout, 'blast', -2.0, 2.0)
-      addChoiceParam(gui_layout, 'edge orientation', orientations)
+      addChoiceParam(gui_layout, 'arg orientation', orientations)
       addChoiceParam(gui_layout, 'left placement', x_placements)
       addChoiceParam(gui_layout, 'right placement', y_placements)
       addChoiceParam(gui_layout, 'result placement', z_placements)
