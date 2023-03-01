@@ -683,20 +683,19 @@ export class MatMul {
     }
     this.left.initVis()
 
-    if (this.params.layout == 'left spiral') {
+    if (this.params.layout == 'spiral') {
       if (this.params['arg orientation'] == 'positive') {
         if (this.params['left placement'] == 'left') {
           this.left.group.rotation.y = -Math.PI / 2
           this.left.group.position.x = -this.getLeftScatter()
         }
-      }
-    } else {
-      if (this.params['arg orientation'] == 'negative')
+      } else {
         if (this.params['left placement'] == 'right') {
           this.left.group.rotation.y = Math.PI / 2
           this.left.group.position.x = this.getExtent().x + this.getLeftScatter()
           this.left.group.position.z = this.getExtent().z
         }
+      }
     }
     // } else {
     // }
@@ -728,7 +727,7 @@ export class MatMul {
     }
     this.right.initVis()
 
-    if (this.params.layout == 'left spiral') {
+    if (this.params.layout == 'spiral') {
       if (this.params['left placement'] == 'left') {
         if (this.params['right placement'] == 'top') {
           this.right.group.rotation.x = Math.PI / 2
@@ -768,7 +767,7 @@ export class MatMul {
     this.result.initVis()
 
     // this.result.params.tag = this.params.convex ? 'x' : 'v'
-    if (this.params.layout == 'left spiral') {
+    if (this.params.layout == 'spiral') {
       // TODO remove
       if (this.params['result placement'] == 'back') {
         this.result.group.position.z = this.getExtent().z
