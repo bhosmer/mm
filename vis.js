@@ -722,11 +722,13 @@ export class MatMul {
     this.right.initVis()
 
     if (this.params.layout == 'inward spiral') {
-      this.right.group.rotation.x = Math.PI / 2
       if (this.params['right placement'] == 'top') {
+        this.right.group.rotation.x = Math.PI / 2
         this.right.group.position.y = -this.getRightScatter()
       } else {
+        this.right.group.rotation.x = -Math.PI / 2
         this.right.group.position.y = this.getExtent().y + this.getRightScatter()
+        this.right.group.position.z = this.getExtent().z
       }
     }
 

@@ -119,7 +119,7 @@ export function rowGuide(h, w) {
 const ARROW_ATTR = new THREE.Uint8BufferAttribute([
   128, 160, 192, 160,
   128, 160, 192, 160,
-  128, 170, 255, 255,
+  128, 170, 255, 224,
 ], 4)
 ARROW_ATTR.normalized = true
 

@@ -212,7 +212,7 @@
               p.count += p.left_mm.count
             }
             if (p.right_mm) {
-              p.left_mm.layout = p.layout
+              p.right_mm.layout = p.layout
               f(p.right_mm, j, undefined, k, d + 1)
               p.max_depth = Math.max(p.right_mm.max_depth, p.max_depth)
               p.count += p.right_mm.count
@@ -239,8 +239,8 @@
         // L @ (RL @ RR)
         // spacious: RL/RR not oriented properly, flip RR along horizontal axis (face front, RSU)
         // @@@ repro 1: just RR @@@
-        // const r = { ...getParams(), 'left name': "RL", 'right name': "RR", 'result name': "R" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), right_mm: r }))
+        const r = { ...getParams(), 'left name': "RL", 'right name': "RR", 'result name': "R" }
+        obj = new vis.MatMul(fix_shape({ ...getParams(), right_mm: r }))
 
         // (LL @ LR) @ (RL @ RR)
         // spacious: repro 1
@@ -357,11 +357,11 @@
         // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
 
         // (((LLLL @ LLLR) @ LLR) @ LR) @ R
-        const llll = { ...getParams(), 'left name': "LLLLL", 'right name': "LLLLR", 'result name': "LLLL" }
-        const lll = { ...getParams(), left_mm: llll, 'right name': "LLLR", 'result name': "LLL" }
-        const ll = { ...getParams(), left_mm: lll, 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
-        const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", 'result name': "L" }
-        obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
+        // const llll = { ...getParams(), 'left name': "LLLLL", 'right name': "LLLLR", 'result name': "LLLL" }
+        // const lll = { ...getParams(), left_mm: llll, 'right name': "LLLR", 'result name': "LLL" }
+        // const ll = { ...getParams(), left_mm: lll, 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
+        // const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", 'result name': "L" }
+        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
 
         // L @ (RL @ (RRL @ (RRRL @ RRRR)))
         // note here (and elsewhere) that flipping leaf inputs around is only trivial when 
