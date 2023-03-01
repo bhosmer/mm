@@ -257,7 +257,6 @@ export class Mat {
 
     this.data = data
     this.H = data.h
-    this.D = 0
     this.W = data.w
     this.absmax = this.data.absmax()
 
@@ -268,7 +267,20 @@ export class Mat {
     }
   }
 
-  initVis(r = undefined, c = undefined, size = undefined, color = undefined) {
+  initVis() {
+    this.setColorsAndSizes()
+
+    this.inner_group = new THREE.Group()
+    this.inner_group.add(this.points)
+
+    const gap = this.params.gap
+    util.updateProps(this.inner_group.position, { x: gap, y: gap })
+
+    this.group = new THREE.Group()
+    this.group.add(this.inner_group)
+  }
+
+  setColorsAndSizes(r = undefined, c = undefined, size = undefined, color = undefined) {
     const [rstart, rend] = toRange(r, this.H)
     const [cstart, cend] = toRange(c, this.W)
     size = size || this.sizeFromData.bind(this)
@@ -281,14 +293,14 @@ export class Mat {
         this.checkLabel(i, j, x)
       }
     }
-    if (r === undefined && c === undefined) {
-      this.inner_group = new THREE.Group()
-      this.inner_group.add(this.points)
-      const gap = this.params.gap
-      util.updateProps(this.inner_group.position, { x: gap, y: gap })
-      this.group = new THREE.Group()
-      this.group.add(this.inner_group)
-    }
+  }
+
+  getExtent() {
+    return this._extents || (this._extents = {
+      x: this.W + 2 * this.params.gap - 1,
+      y: this.H + 2 * this.params.gap - 1,
+      z: 0,
+    })
   }
 
   sizeFromData(x) {
@@ -344,7 +356,7 @@ export class Mat {
     if (this.params.stretch_absmax) {
       this.absmax = Math.max(this.absmax, this.data.absmax())
     }
-    this.initVis(r, c)
+    this.setColorsAndSizes(r, c)
   }
 
   getData(i, j) {
@@ -374,11 +386,11 @@ export class Mat {
   }
 
   show(r = undefined, c = undefined) {
-    this.initVis(r, c)
+    this.setColorsAndSizes(r, c)
   }
 
   hide(r = undefined, c = undefined) {
-    this.initVis(r, c, _ => 0, _ => ZERO_COLOR)
+    this.setColorsAndSizes(r, c, _ => 0, _ => ZERO_COLOR)
   }
 
   isHidden(i, j) {
@@ -387,7 +399,7 @@ export class Mat {
 
   bumpColor(r = undefined, c = undefined) {
     const bump = new THREE.Color(0x808080)
-    this.initVis(r, c, undefined, x => this.colorFromData(x).add(bump))
+    this.setColorsAndSizes(r, c, undefined, x => this.colorFromData(x).add(bump))
   }
 
   setRowGuides(enabled = undefined) {
@@ -647,19 +659,14 @@ export class MatMul {
     this.group.clear()
     this.flow_guide_group = undefined
 
+    // new
     if (this.params.left_mm) {
-      if (this.params['left placement'] == 'left') {
-        this.left.params['left placement'] = 'right'
-        this.left.params['right placement'] = 'bottom'
-      }
+      this.params.left_mm.convex = !this.params.convex
     }
 
-    if (this.params.right_mm) {
-      if (this.params['right placement'] == 'top') {
-        this.right.params['left placement'] = 'right'
-        this.right.params['right placement'] = 'bottom'
-      }
-    }
+    // if (this.params.right_mm) {
+    //   this.params.right_mm.convex = !this.params.convex
+    // }
 
     this.initLeftVis()
     this.initRightVis()
@@ -668,6 +675,75 @@ export class MatMul {
     this.setFlowGuide()
     this.initAnimation()
     this.setRowGuides()
+  }
+
+  getExtent() {
+    return this._extents || (this._extents = {
+      x: this.W + 2 * this.params.gap - 1,
+      y: this.H + 2 * this.params.gap - 1,
+      z: this.D + 2 * this.params.gap - 1,
+    })
+  }
+
+  initLeftVis() {
+    if (this.left) {
+      this.group.remove(this.left.group)
+    }
+    this.left.initVis()
+
+    // old
+    // this.left.group.rotation.y = -Math.PI / 2
+
+    // new
+    this.left.group.rotation.y = Math.PI / 2
+    if (this.params.convex) {
+      this.left.group.position.x = -(this.left.getExtent().z + this.getLeftScatter())
+    }
+    this.left.group.position.z = this.getExtent().z
+
+    this.group.add(this.left.group)
+
+    // TODO push down
+    this.setLeftLegends()
+  }
+
+  initRightVis() {
+    if (this.right) {
+      this.group.remove(this.right.group)
+    }
+    this.right.initVis()
+
+    // old
+    // this.right.group.rotation.x = Math.PI / 2
+    // this.right.group.position.y = -this.getRightScatter()
+
+    // new
+    this.right.group.rotation.x = -Math.PI / 2
+    this.right.group.position.z = this.getExtent().z
+
+    this.group.add(this.right.group)
+
+    // TODO push down 
+    this.setRightLegends()
+  }
+
+  initResultVis() {
+    if (this.result) {
+      this.group.remove(this.result.group)
+    }
+    this.result.initVis()
+
+    // old
+
+    // new
+    if (!this.params.convex) {
+      this.result.group.position.z = this.getExtent().z
+    }
+
+    this.group.add(this.result.group)
+
+    // TODO push down
+    this.setResultLegends()
   }
 
   scatterFromCount(count) {
@@ -681,60 +757,6 @@ export class MatMul {
 
   getRightScatter() {
     return this.scatterFromCount(this.right.params.count)
-  }
-
-  initLeftVis() {
-    if (this.left) {
-      this.group.remove(this.left.group)
-    }
-    this.left.initVis()
-    const gap = this.params.gap
-    if (this.params['left placement'] == 'right') {
-      this.left.group.position.x = this.W + 2 * gap - 1 + this.getLeftScatter()
-      this.left.group.position.z = this.D + 2 * gap - 1
-      this.left.group.rotation.y = Math.PI / 2
-    } else {
-      this.left.group.rotation.y = -Math.PI / 2
-      this.left.group.position.x = -this.getLeftScatter()
-    }
-
-    this.group.add(this.left.group)
-
-    // TODO push down
-    this.setLeftLegends()
-  }
-
-  initRightVis() {
-    if (this.right) {
-      this.group.remove(this.right.group)
-    }
-    this.right.initVis()
-    const gap = this.params.gap
-    if (this.params['right placement'] == 'bottom') {
-      this.right.group.position.y = this.H + 2 * gap - 1 + this.getRightScatter()
-      this.right.group.position.z = this.D + 2 * gap - 1
-      this.right.group.rotation.x = -Math.PI / 2
-    } else {
-      this.right.group.rotation.x = Math.PI / 2
-      this.right.group.position.y = -this.getRightScatter()
-    }
-
-
-    this.group.add(this.right.group)
-
-    // TODO push down 
-    this.setRightLegends()
-  }
-
-  initResultVis() {
-    if (this.result) {
-      this.group.remove(this.result.group)
-    }
-    this.result.initVis()
-    this.group.add(this.result.group)
-
-    // TODO push down
-    this.setResultLegends()
   }
 
   updateLabels(params = undefined) {
@@ -752,9 +774,13 @@ export class MatMul {
     this.anim_mats.map(m => m.updateLabels(interior_spotlight))
   }
 
+  getBoundingBox() {
+    return new THREE.Box3().setFromObject(this.group)
+  }
+
   center() {
-    const bb = new THREE.Box3().setFromObject(this.group)
-    Object.keys(this.group.position).forEach(k => this.group.position[k] = -(bb.max[k] + bb.min[k]) / 2)
+    const c = this.getBoundingBox().getCenter(new THREE.Vector3())
+    util.updateProps(this.group.position, c.negate())
   }
 
   getAbsmax() {
@@ -791,14 +817,20 @@ export class MatMul {
   }
 
   getPlacementInfo() {
+    // TODO port the rest
     return {
       left: this.params['left placement'] == 'left' ? 1 : -1,
       right: this.params['right placement'] == 'top' ? 1 : -1,
-      result: this.params['result placement'] == 'front' ? 1 : -1,
       orientation: this.params['edge orientation'] == 'right to left' ? 1 : -1,
       gap: this.params.gap,
       left_scatter: this.getLeftScatter(),
       right_scatter: this.getRightScatter(),
+
+      // old
+      // result: this.params['result placement'] == 'front' ? 1 : -1,
+
+      // new
+      result: this.params.convex ? 1 : -1,
     }
   }
 
@@ -920,7 +952,7 @@ export class MatMul {
   }
 
   getAnimMatParams() {
-    return { ...this.prepChildParams(), stretch_absmax: true }
+    return { ...this.getLeafParams(), stretch_absmax: true }
   }
 
   getAnimResultMats() {
@@ -987,7 +1019,7 @@ export class MatMul {
         if (sweep) {
           this.grid('k', ({ start: k, extent: kx }) => {
             if (oldk < kx) {
-              this.right.initVis(undefined, k + oldk)
+              this.right.setColorsAndSizes(undefined, k + oldk)
             }
             if (curk < kx) {
               this.right.bumpColor(undefined, k + curk)
@@ -997,7 +1029,7 @@ export class MatMul {
         if (oldi != curi) {
           this.grid('i', ({ start: i, extent: ix }) => {
             if (oldi < ix) {
-              this.left.initVis(i + oldi, undefined)
+              this.left.setColorsAndSizes(i + oldi, undefined)
             }
             if (curi < ix) {
               this.left.bumpColor(i + curi, undefined)
@@ -1021,6 +1053,8 @@ export class MatMul {
   }
 
   initAnimMvprod(sweep) {
+    const gap = this.params.gap
+    const { y: exty, z: extz } = this.getExtent()
     const results = this.getAnimResultMats()
 
     const mvps = {}
@@ -1028,8 +1062,9 @@ export class MatMul {
       const mvpinit = (ii, ji) => this.ijkmul(i + ii, j + ji, k)
       const data = Array2D.fromInit(sweep ? 1 : ix, jx, mvpinit)
       const mvp = new Mat(data, this.getAnimMatParams(), true)
-      util.updateProps(mvp.group.position, { x: k, y: -i, z: j })
-      util.updateProps(mvp.group.rotation, { y: Math.PI / 2, z: Math.PI })
+      mvp.hide()
+      util.updateProps(mvp.group.position, { x: gap + k, z: extz + j })
+      util.updateProps(mvp.group.rotation, { y: Math.PI / 2 })
       mvps[[i, j, k]] = mvp
       this.anim_mats.push(mvp)
       this.group.add(mvp.group)
@@ -1064,7 +1099,7 @@ export class MatMul {
         if (sweep) {
           this.grid('i', ({ start: i, extent: ix }) => {
             if (oldi < ix) {
-              this.left.initVis(i + oldi, undefined)
+              this.left.setColorsAndSizes(i + oldi, undefined)
             }
             if (curi < ix) {
               this.left.bumpColor(i + curi, undefined)
@@ -1074,7 +1109,7 @@ export class MatMul {
         if (oldk != curk) {
           this.grid('k', ({ start: k, extent: kx }) => {
             if (oldk < kx) {
-              this.right.initVis(undefined, k + oldk)
+              this.right.setColorsAndSizes(undefined, k + oldk)
             }
             if (curk < kx) {
               this.right.bumpColor(undefined, k + curk)
@@ -1087,7 +1122,7 @@ export class MatMul {
       this.grid('ijk', ({ start: i, extent: ix }, { start: j }, { start: k, extent: kx }) => {
         const mvp = mvps[[i, j, k]]
         if (curi < ix && curk < kx) {
-          util.updateProps(mvp.group.position, { x: k + curk, y: -i - curi })
+          util.updateProps(mvp.group.position, { x: gap + k + curk, y: i + curi })
           mvp.reinit((ii, ji) => this.ijkmul(i + curi + ii, j + ji, k + curk))
         }
       })
@@ -1140,7 +1175,7 @@ export class MatMul {
         if (sweep) {
           this.grid('jk', ({ start: j, extent: jx }, { start: k, extent: kx }) => {
             if (oldj < jx && oldk < kx) {
-              this.right.initVis(j + oldj, k + oldk)
+              this.right.setColorsAndSizes(j + oldj, k + oldk)
             }
             if (curj < jx && curk < kx) {
               this.right.bumpColor(j + curj, k + curk)
@@ -1149,7 +1184,7 @@ export class MatMul {
         } else {
           this.grid('j', ({ start: j, extent: jx }) => {
             if (oldj < jx) {
-              this.right.initVis(j + oldj, undefined)
+              this.right.setColorsAndSizes(j + oldj, undefined)
             }
             if (curj < jx) {
               this.right.bumpColor(j + curj, undefined)
@@ -1158,7 +1193,7 @@ export class MatMul {
         }
         this.grid('j', ({ start: j, extent: jx }) => {
           if (oldj < jx) {
-            this.left.initVis(undefined, j + oldj)
+            this.left.setColorsAndSizes(undefined, j + oldj)
           }
           if (curj < jx) {
             this.left.bumpColor(undefined, j + curj)
