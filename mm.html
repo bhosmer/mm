@@ -206,11 +206,13 @@
             p.depth = d
             p.max_depth = d + 1
             if (p.left_mm) {
+              p.left_mm.layout = p.layout
               f(p.left_mm, i, undefined, j, d + 1)
               p.max_depth = p.left_mm.max_depth
               p.count += p.left_mm.count
             }
             if (p.right_mm) {
+              p.left_mm.layout = p.layout
               f(p.right_mm, j, undefined, k, d + 1)
               p.max_depth = Math.max(p.right_mm.max_depth, p.max_depth)
               p.count += p.right_mm.count
@@ -220,8 +222,8 @@
             p.J = j
             p.K = k
           }
+          params.layout = 'inward spiral'
           f(params, params.I, params.J, params.K, 0)
-          params.layout = true
           return params
         }
 
@@ -249,9 +251,9 @@
         // 3 levels
 
         // ((LLL @ LLR) @ LR) @ R
-        const ll = { ...getParams(), 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
-        const l = { ...getParams(), left_mm: ll, 'right name': "LR", 'result name': "L" }
-        obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
+        // const ll = { ...getParams(), 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
+        // const l = { ...getParams(), left_mm: ll, 'right name': "LR", 'result name': "L" }
+        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
 
         // (LL @ (LRL @ LRR)) @ R
         // spacious: here orientation is CORRECT. test any orientation fix against this
@@ -349,10 +351,10 @@
         // long paths at extremes
 
         // (((LLLL @ LLLR) @ LLR) @ LR) @ R
-        // const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", 'result name': "LLL" }
-        // const ll = { ...getParams(), left_mm: lll, 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
-        // const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", 'result name': "L" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
+        const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", 'result name': "LLL" }
+        const ll = { ...getParams(), left_mm: lll, 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
+        const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", 'result name': "L" }
+        obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
 
         // L @ (RL @ (RRL @ (RRRL @ RRRR)))
         // note here (and elsewhere) that flipping leaf inputs around is only trivial when 
@@ -669,7 +671,7 @@
 
       const gui_layout = gui.addFolder('layout')
       addIntParam(gui_layout, 'gap', 1, 32)
-      addIntParam(gui_layout, 'scatter', 0, 128)
+      addIntParam(gui_layout, 'scatter', 0, 256)
       addIntParam(gui_layout, 'molecule', 1, 8)
       addNumParam(gui_layout, 'blast', -2.0, 2.0)
       addChoiceParam(gui_layout, 'edge orientation', orientations)

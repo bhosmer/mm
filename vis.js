@@ -653,25 +653,12 @@ export class MatMul {
   }
 
   initVis(params = undefined) {
-    console.log(`HEY initVis ${this.params['result name']}`)
-
     if (params) {
       this.params = { ...params }
     }
 
     this.group.clear()
     this.flow_guide_group = undefined
-
-    // new 
-    // zigzag
-    this.left.params.convex = !this.params.convex
-    // spiral
-    // this.left.params.convex = !this.params.convex
-
-
-    // if (this.params.right_mm) {
-    //   this.params.right_mm.convex = !this.params.convex
-    // }
 
     this.initLeftVis()
     this.initRightVis()
@@ -680,8 +667,6 @@ export class MatMul {
     this.setFlowGuide()
     this.initAnimation()
     this.setRowGuides()
-
-    console.log(`HEY /initVis ${this.params['result name']}`)
   }
 
   getExtent() {
@@ -698,23 +683,25 @@ export class MatMul {
     }
     this.left.initVis()
 
-    // old
-    // this.left.group.rotation.y = -Math.PI / 2
+    if (this.params.layout == 'inward spiral') {
+      this.left.group.rotation.y = -Math.PI / 2
+      this.left.group.position.x = -this.getLeftScatter()
+    }
 
     // new
     // zigzag?
-    this.left.group.rotation.y = Math.PI / 2
-    this.left.group.position.x = -(this.left.getExtent().z + this.getLeftScatter())
-    this.left.group.position.z = this.getExtent().z
+    // this.left.group.rotation.y = Math.PI / 2
+    // this.left.group.position.x = -(this.left.getExtent().z + this.getLeftScatter())
+    // this.left.group.position.z = this.getExtent().z
 
     // spiral?
     // this.left.group.rotation.y = -Math.PI / 2
     // // this.left.group.position.x = -(this.left.getExtent().z + this.getLeftScatter())
     // // this.left.group.position.z = this.getExtent().z
 
-    if (this.params.convex) {
-    } else {
-    }
+    // if (this.params.convex) {
+    // } else {
+    // }
 
     this.group.add(this.left.group)
 
@@ -728,13 +715,14 @@ export class MatMul {
     }
     this.right.initVis()
 
-    // old
-    // this.right.group.rotation.x = Math.PI / 2
-    // this.right.group.position.y = -this.getRightScatter()
+    if (this.params.layout == 'inward spiral') {
+      this.right.group.rotation.x = Math.PI / 2
+      this.right.group.position.y = -this.getRightScatter()
+    }
 
     // new
-    this.right.group.rotation.x = -Math.PI / 2
-    this.right.group.position.z = this.getExtent().z
+    // this.right.group.rotation.x = -Math.PI / 2
+    // this.right.group.position.z = this.getExtent().z
 
     this.group.add(this.right.group)
 
@@ -746,15 +734,17 @@ export class MatMul {
     if (this.result) {
       this.group.remove(this.result.group)
     }
-    this.result.params.tag = this.params.convex ? 'x' : 'v'
+
     this.result.initVis()
 
-    // old
+    // this.result.params.tag = this.params.convex ? 'x' : 'v'
+    if (this.params.layout == 'inward spiral') {
+    }
 
     // new
-    if (!this.params.convex) {
-      this.result.group.position.z = this.getExtent().z
-    }
+    // if (!this.params.convex) {
+    //   this.result.group.position.z = this.getExtent().z
+    // }
 
     this.group.add(this.result.group)
 
@@ -833,7 +823,6 @@ export class MatMul {
   }
 
   getPlacementInfo() {
-    // TODO port the rest
     return {
       left: this.params['left placement'] == 'left' ? 1 : -1,
       right: this.params['right placement'] == 'top' ? 1 : -1,
@@ -841,12 +830,7 @@ export class MatMul {
       gap: this.params.gap,
       left_scatter: this.getLeftScatter(),
       right_scatter: this.getRightScatter(),
-
-      // old
-      // result: this.params['result placement'] == 'front' ? 1 : -1,
-
-      // new
-      result: this.params.convex ? 1 : -1,
+      result: this.params['result placement'] == 'front' ? 1 : -1,
     }
   }
 
