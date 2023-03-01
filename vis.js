@@ -685,13 +685,17 @@ export class MatMul {
 
     if (this.params.layout == 'spiral') {
       if (this.params['arg orientation'] == 'positive') {
+        this.left.group.rotation.y = -Math.PI / 2
         if (this.params['left placement'] == 'left') {
-          this.left.group.rotation.y = -Math.PI / 2
           this.left.group.position.x = -this.getLeftScatter()
+        } else { // right
+          this.left.group.position.x = this.getExtent().x + this.getLeftScatter()
         }
-      } else {
-        if (this.params['left placement'] == 'right') {
-          this.left.group.rotation.y = Math.PI / 2
+      } else { // negative
+        this.left.group.rotation.y = Math.PI / 2
+        if (this.params['left placement'] == 'left') {
+          this.left.group.position.z = this.getExtent().z
+        } else { // right
           this.left.group.position.x = this.getExtent().x + this.getLeftScatter()
           this.left.group.position.z = this.getExtent().z
         }
@@ -728,25 +732,41 @@ export class MatMul {
     this.right.initVis()
 
     if (this.params.layout == 'spiral') {
-      if (this.params['left placement'] == 'left') {
+      if (this.params['arg orientation'] == 'positive') {
+        this.right.group.rotation.x = Math.PI / 2
         if (this.params['right placement'] == 'top') {
-          this.right.group.rotation.x = Math.PI / 2
           this.right.group.position.y = -this.getRightScatter()
-        } else {
-          this.right.group.rotation.x = -Math.PI / 2
+        } else { // bottom
           this.right.group.position.y = this.getExtent().y + this.getRightScatter()
-          this.right.group.position.z = this.getExtent().z
         }
-      } else {
+      } else { // negative
+        this.right.group.rotation.x = -Math.PI / 2
         if (this.params['right placement'] == 'top') {
-          this.right.group.rotation.x = -Math.PI / 2
           this.right.group.position.z = this.getExtent().z
-        } else {
-          this.right.group.rotation.x = -Math.PI / 2
+        } else { // bottom
           this.right.group.position.y = this.getExtent().y + this.getRightScatter()
           this.right.group.position.z = this.getExtent().z
         }
       }
+      // if (this.params['left placement'] == 'left') {
+      //   if (this.params['right placement'] == 'top') {
+      //     this.right.group.rotation.x = Math.PI / 2
+      //     this.right.group.position.y = -this.getRightScatter()
+      //   } else {
+      //     this.right.group.rotation.x = -Math.PI / 2
+      //     this.right.group.position.y = this.getExtent().y + this.getRightScatter()
+      //     this.right.group.position.z = this.getExtent().z
+      //   }
+      // } else {
+      //   if (this.params['right placement'] == 'top') {
+      //     this.right.group.rotation.x = -Math.PI / 2
+      //     this.right.group.position.z = this.getExtent().z
+      //   } else {
+      //     this.right.group.rotation.x = -Math.PI / 2
+      //     this.right.group.position.y = this.getExtent().y + this.getRightScatter()
+      //     this.right.group.position.z = this.getExtent().z
+      //   }
+      // }
     }
 
     // new
