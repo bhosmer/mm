@@ -227,13 +227,13 @@
         }
 
         // L @ R
-        obj = new vis.MatMul(fix_shape(getParams()))
+        // obj = new vis.MatMul(fix_shape(getParams()))
 
         // 2 levels
 
         // (LL @ LR) @ R
-        // const l = { ...getParams(), 'left name': "LL", 'right name': "LR", 'result name': "L" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
+        const l = { ...getParams(), 'left name': "LL", 'right name': "LR", 'result name': "L" }
+        obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
 
         // L @ (RL @ RR)
         // spacious: RL/RR not oriented properly, flip RR along horizontal axis (face front, RSU)

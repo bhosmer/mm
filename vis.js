@@ -694,6 +694,7 @@ export class MatMul {
       } else { // negative
         this.left.group.rotation.y = Math.PI / 2
         if (this.params['left placement'] == 'left') {
+          this.left.group.position.x = -(this.left.getExtent().z + this.getLeftScatter())
           this.left.group.position.z = this.getExtent().z
         } else { // right
           this.left.group.position.x = this.getExtent().x + this.getLeftScatter()
