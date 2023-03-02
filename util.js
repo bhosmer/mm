@@ -118,7 +118,7 @@ export function rowGuide(h, w) {
 
 const ARROW_ATTR = new THREE.Uint8BufferAttribute([
   128, 160, 192, 160,
-  128, 160, 192, 160,
+  128, 160, 192, 128,
   128, 170, 255, 224,
 ], 4)
 ARROW_ATTR.normalized = true
@@ -135,7 +135,7 @@ export function flowGuide(h, d, w, placement) {
   const left_geometry = new THREE.BufferGeometry()
   left_geometry.setAttribute('position', new THREE.Float32BufferAttribute([
     place_left(gap - left_scatter), (h + gap * 2) / 2, place_result((d + gap * 2) / 2 - 1),
-    place_left(gap + w / 2), (h + gap * 2) / 2, place_result((d + gap * 2) / 2 - d / 6 - 1),
+    place_left(gap + w / 2), (h + gap * 2) / 2, place_result((d + gap * 2) / 2 - d / 4 - 1),
     place_left(gap + w / 2), (h + gap * 2) / 2, place_result(gap),
   ], 3))
   left_geometry.setAttribute('color', ARROW_ATTR)
@@ -144,7 +144,7 @@ export function flowGuide(h, d, w, placement) {
   const right_geometry = new THREE.BufferGeometry()
   right_geometry.setAttribute('position', new THREE.Float32BufferAttribute([
     (w + gap * 2) / 2, place_right(gap - right_scatter), place_result((d + gap * 2) / 2 - 1),
-    (w + gap * 2) / 2, place_right(gap + h / 2), place_result((d + gap * 2) / 2 - d / 6 - 1),
+    (w + gap * 2) / 2, place_right(gap + h / 2), place_result((d + gap * 2) / 2 - d / 4 - 1),
     (w + gap * 2) / 2, place_right(gap + h / 2), place_result(gap),
   ], 3))
   right_geometry.setAttribute('color', ARROW_ATTR)

@@ -232,8 +232,8 @@
         // 2 levels
 
         // (LL @ LR) @ R
-        const l = { ...getParams(), 'left name': "LL", 'right name': "LR", 'result name': "L" }
-        obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
+        // const l = { ...getParams(), 'left name': "LL", 'right name': "LR", 'result name': "L" }
+        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
 
         // L @ (RL @ RR)
         // spacious: RL/RR not oriented properly, flip RR along horizontal axis (face front, RSU)
@@ -355,12 +355,12 @@
         // const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", 'result name': "L" }
         // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
 
-        // (((LLLL @ LLLR) @ LLR) @ LR) @ R
-        // const llll = { ...getParams(), 'left name': "LLLLL", 'right name': "LLLLR", 'result name': "LLLL" }
-        // const lll = { ...getParams(), left_mm: llll, 'right name': "LLLR", 'result name': "LLL" }
-        // const ll = { ...getParams(), left_mm: lll, 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
-        // const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", 'result name': "L" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
+        // ((((LLLLL @ LLLLR) @ LLLR) @ LLR) @ LR) @ R
+        const llll = { ...getParams(), 'left name': "LLLLL", 'right name': "LLLLR", 'result name': "LLLL" }
+        const lll = { ...getParams(), left_mm: llll, 'right name': "LLLR", 'result name': "LLL" }
+        const ll = { ...getParams(), left_mm: lll, 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
+        const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", 'result name': "L" }
+        obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
 
         // L @ (RL @ (RRL @ (RRRL @ RRRR)))
         // note here (and elsewhere) that flipping leaf inputs around is only trivial when 
