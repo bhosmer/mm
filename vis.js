@@ -689,16 +689,15 @@ export class MatMul {
         if (this.params['left placement'] == 'left') {
           this.left.group.position.x = -this.getLeftScatter()
         } else { // right
-          this.left.group.position.x = this.getExtent().x + this.getLeftScatter()
+          this.left.group.position.x = this.getExtent().x + this.left.getExtent().z + this.getLeftScatter()
         }
       } else { // negative
         this.left.group.rotation.y = Math.PI / 2
+        this.left.group.position.z = this.getExtent().z
         if (this.params['left placement'] == 'left') {
           this.left.group.position.x = -(this.left.getExtent().z + this.getLeftScatter())
-          this.left.group.position.z = this.getExtent().z
         } else { // right
           this.left.group.position.x = this.getExtent().x + this.getLeftScatter()
-          this.left.group.position.z = this.getExtent().z
         }
       }
     }
