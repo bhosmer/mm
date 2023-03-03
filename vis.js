@@ -652,6 +652,14 @@ export class MatMul {
     return this.left.getData(i, j) * this.right.getData(j, k)
   }
 
+  getExtent() {
+    return this._extents || (this._extents = {
+      x: this.W + 2 * this.params.gap - 1,
+      y: this.H + 2 * this.params.gap - 1,
+      z: this.D + 2 * this.params.gap - 1,
+    })
+  }
+
   initVis(params = undefined) {
     if (params) {
       this.params = { ...params }
@@ -660,6 +668,22 @@ export class MatMul {
     this.group.clear()
     this.flow_guide_group = undefined
 
+    if (this.params['left placement'] == 'left/right') {
+      this.left.params['left placement'] = 'right/left'
+      this.right.params['left placement'] = 'right/left'
+    } else if (this.params['left placement'] == 'right/left') {
+      this.left.params['left placement'] = 'left/right'
+      this.right.params['left placement'] = 'left/right'
+    }
+
+    if (this.params['right placement'] == 'top/bottom') {
+      this.left.params['right placement'] = 'bottom/top'
+      this.right.params['right placement'] = 'bottom/top'
+    } else if (this.params['right placement'] == 'bottom/top') {
+      this.left.params['right placement'] = 'top/bottom'
+      this.right.params['right placement'] = 'top/bottom'
+    }
+
     this.initLeftVis()
     this.initRightVis()
     this.initResultVis()
@@ -667,14 +691,6 @@ export class MatMul {
     this.setFlowGuide()
     this.initAnimation()
     this.setRowGuides()
-  }
-
-  getExtent() {
-    return this._extents || (this._extents = {
-      x: this.W + 2 * this.params.gap - 1,
-      y: this.H + 2 * this.params.gap - 1,
-      z: this.D + 2 * this.params.gap - 1,
-    })
   }
 
   initLeftVis() {
@@ -686,19 +702,18 @@ export class MatMul {
     if (this.params.layout == 'spiral') {
       if (this.params['arg orientation'] == 'positive') {
         this.left.group.rotation.y = -Math.PI / 2
-        this.left.group.position.x = this.params['left placement'] == 'left' ?
+        this.left.group.position.x = this.params['left placement'].startsWith('left') ?
           -this.getLeftScatter() :
           this.getExtent().x + this.left.getExtent().z + this.getLeftScatter()
       } else { // negative
         this.left.group.rotation.y = Math.PI / 2
         this.left.group.position.z = this.getExtent().z
-        this.left.group.position.x = this.params['left placement'] == 'left' ?
+        this.left.group.position.x = this.params['left placement'].startsWith('left') ?
           -(this.left.getExtent().z + this.getLeftScatter()) :
           this.getExtent().x + this.getLeftScatter()
       }
+      // } else {
     }
-    // } else {
-    // }
 
     // new
     // zigzag?
@@ -730,13 +745,13 @@ export class MatMul {
     if (this.params.layout == 'spiral') {
       if (this.params['arg orientation'] == 'positive') {
         this.right.group.rotation.x = Math.PI / 2
-        this.right.group.position.y = this.params['right placement'] == 'top' ?
+        this.right.group.position.y = this.params['right placement'].startsWith('top') ?
           -this.getRightScatter() :
           this.getExtent().y + this.right.getExtent().z + this.getRightScatter()
       } else { // negative
         this.right.group.rotation.x = -Math.PI / 2
         this.right.group.position.z = this.getExtent().z
-        this.right.group.position.y = this.params['right placement'] == 'top' ?
+        this.right.group.position.y = this.params['right placement'].startsWith('top') ?
           -(this.right.getExtent().z + this.getRightScatter()) :
           this.getExtent().y + this.getRightScatter()
       }
@@ -799,7 +814,7 @@ export class MatMul {
   getPlacementInfo() {
     return {
       left: this.params['left placement'] == 'left' ? 1 : -1,
-      right: this.params['right placement'] == 'top' ? 1 : -1,
+      right: this.params['right placement'].startsWith('top') ? 1 : -1,
       result: this.params['result placement'] == 'front' ? 1 : -1,
       zip: this.params['arg orientation'] == 'positive' ? 1 : -1,
       gap: this.params.gap,
