@@ -668,8 +668,6 @@ export class MatMul {
     this.group.clear()
     this.flow_guide_group = undefined
 
-    // this.left.params = {'left/right': 'right/left', }
-
     if (this.params['arg orientation'] == 'positive/negative') {
       this.left.params['arg orientation'] = 'negative/positive'
       this.right.params['arg orientation'] = 'negative/positive'
@@ -712,11 +710,7 @@ export class MatMul {
   }
 
   initLeftVis() {
-    if (this.left) {
-      this.group.remove(this.left.group)
-    }
     this.left.initVis()
-
     if (this.params['arg orientation'].startsWith('positive')) {
       this.left.group.rotation.y = -Math.PI / 2
       this.left.group.position.x = this.params['left placement'].startsWith('left') ?
@@ -729,7 +723,6 @@ export class MatMul {
         -(this.left.getExtent().z + this.getLeftScatter()) :
         this.getExtent().x + this.getLeftScatter()
     }
-
     this.group.add(this.left.group)
 
     // TODO push down
@@ -737,11 +730,7 @@ export class MatMul {
   }
 
   initRightVis() {
-    if (this.right) {
-      this.group.remove(this.right.group)
-    }
     this.right.initVis()
-
     if (this.params['arg orientation'].startsWith('positive')) {
       this.right.group.rotation.x = Math.PI / 2
       this.right.group.position.y = this.params['right placement'].startsWith('top') ?
@@ -754,7 +743,6 @@ export class MatMul {
         -(this.right.getExtent().z + this.getRightScatter()) :
         this.getExtent().y + this.getRightScatter()
     }
-
     this.group.add(this.right.group)
 
     // TODO push down 
@@ -762,16 +750,10 @@ export class MatMul {
   }
 
   initResultVis() {
-    if (this.result) {
-      this.group.remove(this.result.group)
-    }
-
     this.result.initVis()
-
     this.result.group.position.z = this.params['result placement'].startsWith('back') ?
       this.getExtent().z :
       0
-
     this.group.add(this.result.group)
 
     // TODO push down
