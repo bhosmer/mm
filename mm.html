@@ -41,10 +41,10 @@
     const epilog_funcs = ['none', 'x/J', 'x/sqrt(J)', 'softmax(x/sqrt(J))', 'tanh(x)', 'relu(x)', 'layernorm']
     const sensitivities = ['local', 'global']
     const anim_algs = ['none', 'dotprod (row major)', 'dotprod (col major)', 'axpy', 'vmprod', 'mvprod', 'vvprod']
-    const orientations = ['positive', 'negative']
+    const orientations = ['positive', 'negative', 'positive/negative', 'negative/positive']
     const x_placements = ['left', 'right', 'left/right', 'right/left']
     const y_placements = ['top', 'bottom', 'top/bottom', 'bottom/top']
-    const z_placements = ['front', 'back']
+    const z_placements = ['front', 'back', 'front/back', 'back/front']
     const layouts = ['spiral', 'zigzag']
 
     const params = {
@@ -250,9 +250,9 @@
         // 3 levels
 
         // ((LLL @ LLR) @ LR) @ R
-        const ll = { ...getParams(), 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
-        const l = { ...getParams(), left_mm: ll, 'right name': "LR", 'result name': "L" }
-        obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
+        // const ll = { ...getParams(), 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
+        // const l = { ...getParams(), left_mm: ll, 'right name': "LR", 'result name': "L" }
+        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
 
         // (LL @ (LRL @ LRR)) @ R
         // spacious: here orientation is CORRECT. test any orientation fix against this
@@ -350,10 +350,10 @@
         // long paths at extremes
 
         // (((LLLL @ LLLR) @ LLR) @ LR) @ R
-        // const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", 'result name': "LLL" }
-        // const ll = { ...getParams(), left_mm: lll, 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
-        // const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", 'result name': "L" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
+        const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", 'result name': "LLL" }
+        const ll = { ...getParams(), left_mm: lll, 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
+        const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", 'result name': "L" }
+        obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
 
         // ((((LLLLL @ LLLLR) @ LLLR) @ LLR) @ LR) @ R
         // const llll = { ...getParams(), 'left name': "LLLLL", 'right name': "LLLLR", 'result name': "LLLL" }
@@ -677,14 +677,14 @@
 
       const gui_layout = gui.addFolder('layout')
       addChoiceParam(gui_layout, 'layout', layouts)
-      addIntParam(gui_layout, 'gap', 1, 32)
-      addIntParam(gui_layout, 'scatter', 0, 256)
-      addIntParam(gui_layout, 'molecule', 1, 8)
-      addNumParam(gui_layout, 'blast', -2.0, 2.0)
       addChoiceParam(gui_layout, 'arg orientation', orientations)
       addChoiceParam(gui_layout, 'left placement', x_placements)
       addChoiceParam(gui_layout, 'right placement', y_placements)
       addChoiceParam(gui_layout, 'result placement', z_placements)
+      addIntParam(gui_layout, 'gap', 1, 32)
+      addIntParam(gui_layout, 'scatter', 0, 256)
+      addIntParam(gui_layout, 'molecule', 1, 8)
+      addNumParam(gui_layout, 'blast', -2.0, 2.0)
 
       const gui_vis = gui.addFolder('vis')
       addParam(gui_vis, 'legends', x => getObj().setLegends(getParams()))

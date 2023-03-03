@@ -668,6 +668,16 @@ export class MatMul {
     this.group.clear()
     this.flow_guide_group = undefined
 
+    // this.left.params = {'left/right': 'right/left', }
+
+    if (this.params['arg orientation'] == 'positive/negative') {
+      this.left.params['arg orientation'] = 'negative/positive'
+      this.right.params['arg orientation'] = 'negative/positive'
+    } else if (this.params['arg orientation'] == 'negative/positive') {
+      this.left.params['arg orientation'] = 'positive/negative'
+      this.right.params['arg orientation'] = 'positive/negative'
+    }
+
     if (this.params['left placement'] == 'left/right') {
       this.left.params['left placement'] = 'right/left'
       this.right.params['left placement'] = 'right/left'
@@ -682,6 +692,14 @@ export class MatMul {
     } else if (this.params['right placement'] == 'bottom/top') {
       this.left.params['right placement'] = 'top/bottom'
       this.right.params['right placement'] = 'top/bottom'
+    }
+
+    if (this.params['result placement'] == 'front/back') {
+      this.left.params['result placement'] = 'back/front'
+      this.right.params['result placement'] = 'back/front'
+    } else if (this.params['result placement'] == 'back/front') {
+      this.left.params['result placement'] = 'front/back'
+      this.right.params['result placement'] = 'front/back'
     }
 
     this.initLeftVis()
@@ -700,7 +718,7 @@ export class MatMul {
     this.left.initVis()
 
     if (this.params.layout == 'spiral') {
-      if (this.params['arg orientation'] == 'positive') {
+      if (this.params['arg orientation'].startsWith('positive')) {
         this.left.group.rotation.y = -Math.PI / 2
         this.left.group.position.x = this.params['left placement'].startsWith('left') ?
           -this.getLeftScatter() :
@@ -743,7 +761,7 @@ export class MatMul {
     this.right.initVis()
 
     if (this.params.layout == 'spiral') {
-      if (this.params['arg orientation'] == 'positive') {
+      if (this.params['arg orientation'].startsWith('positive')) {
         this.right.group.rotation.x = Math.PI / 2
         this.right.group.position.y = this.params['right placement'].startsWith('top') ?
           -this.getRightScatter() :
@@ -795,7 +813,7 @@ export class MatMul {
     this.result.initVis()
 
     if (this.params.layout == 'spiral') {
-      if (this.params['result placement'] == 'back') {
+      if (this.params['result placement'].startsWith('back')) {
         this.result.group.position.z = this.getExtent().z
       }
     }
@@ -813,10 +831,10 @@ export class MatMul {
 
   getPlacementInfo() {
     return {
-      left: this.params['left placement'] == 'left' ? 1 : -1,
+      left: this.params['left placement'].startsWith('left') ? 1 : -1,
       right: this.params['right placement'].startsWith('top') ? 1 : -1,
-      result: this.params['result placement'] == 'front' ? 1 : -1,
-      zip: this.params['arg orientation'] == 'positive' ? 1 : -1,
+      result: this.params['result placement'].startsWith('front') ? 1 : -1,
+      zip: this.params['arg orientation'].startsWith('positive') ? 1 : -1,
       gap: this.params.gap,
       left_scatter: this.getLeftScatter(),
       right_scatter: this.getRightScatter(),
