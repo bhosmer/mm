@@ -45,7 +45,6 @@
     const x_placements = ['left', 'right', 'left/right', 'right/left']
     const y_placements = ['top', 'bottom', 'top/bottom', 'bottom/top']
     const z_placements = ['front', 'back', 'front/back', 'back/front']
-    const layouts = ['spiral', 'zigzag']
 
     const params = {
       // shape
@@ -76,7 +75,6 @@
       'j threads': 1,
       'k threads': 1,
       // layout
-      'layout': 'spiral',
       gap: 3,
       scatter: 0,
       molecule: 3,
@@ -676,7 +674,6 @@
       addIntParam(gui_anim, 'k threads', 1, 16)
 
       const gui_layout = gui.addFolder('layout')
-      addChoiceParam(gui_layout, 'layout', layouts)
       addChoiceParam(gui_layout, 'arg orientation', orientations)
       addChoiceParam(gui_layout, 'left placement', x_placements)
       addChoiceParam(gui_layout, 'right placement', y_placements)

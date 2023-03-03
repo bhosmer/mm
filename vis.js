@@ -717,36 +717,18 @@ export class MatMul {
     }
     this.left.initVis()
 
-    if (this.params.layout == 'spiral') {
-      if (this.params['arg orientation'].startsWith('positive')) {
-        this.left.group.rotation.y = -Math.PI / 2
-        this.left.group.position.x = this.params['left placement'].startsWith('left') ?
-          -this.getLeftScatter() :
-          this.getExtent().x + this.left.getExtent().z + this.getLeftScatter()
-      } else { // negative
-        this.left.group.rotation.y = Math.PI / 2
-        this.left.group.position.z = this.getExtent().z
-        this.left.group.position.x = this.params['left placement'].startsWith('left') ?
-          -(this.left.getExtent().z + this.getLeftScatter()) :
-          this.getExtent().x + this.getLeftScatter()
-      }
-      // } else {
+    if (this.params['arg orientation'].startsWith('positive')) {
+      this.left.group.rotation.y = -Math.PI / 2
+      this.left.group.position.x = this.params['left placement'].startsWith('left') ?
+        -this.getLeftScatter() :
+        this.getExtent().x + this.left.getExtent().z + this.getLeftScatter()
+    } else { // negative
+      this.left.group.rotation.y = Math.PI / 2
+      this.left.group.position.z = this.getExtent().z
+      this.left.group.position.x = this.params['left placement'].startsWith('left') ?
+        -(this.left.getExtent().z + this.getLeftScatter()) :
+        this.getExtent().x + this.getLeftScatter()
     }
-
-    // new
-    // zigzag?
-    // this.left.group.rotation.y = Math.PI / 2
-    // this.left.group.position.x = -(this.left.getExtent().z + this.getLeftScatter())
-    // this.left.group.position.z = this.getExtent().z
-
-    // spiral?
-    // this.left.group.rotation.y = -Math.PI / 2
-    // // this.left.group.position.x = -(this.left.getExtent().z + this.getLeftScatter())
-    // // this.left.group.position.z = this.getExtent().z
-
-    // if (this.params.convex) {
-    // } else {
-    // }
 
     this.group.add(this.left.group)
 
@@ -760,44 +742,18 @@ export class MatMul {
     }
     this.right.initVis()
 
-    if (this.params.layout == 'spiral') {
-      if (this.params['arg orientation'].startsWith('positive')) {
-        this.right.group.rotation.x = Math.PI / 2
-        this.right.group.position.y = this.params['right placement'].startsWith('top') ?
-          -this.getRightScatter() :
-          this.getExtent().y + this.right.getExtent().z + this.getRightScatter()
-      } else { // negative
-        this.right.group.rotation.x = -Math.PI / 2
-        this.right.group.position.z = this.getExtent().z
-        this.right.group.position.y = this.params['right placement'].startsWith('top') ?
-          -(this.right.getExtent().z + this.getRightScatter()) :
-          this.getExtent().y + this.getRightScatter()
-      }
-
-      // if (this.params['left placement'] == 'left') {
-      //   if (this.params['right placement'] == 'top') {
-      //     this.right.group.rotation.x = Math.PI / 2
-      //     this.right.group.position.y = -this.getRightScatter()
-      //   } else {
-      //     this.right.group.rotation.x = -Math.PI / 2
-      //     this.right.group.position.y = this.getExtent().y + this.getRightScatter()
-      //     this.right.group.position.z = this.getExtent().z
-      //   }
-      // } else {
-      //   if (this.params['right placement'] == 'top') {
-      //     this.right.group.rotation.x = -Math.PI / 2
-      //     this.right.group.position.z = this.getExtent().z
-      //   } else {
-      //     this.right.group.rotation.x = -Math.PI / 2
-      //     this.right.group.position.y = this.getExtent().y + this.getRightScatter()
-      //     this.right.group.position.z = this.getExtent().z
-      //   }
-      // }
+    if (this.params['arg orientation'].startsWith('positive')) {
+      this.right.group.rotation.x = Math.PI / 2
+      this.right.group.position.y = this.params['right placement'].startsWith('top') ?
+        -this.getRightScatter() :
+        this.getExtent().y + this.right.getExtent().z + this.getRightScatter()
+    } else { // negative
+      this.right.group.rotation.x = -Math.PI / 2
+      this.right.group.position.z = this.getExtent().z
+      this.right.group.position.y = this.params['right placement'].startsWith('top') ?
+        -(this.right.getExtent().z + this.getRightScatter()) :
+        this.getExtent().y + this.getRightScatter()
     }
-
-    // new
-    // this.right.group.rotation.x = -Math.PI / 2
-    // this.right.group.position.z = this.getExtent().z
 
     this.group.add(this.right.group)
 
@@ -812,16 +768,9 @@ export class MatMul {
 
     this.result.initVis()
 
-    if (this.params.layout == 'spiral') {
-      if (this.params['result placement'].startsWith('back')) {
-        this.result.group.position.z = this.getExtent().z
-      }
+    if (this.params['result placement'].startsWith('back')) {
+      this.result.group.position.z = this.getExtent().z
     }
-
-    // new
-    // if (!this.params.convex) {
-    //   this.result.group.position.z = this.getExtent().z
-    // }
 
     this.group.add(this.result.group)
 
