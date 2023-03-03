@@ -768,9 +768,9 @@ export class MatMul {
 
     this.result.initVis()
 
-    if (this.params['result placement'].startsWith('back')) {
-      this.result.group.position.z = this.getExtent().z
-    }
+    this.result.group.position.z = this.params['result placement'].startsWith('back') ?
+      this.getExtent().z :
+      0
 
     this.group.add(this.result.group)
 

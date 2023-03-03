@@ -75,14 +75,14 @@
       'j threads': 1,
       'k threads': 1,
       // layout
-      gap: 3,
-      scatter: 0,
-      molecule: 3,
-      blast: 0,
       'arg orientation': 'negative',
       'left placement': 'left',
       'right placement': 'top',
       'result placement': 'front',
+      gap: 3,
+      scatter: 0,
+      molecule: 3,
+      blast: 0,
       // viz      
       legends: true,
       spotlight: 1,
@@ -375,13 +375,13 @@
         // (nice alternating layout is about to collide)
         // spacious: @@@ repro 3, RRRL should be on other side @@@
         // @@@ depth issue?
-        const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", 'result name': "LLL" }
-        const ll = { ...getParams(), left_mm: lll, 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
-        const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", 'result name': "L" }
-        const rrr = { ...getParams(), 'left name': "RRRL", 'right name': "RRRR", 'result name': "RRR" }
-        const rr = { ...getParams(), right_mm: rrr, 'left name': "RRL", 'right name': "RRR", 'result name': "RR" }
-        const r = { ...getParams(), right_mm: rr, 'left name': "RL", 'right name': "RR", 'result name': "R" }
-        obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
+        // const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", 'result name': "LLL" }
+        // const ll = { ...getParams(), left_mm: lll, 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
+        // const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", 'result name': "L" }
+        // const rrr = { ...getParams(), 'left name': "RRRL", 'right name': "RRRR", 'result name': "RRR" }
+        // const rr = { ...getParams(), right_mm: rrr, 'left name': "RRL", 'right name': "RRR", 'result name': "RR" }
+        // const r = { ...getParams(), right_mm: rr, 'left name': "RL", 'right name': "RR", 'result name': "R" }
+        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
 
         // ---
 
