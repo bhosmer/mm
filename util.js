@@ -117,35 +117,37 @@ export function rowGuide(h, w) {
 // 
 
 const ARROW_ATTR = new THREE.Uint8BufferAttribute([
-  128, 160, 192, 160,
-  128, 160, 192, 128,
-  128, 170, 255, 224,
+  224, 64, 64, 208,
+  64, 224, 64, 208,
+  96, 96, 255, 208,
 ], 4)
 ARROW_ATTR.normalized = true
 
 export function flowGuide(h, d, w, placement) {
-  const group = new THREE.Group()
-
-  const { left, right, result, gap, zip, left_scatter, right_scatter } = placement
+  const { orientation, left, right, result, gap, left_scatter, right_scatter } = placement
+  const extent = x => x + gap * 2 - 1
+  const center = x => extent(x) / 2
   const place = (n, p, x) => p == 1 ? x : n - x
-  const place_left = x => place(w + gap * 2, left, x)
-  const place_right = x => place(h + gap * 2, right, x)
-  const place_result = x => place(d + gap * 2, result, x)
+  const place_x = x => place(extent(w), left, x)
+  const place_y = x => place(extent(h), right, x)
+  const place_z = x => place(extent(d), result, x)
+
+  const group = new THREE.Group()
 
   const left_geometry = new THREE.BufferGeometry()
   left_geometry.setAttribute('position', new THREE.Float32BufferAttribute([
-    place_left(gap - left_scatter), (h + gap * 2) / 2, place_result((d + gap * 2) / 2 - 1),
-    place_left(gap + w / 2), (h + gap * 2) / 2, place_result((d + gap * 2) / 2 - d / 5 - 1),
-    place_left(gap + w / 2), (h + gap * 2) / 2, place_result(gap),
+    place_x(gap - left_scatter), place_y(center(h)), place_z(center(d) - (d / 6 * orientation)),
+    place_x(gap - left_scatter), place_y(center(h)), place_z(center(d) + (d / 6 * orientation)),
+    place_x(center(w)), place_y(center(h)), place_z(gap),
   ], 3))
   left_geometry.setAttribute('color', ARROW_ATTR)
   group.add(new THREE.Mesh(left_geometry, MMGUIDE_MATERIAL));
 
   const right_geometry = new THREE.BufferGeometry()
   right_geometry.setAttribute('position', new THREE.Float32BufferAttribute([
-    (w + gap * 2) / 2, place_right(gap - right_scatter), place_result((d + gap * 2) / 2 - 1),
-    (w + gap * 2) / 2, place_right(gap + h / 2), place_result((d + gap * 2) / 2 - d / 5 - 1),
-    (w + gap * 2) / 2, place_right(gap + h / 2), place_result(gap),
+    place_x(center(w) - (w / 6 * orientation)), place_y(gap - right_scatter), place_z(center(d)),
+    place_x(center(w) + (w / 6 * orientation)), place_y(gap - right_scatter), place_z(center(d)),
+    place_x(center(w)), place_y(center(h)), place_z(gap),
   ], 3))
   right_geometry.setAttribute('color', ARROW_ATTR)
   group.add(new THREE.Mesh(right_geometry, MMGUIDE_MATERIAL));

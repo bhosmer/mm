@@ -762,10 +762,10 @@ export class MatMul {
 
   getPlacementInfo() {
     return {
+      orientation: this.params['arg orientation'].startsWith('positive') ? 1 : -1,
       left: this.params['left placement'].startsWith('left') ? 1 : -1,
       right: this.params['right placement'].startsWith('top') ? 1 : -1,
       result: this.params['result placement'].startsWith('front') ? 1 : -1,
-      zip: this.params['arg orientation'].startsWith('positive') ? 1 : -1,
       gap: this.params.gap,
       left_scatter: this.getLeftScatter(),
       right_scatter: this.getRightScatter(),
