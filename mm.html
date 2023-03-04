@@ -78,8 +78,8 @@
       // viz      
       legends: true,
       spotlight: 1,
-      'row guides': false,
-      'flow guides': false,
+      'row guides': 0.0,
+      'flow guides': 0.0,
       'interior spotlight': false,
       axes: true,
       // colors and sizes
@@ -721,8 +721,8 @@
       const gui_vis = gui.addFolder('vis')
       addParam(gui_vis, 'legends', x => getObj().setLegends(getParams()))
       addIntParam(gui_vis, 'spotlight', 0, 10, x => getObj().updateLabels(getParams()))
-      addParam(gui_vis, 'row guides', x => getObj().setRowGuides(x))
-      addParam(gui_vis, 'flow guides', x => getObj().setFlowGuide(x))
+      addNumParam(gui_vis, 'row guides', 0.0, 1.0, x => getObj().setRowGuides(x))
+      addNumParam(gui_vis, 'flow guides', 0.0, 1.0, x => getObj().setFlowGuide(x))
       addParam(gui_vis, 'interior spotlight', x => getObj().updateLabels(getParams()))
       addParam(gui_vis, 'axes', x => initAxes(x))
 

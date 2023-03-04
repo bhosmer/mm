@@ -252,8 +252,8 @@ function emptyPoints(h, w) {
       points[ptr++] = 0
     }
   }
-  const geom = new THREE.BufferGeometry();
-  geom.setAttribute('position', new THREE.BufferAttribute(points, 3));
+  const geom = new THREE.BufferGeometry()
+  geom.setAttribute('position', new THREE.BufferAttribute(points, 3))
   geom.setAttribute('pointSize', new THREE.Float32BufferAttribute(new Float32Array(n), 1))
   geom.setAttribute('pointColor', new THREE.Float32BufferAttribute(new Float32Array(n * 3), 3))
   return new THREE.Points(geom, MATERIAL)
@@ -357,7 +357,6 @@ export class Mat {
     const range = this.params['max light'] - this.params['min light']
     const light = this.params['min light'] + range * Math.cbrt(light_vol)
 
-    // return new THREE.Color().setHSL(hue, 1.0, light)
     return COLOR_TEMP.setHSL(hue, 1.0, light)
   }
 
@@ -385,12 +384,13 @@ export class Mat {
   }
 
   getColor(i, j) {
-    const c = new THREE.Color()
-    return c.fromArray(this.points.geometry.attributes.pointColor.array, this.data.addr(i, j) * 3)
+    const colors = this.points.geometry.attributes.pointColor.array
+    return COLOR_TEMP.fromArray(colors, this.data.addr(i, j) * 3)
   }
 
   setColor(i, j, c) {
-    c.toArray(this.points.geometry.attributes.pointColor.array, this.data.addr(i, j) * 3)
+    const colors = this.points.geometry.attributes.pointColor.array
+    c.toArray(colors, this.data.addr(i, j) * 3)
     this.points.geometry.attributes.pointColor.needsUpdate = true
   }
 
@@ -416,27 +416,26 @@ export class Mat {
   }
 
   bumpColor(r = undefined, c = undefined) {
-    const bump = new THREE.Color(0x808080)
-    this.setColorsAndSizes(r, c, undefined, x => this.colorFromData(x).add(bump))
+    COLOR_TEMP.set(0x808080)
+    this.setColorsAndSizes(r, c, undefined, x => this.colorFromData(x).add(COLOR_TEMP))
   }
 
-  setRowGuides(enabled = undefined) {
-    enabled = util.syncProp(this.params, 'row guides', enabled)
-    if (enabled) {
-      if (!this.row_guide_group) {
-        this.row_guide_group = util.rowGuide(this.H, this.W)
-        this.inner_group.add(this.row_guide_group)
-      }
-    } else {
+  setRowGuides(light = undefined) {
+    if (light != this.params['row guides']) {
+      light = util.syncProp(this.params, 'row guides', light)
       if (this.row_guide_group) {
         this.inner_group.remove(this.row_guide_group)
         this.row_guide_group.clear()
         this.row_guide_group = undefined
       }
+      if (light > 0.0) {
+        this.row_guide_group = util.rowGuide(this.H, this.W, light)
+        this.inner_group.add(this.row_guide_group)
+      }
     }
   }
 
-  setFlowGuide(enabled) { }
+  setFlowGuide(light) { }
 
   getLegendTextProps() {
     const sa_geo = Math.cbrt(Math.max(5, this.H) * Math.max(this.W, 5))
@@ -783,21 +782,21 @@ export class MatMul {
     }
   }
 
-  setFlowGuide(enabled) {
-    enabled = util.syncProp(this.params, 'flow guides', enabled)
-    if (enabled) {
-      if (!this.flow_guide_group) {
-        this.flow_guide_group = util.flowGuide(this.H, this.D, this.W, this.getPlacementInfo())
-        this.group.add(this.flow_guide_group)
-      }
-    } else {
+  setFlowGuide(light = undefined) {
+    if (light != this.params['flow guides']) {
+      light = util.syncProp(this.params, 'flow guides', light)
       if (this.flow_guide_group) {
         this.group.remove(this.flow_guide_group)
+        this.flow_guide_group.clear()
         this.flow_guide_group = undefined
       }
+      if (light > 0.0) {
+        this.flow_guide_group = util.flowGuide(this.H, this.D, this.W, this.getPlacementInfo(), light)
+        this.group.add(this.flow_guide_group)
+      }
     }
-    this.left.setFlowGuide(enabled)
-    this.right.setFlowGuide(enabled)
+    this.left.setFlowGuide(light)
+    this.right.setFlowGuide(light)
   }
 
   scatterFromCount(count) {
@@ -863,11 +862,10 @@ export class MatMul {
     }
   }
 
-  setRowGuides(enabled) {
-    enabled = util.syncProp(this.params, 'row guides', enabled)
-    this.left.setRowGuides(enabled)
-    this.right.setRowGuides(enabled)
-    this.result.setRowGuides(enabled)
+  setRowGuides(light) {
+    this.left.setRowGuides(light)
+    this.right.setRowGuides(light)
+    this.result.setRowGuides(light)
   }
 
   setLeftLegends() {

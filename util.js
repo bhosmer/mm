@@ -92,21 +92,21 @@ export function axes() {
   return group
 }
 
-export function rowGuide(h, w) {
+export function rowGuide(h, w, light = 1.0) {
   const rstride = Math.max(1, Math.floor(h / 8))
   const group = new THREE.Group()
   const color = new THREE.Color()
 
-  const draw = (i0, j0, i1, j1, c = undefined) => {
-    const start = new THREE.Vector3(j0, i0, 0);
-    const end = new THREE.Vector3(j1, i1, 0);
-    color.setHSL(1.0, 0.0, c || (h - i0) / h)
+  const draw = (i0, j0, i1, j1, l) => {
+    const start = new THREE.Vector3(j0, i0, 0)
+    const end = new THREE.Vector3(j1, i1, 0)
+    color.setHSL(1.0, 0.0, l)
     group.add(lineSeg(start, end, color))
   }
 
   for (let i = 0; i < h; i += rstride) {
-    draw(i, 0, Math.min(i + rstride, h - 1), 0, 1.0)
-    draw(i, 0, i, w - 1)
+    draw(i, 0, Math.min(i + rstride, h - 1), 0, light)
+    draw(i, 0, i, w - 1, light)
   }
 
   return group
@@ -123,7 +123,10 @@ const ARROW_ATTR = new THREE.Uint8BufferAttribute([
 ], 4)
 ARROW_ATTR.normalized = true
 
-export function flowGuide(h, d, w, placement) {
+export function flowGuide(h, d, w, placement, light = 1.0) {
+  ARROW_ATTR.array[3] = ARROW_ATTR.array[7] = ARROW_ATTR.array[3] = 255 * light
+  ARROW_ATTR.needsUpdate = true
+
   const { orientation, left, right, result, gap, left_scatter, right_scatter } = placement
   const extent = x => x + gap * 2 - 1
   const center = x => extent(x) / 2
