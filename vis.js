@@ -52,7 +52,7 @@ function gaussianRandom(mean = 0, stdev = 1) {
   return z * stdev + mean
 }
 
-const INIT_FUNCS = {
+export const INIT_FUNCS = {
   rows: (i, j, h) => h > 1 ? i / (h - 1) : 0,
   cols: (i, j, h, w) => w > 1 ? j / (w - 1) : 0,
   'row major': (i, j, h, w) => h * w > 1 ? (i * w + j) / (h * w - 1) : 0,
@@ -66,6 +66,8 @@ const INIT_FUNCS = {
   eye: (i, j) => i == j ? 1 : 0,
   diff: (i, j) => i == j ? 1 : i == j + 1 ? -1 : 0,
 }
+
+export const INITS = Object.keys(INIT_FUNCS)
 
 const USE_RANGE = ['rows', 'cols', 'row major', 'col major', 'uniform', 'gaussian']
 
@@ -91,6 +93,11 @@ function initFuncFromParams(init_params) {
   const { name, min, max, sparsity } = init_params
   return getInitFunc(name, min, max, sparsity)
 }
+
+// epilogs
+
+export const EPILOGS = ['none', 'x/J', 'x/sqrt(J)', 'softmax(x/sqrt(J))', 'tanh', 'relu', 'layernorm']
+
 
 function softmax_(h, w, data) {
   let ptr = 0
@@ -232,6 +239,8 @@ class Array2D {
 
 const ELEM_SIZE = 2000
 const ZERO_COLOR = new THREE.Color(0, 0, 0)
+const COLOR_TEMP = new THREE.Color()
+
 
 function emptyPoints(h, w) {
   const n = h * w
@@ -312,6 +321,10 @@ export class Mat {
     const absx = Math.abs(x)
     const absmax = local_sens ? this.absmax : this.getGlobalAbsmax()
 
+    if (absx === Infinity) {
+      return ELEM_SIZE
+    }
+
     const vol = absmax == 0 ? 0 : absx / absmax
     const zsize = this.params['min size'] * ELEM_SIZE
     const size = zsize + (ELEM_SIZE - zsize) * Math.cbrt(vol)
@@ -332,6 +345,10 @@ export class Mat {
     const absx = Math.abs(x)
     const absmax = local_sens ? this.absmax : this.getGlobalAbsmax()
 
+    if (absx === Infinity) {
+      return COLOR_TEMP.setHSL(1.0, 1.0, 1.0)
+    }
+
     const hue_vol = absmax == 0 ? 0 : x / absmax
     const gap = this.params['hue gap'] * Math.sign(x)
     const hue = (this.params['zero hue'] + gap + (Math.cbrt(hue_vol) * this.params['hue spread'])) % 1
@@ -340,7 +357,8 @@ export class Mat {
     const range = this.params['max light'] - this.params['min light']
     const light = this.params['min light'] + range * Math.cbrt(light_vol)
 
-    return new THREE.Color().setHSL(hue, 1.0, light)
+    // return new THREE.Color().setHSL(hue, 1.0, light)
+    return COLOR_TEMP.setHSL(hue, 1.0, light)
   }
 
   getAbsmax() {
@@ -542,6 +560,15 @@ export class Mat {
 // MatMul
 //
 
+export const ORIENTATIONS = ['positive', 'negative', 'positive/negative', 'negative/positive']
+export const LEFT_PLACEMENTS = ['left', 'right', 'left/right', 'right/left']
+export const RIGHT_PLACEMENTS = ['top', 'bottom', 'top/bottom', 'bottom/top']
+export const RESULT_PLACEMENTS = ['front', 'back', 'front/back', 'back/front']
+
+export const SENSITIVITIES = ['local', 'global']
+export const ANIM_ALGS = ['none', 'dotprod (row major)', 'dotprod (col major)', 'axpy', 'vmprod', 'mvprod', 'vvprod']
+
+
 export class MatMul {
 
   constructor(params, init_vis = true) {
@@ -630,7 +657,6 @@ export class MatMul {
     }
     let x = 0.0
     for (let j = minj; j < maxj; j++) {
-      // x += this.left.data.get(i, j) * this.right.data.get(j, k)
       x += this.left.getData(i, j) * this.right.getData(j, k)
     }
     if (isNaN(x)) {
@@ -639,8 +665,8 @@ export class MatMul {
     const epi = this.params.epilog
     return epi == 'x/J' ? x / this.D :
       epi == 'x/sqrt(J)' || epi == 'softmax(x/sqrt(J))' ? x / Math.sqrt(this.D) :
-        epi == 'tanh(x)' ? Math.tanh(x) :
-          epi == 'relu(x)' ? Math.max(0, x) :
+        epi == 'tanh' ? Math.tanh(x) :
+          epi == 'relu' ? Math.max(0, x) :
             x
   }
 
@@ -668,37 +694,22 @@ export class MatMul {
     this.group.clear()
     this.flow_guide_group = undefined
 
-    if (this.params['arg orientation'] == 'positive/negative') {
-      this.left.params['arg orientation'] = 'negative/positive'
-      this.right.params['arg orientation'] = 'negative/positive'
-    } else if (this.params['arg orientation'] == 'negative/positive') {
-      this.left.params['arg orientation'] = 'positive/negative'
-      this.right.params['arg orientation'] = 'positive/negative'
+    function invert(x, opts) {
+      const invertible = opts.filter(opt => opt.includes('/'))
+      return invertible.concat(x)[invertible.length - invertible.indexOf(x) - 1]
     }
 
-    if (this.params['left placement'] == 'left/right') {
-      this.left.params['left placement'] = 'right/left'
-      this.right.params['left placement'] = 'right/left'
-    } else if (this.params['left placement'] == 'right/left') {
-      this.left.params['left placement'] = 'left/right'
-      this.right.params['left placement'] = 'left/right'
-    }
+    this.left.params.polarity = invert(this.params.polarity, ORIENTATIONS)
+    this.right.params.polarity = invert(this.params.polarity, ORIENTATIONS)
 
-    if (this.params['right placement'] == 'top/bottom') {
-      this.left.params['right placement'] = 'bottom/top'
-      this.right.params['right placement'] = 'bottom/top'
-    } else if (this.params['right placement'] == 'bottom/top') {
-      this.left.params['right placement'] = 'top/bottom'
-      this.right.params['right placement'] = 'top/bottom'
-    }
+    this.left.params['left placement'] = invert(this.params['left placement'], LEFT_PLACEMENTS)
+    this.right.params['left placement'] = invert(this.params['left placement'], LEFT_PLACEMENTS)
 
-    if (this.params['result placement'] == 'front/back') {
-      this.left.params['result placement'] = 'back/front'
-      this.right.params['result placement'] = 'back/front'
-    } else if (this.params['result placement'] == 'back/front') {
-      this.left.params['result placement'] = 'front/back'
-      this.right.params['result placement'] = 'front/back'
-    }
+    this.left.params['right placement'] = invert(this.params['right placement'], RIGHT_PLACEMENTS)
+    this.right.params['right placement'] = invert(this.params['right placement'], RIGHT_PLACEMENTS)
+
+    this.left.params['result placement'] = invert(this.params['result placement'], RESULT_PLACEMENTS)
+    this.right.params['result placement'] = invert(this.params['result placement'], RESULT_PLACEMENTS)
 
     this.initLeftVis()
     this.initRightVis()
@@ -711,7 +722,7 @@ export class MatMul {
 
   initLeftVis() {
     this.left.initVis()
-    if (this.params['arg orientation'].startsWith('positive')) {
+    if (this.params.polarity.startsWith('positive')) {
       this.left.group.rotation.y = -Math.PI / 2
       this.left.group.position.x = this.params['left placement'].startsWith('left') ?
         -this.getLeftScatter() :
@@ -731,7 +742,7 @@ export class MatMul {
 
   initRightVis() {
     this.right.initVis()
-    if (this.params['arg orientation'].startsWith('positive')) {
+    if (this.params.polarity.startsWith('positive')) {
       this.right.group.rotation.x = Math.PI / 2
       this.right.group.position.y = this.params['right placement'].startsWith('top') ?
         -this.getRightScatter() :
@@ -762,7 +773,7 @@ export class MatMul {
 
   getPlacementInfo() {
     return {
-      orientation: this.params['arg orientation'].startsWith('positive') ? 1 : -1,
+      orientation: this.params.polarity.startsWith('positive') ? 1 : -1,
       left: this.params['left placement'].startsWith('left') ? 1 : -1,
       right: this.params['right placement'].startsWith('top') ? 1 : -1,
       result: this.params['result placement'].startsWith('front') ? 1 : -1,

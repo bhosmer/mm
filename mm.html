@@ -37,14 +37,6 @@
     import { RenderPass } from 'https://threejs.org/examples/jsm/postprocessing/RenderPass.js'
 
     const init_dims = { i: 32, j: 32, k: 32 }
-    const init_funcs = ['rows', 'cols', 'row major', 'col major', 'pt linear', 'pt linear+', 'uniform', 'gaussian', 'tril', 'triu', 'eye', 'diff']
-    const epilog_funcs = ['none', 'x/J', 'x/sqrt(J)', 'softmax(x/sqrt(J))', 'tanh(x)', 'relu(x)', 'layernorm']
-    const sensitivities = ['local', 'global']
-    const anim_algs = ['none', 'dotprod (row major)', 'dotprod (col major)', 'axpy', 'vmprod', 'mvprod', 'vvprod']
-    const orientations = ['positive', 'negative', 'positive/negative', 'negative/positive']
-    const x_placements = ['left', 'right', 'left/right', 'right/left']
-    const y_placements = ['top', 'bottom', 'top/bottom', 'bottom/top']
-    const z_placements = ['front', 'back', 'front/back', 'back/front']
 
     const params = {
       // shape
@@ -53,13 +45,13 @@
       K: init_dims.k,
       // data
       // left arg
-      'left init': 'rows',
+      'left init': 'row major',
       'left min': -1,
       'left max': 1,
       'left sparsity': 0,
       'left name': 'X',
       // right arg
-      'right init': 'cols',
+      'right init': 'col major',
       'right min': -1,
       'right max': 1,
       'right sparsity': 0,
@@ -75,7 +67,7 @@
       'j threads': 1,
       'k threads': 1,
       // layout
-      'arg orientation': 'negative',
+      polarity: 'negative',
       'left placement': 'left',
       'right placement': 'top',
       'result placement': 'front',
@@ -482,20 +474,53 @@
         // also good example of where z always coming towards you breaks down a little in 
         // nice (although it's still very legible as a ~2d surface)
         // spacious: repro 3 and maybe more
-        const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", 'result name': "LLL" }
-        const llr = { ...getParams(), 'left name': "LLRL", 'right name': "LLRR", 'result name': "LLR" }
+        // const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", 'result name': "LLL" }
+        // const llr = { ...getParams(), 'left name': "LLRL", 'right name': "LLRR", 'result name': "LLR" }
+        // const ll = { ...getParams(), left_mm: lll, right_mm: llr, 'result name': "LL" }
+        // const lrlr = { ...getParams(), 'left name': "LRLRL", 'right name': "LRLRR", 'result name': "LRLR" }
+        // const lrl = { ...getParams(), 'left name': "LRLL", right_mm: lrlr, 'result name': "LRL" }
+        // const lrr = { ...getParams(), 'left name': "LRRL", 'right name': "LRRR", 'result name': "LRR" }
+        // const lr = { ...getParams(), left_mm: lrl, right_mm: lrr, 'result name': "LR" }
+        // const l = { ...getParams(), left_mm: ll, right_mm: lr, 'result name': "L" }
+        // const rll = { ...getParams(), 'left name': "RLLL", 'right name': "RLLR", 'result name': "RLL" }
+        // const rlrl = { ...getParams(), 'left name': "RLRLL", 'right name': "RLRLR", 'result name': "RLRL" }
+        // const rlr = { ...getParams(), left_mm: rlrl, 'right name': "RLRR", 'result name': "RLR" }
+        // const rl = { ...getParams(), left_mm: rll, right_mm: rlr, 'result name': "RL" }
+        // const rrl = { ...getParams(), 'left name': "RRLL", 'right name': "RRLR", 'result name': "RRL" }
+        // const rrr = { ...getParams(), 'left name': "RRRL", 'right name': "RRRR", 'result name': "RRR" }
+        // const rr = { ...getParams(), left_mm: rrl, right_mm: rrr, 'result name': "RR" }
+        // const r = { ...getParams(), left_mm: rl, right_mm: rr, 'left name': "RL", 'right name': "RR", 'result name': "R" }
+        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
+
+        // 5 levels saturated
+        const llll = { ...getParams(), 'left name': "LLLLL", 'right name': "LLLLR", 'result name': "LLLL" }
+        const lllr = { ...getParams(), 'left name': "LLLRL", 'right name': "LLLRR", 'result name': "LLLR" }
+        const lll = { ...getParams(), left_mm: llll, right_mm: lllr, 'result name': "LLL" }
+        const llrl = { ...getParams(), 'left name': "LLRLL", 'right name': "LLRLR", 'result name': "LLRL" }
+        const llrr = { ...getParams(), 'left name': "LLRRL", 'right name': "LLRRR", 'result name': "LLRR" }
+        const llr = { ...getParams(), left_mm: llll, right_mm: lllr, 'result name': "LLR" }
         const ll = { ...getParams(), left_mm: lll, right_mm: llr, 'result name': "LL" }
+        const lrll = { ...getParams(), 'left name': "LRLLL", 'right name': "LRLLR", 'result name': "LRLL" }
         const lrlr = { ...getParams(), 'left name': "LRLRL", 'right name': "LRLRR", 'result name': "LRLR" }
-        const lrl = { ...getParams(), 'left name': "LRLL", right_mm: lrlr, 'result name': "LRL" }
-        const lrr = { ...getParams(), 'left name': "LRRL", 'right name': "LRRR", 'result name': "LRR" }
+        const lrl = { ...getParams(), left_mm: lrll, right_mm: lrlr, 'result name': "LRL" }
+        const lrrl = { ...getParams(), 'left name': "LRRLL", 'right name': "LRRLR", 'result name': "LRRL" }
+        const lrrr = { ...getParams(), 'left name': "LRRRL", 'right name': "LRRRR", 'result name': "LRRR" }
+        const lrr = { ...getParams(), left_mm: lrrl, right_mm: lrrr, 'result name': "LRR" }
         const lr = { ...getParams(), left_mm: lrl, right_mm: lrr, 'result name': "LR" }
         const l = { ...getParams(), left_mm: ll, right_mm: lr, 'result name': "L" }
-        const rll = { ...getParams(), 'left name': "RLLL", 'right name': "RLLR", 'result name': "RLL" }
+        const rlll = { ...getParams(), 'left name': "RLLLL", 'right name': "RLLLR", 'result name': "RLLL" }
+        const rllr = { ...getParams(), 'left name': "RLLRL", 'right name': "RLLRR", 'result name': "RLLR" }
+        const rll = { ...getParams(), left_mm: rlll, right_mm: rllr, 'result name': "RLL" }
         const rlrl = { ...getParams(), 'left name': "RLRLL", 'right name': "RLRLR", 'result name': "RLRL" }
-        const rlr = { ...getParams(), left_mm: rlrl, 'right name': "RLRR", 'result name': "RLR" }
+        const rlrr = { ...getParams(), 'left name': "RLRRL", 'right name': "RLRRR", 'result name': "RLRR" }
+        const rlr = { ...getParams(), left_mm: rlrl, right_mm: rlrr, 'result name': "RLR" }
         const rl = { ...getParams(), left_mm: rll, right_mm: rlr, 'result name': "RL" }
-        const rrl = { ...getParams(), 'left name': "RRLL", 'right name': "RRLR", 'result name': "RRL" }
-        const rrr = { ...getParams(), 'left name': "RRRL", 'right name': "RRRR", 'result name': "RRR" }
+        const rrll = { ...getParams(), 'left name': "RRLLL", 'right name': "RRLLR", 'result name': "RRLL" }
+        const rrlr = { ...getParams(), 'left name': "RRLRL", 'right name': "RRLRR", 'result name': "RRLR" }
+        const rrl = { ...getParams(), left_mm: rrll, right_mm: rrlr, 'result name': "RRL" }
+        const rrrl = { ...getParams(), 'left name': "RRRLL", 'right name': "RRRLR", 'result name': "RRRL" }
+        const rrrr = { ...getParams(), 'left name': "RRRRL", 'right name': "RRRRR", 'result name': "RRRR" }
+        const rrr = { ...getParams(), left_mm: rrrl, right_mm: rrrr, 'result name': "RRR" }
         const rr = { ...getParams(), left_mm: rrl, right_mm: rrr, 'result name': "RR" }
         const r = { ...getParams(), left_mm: rl, right_mm: rr, 'left name': "RL", 'right name': "RR", 'result name': "R" }
         obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
@@ -656,25 +681,25 @@
       const gui_data = gui.addFolder('data')
 
       const gui_left = gui_data.addFolder('left')
-      addChoiceParam(gui_left, 'left init', init_funcs)
+      addChoiceParam(gui_left, 'left init', vis.INITS)
       addNumParam(gui_left, 'left min', -1.0, 1.0)
       addNumParam(gui_left, 'left max', 0.0, 1.0)
       addNumParam(gui_left, 'left sparsity', 0.0, 1.0)
       addParam(gui_left, 'left name', _ => getObj().setLegends(getParams()))
 
       const gui_right = gui_data.addFolder('right')
-      addChoiceParam(gui_right, 'right init', init_funcs)
+      addChoiceParam(gui_right, 'right init', vis.INITS)
       addNumParam(gui_right, 'right min', -1.0, 1.0)
       addNumParam(gui_right, 'right max', 0.0, 1.0)
       addNumParam(gui_right, 'right sparsity', 0.0, 1.0)
       addParam(gui_right, 'right name', _ => getObj().setLegends(getParams()))
 
       const gui_result = gui_data.addFolder('result')
-      addChoiceParam(gui_result, 'epilog', epilog_funcs)
+      addChoiceParam(gui_result, 'epilog', vis.EPILOGS)
       addParam(gui_result, 'result name', _ => getObj().setLegends(getParams()))
 
       const gui_anim = gui.addFolder('animation')
-      addChoiceParam(gui_anim, 'alg', anim_algs)
+      addChoiceParam(gui_anim, 'alg', vis.ANIM_ALGS)
       addIntParam(gui_anim, 'speed', 1, 10, _ => { })
       gui_anim.add({ pause: false }, 'pause').onChange(x => anim_pause = x)
       gui_anim.add({ step: animStep }, 'step')
@@ -684,10 +709,10 @@
       addIntParam(gui_anim, 'k threads', 1, 16)
 
       const gui_layout = gui.addFolder('layout')
-      addChoiceParam(gui_layout, 'arg orientation', orientations)
-      addChoiceParam(gui_layout, 'left placement', x_placements)
-      addChoiceParam(gui_layout, 'right placement', y_placements)
-      addChoiceParam(gui_layout, 'result placement', z_placements)
+      addChoiceParam(gui_layout, 'polarity', vis.ORIENTATIONS)
+      addChoiceParam(gui_layout, 'left placement', vis.LEFT_PLACEMENTS)
+      addChoiceParam(gui_layout, 'right placement', vis.RIGHT_PLACEMENTS)
+      addChoiceParam(gui_layout, 'result placement', vis.RESULT_PLACEMENTS)
       addIntParam(gui_layout, 'gap', 1, 32)
       addIntParam(gui_layout, 'scatter', 0, 256)
       addIntParam(gui_layout, 'molecule', 1, 8)
@@ -702,7 +727,7 @@
       addParam(gui_vis, 'axes', x => initAxes(x))
 
       const gui_colors = gui.addFolder('colors and sizes')
-      addChoiceParam(gui_colors, 'sensitivity', sensitivities)
+      addChoiceParam(gui_colors, 'sensitivity', vis.SENSITIVITIES)
       addNumParam(gui_colors, 'min size', 0.0, 1.0)
       addNumParam(gui_colors, 'min light', 0.0, 1.0)
       addNumParam(gui_colors, 'max light', 0.0, 1.0)
