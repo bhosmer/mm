@@ -977,13 +977,14 @@ export class MatMul {
       this.result.params.stretch_absmax = true
       return [this.result]
     }
+    const gap = this.params.gap
+    const { z: extz } = this.getExtent()
     const results = []
     this.grid('j', ({ start: j, end: je }) => {
       const result_init = (i, k) => this.dotprod_val(i, k, j, je)
       const data = Array2D.fromInit(this.H, this.W, result_init)
       const result = new Mat(data, this.getAnimMatParams(), true)
-      result.group.position.z = je - 1
-      result.group.rotation.x = Math.PI
+      util.updateProps(result.group.position, { z: extz - je - gap })
       result.hide()
       results.push(result)
       this.group.add(result.group)
@@ -1080,7 +1081,7 @@ export class MatMul {
       const data = Array2D.fromInit(sweep ? 1 : ix, jx, mvpinit)
       const mvp = new Mat(data, this.getAnimMatParams(), true)
       mvp.hide()
-      util.updateProps(mvp.group.position, { x: gap + k, z: extz + j })
+      util.updateProps(mvp.group.position, { x: gap + k, z: extz - j })
       util.updateProps(mvp.group.rotation, { y: Math.PI / 2 })
       mvps[[i, j, k]] = mvp
       this.anim_mats.push(mvp)
