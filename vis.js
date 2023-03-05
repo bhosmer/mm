@@ -994,6 +994,8 @@ export class MatMul {
   }
 
   initAnimVmprod(sweep) {
+    const gap = this.params.gap
+    const { y: exty, z: extz } = this.getExtent()
     const results = this.getAnimResultMats()
 
     const vmps = {}
@@ -1001,8 +1003,9 @@ export class MatMul {
       const vmpinit = (ji, ki) => this.ijkmul(i, j + ji, k + ki)
       const data = Array2D.fromInit(jx, sweep ? 1 : kx, vmpinit)
       const vmp = new Mat(data, this.getAnimMatParams(), true)
-      util.updateProps(vmp.group.position, { x: k, y: -i, z: j })
-      vmp.group.rotation.x = Math.PI / 2
+      vmp.hide()
+      util.updateProps(vmp.group.position, { x: k, y: gap + i, z: extz - j })
+      vmp.group.rotation.x = -Math.PI / 2
       vmps[[i, j, k]] = vmp
       this.anim_mats.push(vmp)
       this.group.add(vmp.group)
@@ -1060,7 +1063,7 @@ export class MatMul {
       this.grid('ijk', ({ start: i, extent: ix }, { start: j }, { start: k, extent: kx }) => {
         const vmp = vmps[[i, j, k]]
         if (curi < ix && curk < kx) {
-          util.updateProps(vmp.group.position, { x: k + curk, y: -i - curi })
+          util.updateProps(vmp.group.position, { x: k + curk, y: gap + i + curi })
           vmp.reinit((ji, ki) => this.ijkmul(i + curi, j + ji, k + curk + ki))
         }
       })
@@ -1081,8 +1084,8 @@ export class MatMul {
       const data = Array2D.fromInit(sweep ? 1 : ix, jx, mvpinit)
       const mvp = new Mat(data, this.getAnimMatParams(), true)
       mvp.hide()
-      util.updateProps(mvp.group.position, { x: gap + k, z: extz - j })
-      util.updateProps(mvp.group.rotation, { y: Math.PI / 2 })
+      util.updateProps(mvp.group.position, { x: gap + k, y: i, z: extz - j })
+      mvp.group.rotation.y = Math.PI / 2
       mvps[[i, j, k]] = mvp
       this.anim_mats.push(mvp)
       this.group.add(mvp.group)
