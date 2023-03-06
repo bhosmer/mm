@@ -94,20 +94,23 @@ export function axes() {
 
 export function rowGuide(h, w, light = 1.0) {
   const rstride = Math.max(1, Math.floor(h / 8))
+  const cstride = Math.max(1, Math.floor(w / 8))
   const group = new THREE.Group()
   const color = new THREE.Color()
 
-  const draw = (i0, j0, i1, j1, l) => {
+  const draw = (i0, j0, i1, j1) => {
     const start = new THREE.Vector3(j0, i0, 0)
     const end = new THREE.Vector3(j1, i1, 0)
-    color.setHSL(1.0, 0.0, l)
+    color.setHSL(1.0, 0.0, light)
     group.add(lineSeg(start, end, color))
   }
 
   for (let i = 0; i < h; i += rstride) {
-    draw(i, 0, Math.min(i + rstride, h - 1), 0, light)
-    draw(i, 0, i, w - 1, light)
+    draw(i, 0, Math.min(i + rstride, h - 1), 0)
+    draw(i, 0, i, w - 1)
   }
+
+  draw(rstride, 0, 0, cstride)
 
   return group
 }
