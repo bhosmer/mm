@@ -420,18 +420,16 @@ export class Mat {
     this.setColorsAndSizes(r, c, undefined, x => this.colorFromData(x).add(COLOR_TEMP))
   }
 
-  setRowGuides(light = undefined) {
-    if (light != this.params['row guides']) {
-      light = util.syncProp(this.params, 'row guides', light)
-      if (this.row_guide_group) {
-        this.inner_group.remove(this.row_guide_group)
-        this.row_guide_group.clear()
-        this.row_guide_group = undefined
-      }
-      if (light > 0.0) {
-        this.row_guide_group = util.rowGuide(this.H, this.W, light)
-        this.inner_group.add(this.row_guide_group)
-      }
+  setRowGuides(light) {
+    light = util.syncProp(this.params, 'row guides', light)
+    if (this.row_guide_group) {
+      this.inner_group.remove(this.row_guide_group)
+      this.row_guide_group.clear()
+      this.row_guide_group = undefined
+    }
+    if (light > 0.0) {
+      this.row_guide_group = util.rowGuide(this.H, this.W, light)
+      this.inner_group.add(this.row_guide_group)
     }
   }
 
@@ -985,7 +983,7 @@ export class MatMul {
       const result_init = (i, k) => this.dotprod_val(i, k, j, je)
       const data = Array2D.fromInit(this.H, this.W, result_init)
       const result = new Mat(data, this.getAnimMatParams(), true)
-      result.group.position.z = extz - je + 1 - gap
+      result.group.position.z = polarity > 0 ? j + gap : extz - je + 1 - gap
       result.hide()
       results.push(result)
       this.group.add(result.group)
@@ -1076,7 +1074,7 @@ export class MatMul {
   }
 
   initAnimMvprod(sweep) {
-    const gap = this.params.gap
+    const { gap, polarity } = this.getPlacementInfo()
     const { y: exty, z: extz } = this.getExtent()
     const results = this.getAnimResultMats()
 
@@ -1156,7 +1154,7 @@ export class MatMul {
   }
 
   initAnimVvprod(sweep) {
-    const gap = this.params.gap
+    const { gap, polarity } = this.getPlacementInfo()
     const { y: exty, z: extz } = this.getExtent()
     const results = this.getAnimResultMats()
 
@@ -1166,7 +1164,8 @@ export class MatMul {
       const data = Array2D.fromInit(ix, sweep ? 1 : kx, vvpinit)
       const vvp = new Mat(data, this.getAnimMatParams(), true)
       vvp.hide()
-      util.updateProps(vvp.group.position, { y: i, z: extz - gap - j })
+      const z = polarity > 0 ? gap + j : extz - gap - j
+      util.updateProps(vvp.group.position, { y: i, z })
       vvps[[i, j, k]] = vvp
       this.anim_mats.push(vvp)
       this.group.add(vvp.group)
@@ -1230,7 +1229,8 @@ export class MatMul {
       this.grid('ijk', ({ start: i }, { start: j, extent: jx, end: je }, { start: k, end: ke, extent: kx }) => {
         const vvp = vvps[[i, j, k]]
         if (curj < jx && curk < kx) {
-          vvp.group.position.z = extz - gap - j - curj
+          const z = polarity > 0 ? gap + j + curj : extz - gap - j - curj
+          vvp.group.position.z = z
           vvp.reinit((ii, ki) => this.ijkmul(i + ii, j + curj, k + curk + ki))
         }
       })
