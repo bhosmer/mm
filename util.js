@@ -134,26 +134,26 @@ export function flowGuide(h, d, w, placement, light = 1.0) {
   const extent = x => x + gap * 2 - 1
   const center = x => extent(x) / 2
   const place = (n, p, x) => p == 1 ? x : n - x
-  const place_x = x => place(extent(w), left, x)
-  const place_y = x => place(extent(h), right, x)
-  const place_z = x => place(extent(d), result, x)
+  const place_left = x => place(extent(w), left, x)
+  const place_right = x => place(extent(h), right, x)
+  const place_result = x => place(extent(d), result, x)
 
   const group = new THREE.Group()
 
   const left_geometry = new THREE.BufferGeometry()
   left_geometry.setAttribute('position', new THREE.Float32BufferAttribute([
-    place_x(gap - left_scatter), place_y(center(h)), place_z(center(d) - (d / 6 * polarity)),
-    place_x(gap - left_scatter), place_y(center(h)), place_z(center(d) + (d / 6 * polarity)),
-    place_x(center(w)), place_y(center(h)), place_z(gap),
+    place_left(gap - left_scatter), center(h) - h / 8, place_result(center(d)),
+    place_left(gap - left_scatter), center(h) + h / 8, place_result(center(d)),
+    place_left(center(w)), place_right(center(h)), place_result(gap),
   ], 3))
   left_geometry.setAttribute('color', ARROW_ATTR)
   group.add(new THREE.Mesh(left_geometry, MMGUIDE_MATERIAL));
 
   const right_geometry = new THREE.BufferGeometry()
   right_geometry.setAttribute('position', new THREE.Float32BufferAttribute([
-    place_x(center(w) - w / 6), place_y(gap - right_scatter), place_z(center(d)),
-    place_x(center(w) + w / 6), place_y(gap - right_scatter), place_z(center(d)),
-    place_x(center(w)), place_y(center(h)), place_z(gap),
+    center(w) - w / 8, place_right(gap - right_scatter), place_result(center(d)),
+    center(w) + w / 8, place_right(gap - right_scatter), place_result(center(d)),
+    center(w), place_right(center(h)), place_result(gap),
   ], 3))
   right_geometry.setAttribute('color', ARROW_ATTR)
   group.add(new THREE.Mesh(right_geometry, MMGUIDE_MATERIAL));
@@ -166,7 +166,10 @@ export function flowGuide(h, d, w, placement, light = 1.0) {
 //
 
 export function bbhw(g) {
-  return { h: g.boundingBox.max.y - g.boundingBox.min.y, w: g.boundingBox.max.x - g.boundingBox.min.x }
+  return {
+    h: g.boundingBox.max.y - g.boundingBox.min.y,
+    w: g.boundingBox.max.x - g.boundingBox.min.x
+  }
 }
 
 export function center(x, y = 0) {
