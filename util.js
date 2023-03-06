@@ -130,7 +130,7 @@ export function flowGuide(h, d, w, placement, light = 1.0) {
   ARROW_ATTR.array[3] = ARROW_ATTR.array[7] = ARROW_ATTR.array[3] = 255 * light
   ARROW_ATTR.needsUpdate = true
 
-  const { orientation, left, right, result, gap, left_scatter, right_scatter } = placement
+  const { polarity, left, right, result, gap, left_scatter, right_scatter } = placement
   const extent = x => x + gap * 2 - 1
   const center = x => extent(x) / 2
   const place = (n, p, x) => p == 1 ? x : n - x
@@ -142,8 +142,8 @@ export function flowGuide(h, d, w, placement, light = 1.0) {
 
   const left_geometry = new THREE.BufferGeometry()
   left_geometry.setAttribute('position', new THREE.Float32BufferAttribute([
-    place_x(gap - left_scatter), place_y(center(h)), place_z(center(d) - (d / 6 * orientation)),
-    place_x(gap - left_scatter), place_y(center(h)), place_z(center(d) + (d / 6 * orientation)),
+    place_x(gap - left_scatter), place_y(center(h)), place_z(center(d) - (d / 6 * polarity)),
+    place_x(gap - left_scatter), place_y(center(h)), place_z(center(d) + (d / 6 * polarity)),
     place_x(center(w)), place_y(center(h)), place_z(gap),
   ], 3))
   left_geometry.setAttribute('color', ARROW_ATTR)
@@ -151,8 +151,8 @@ export function flowGuide(h, d, w, placement, light = 1.0) {
 
   const right_geometry = new THREE.BufferGeometry()
   right_geometry.setAttribute('position', new THREE.Float32BufferAttribute([
-    place_x(center(w) - (w / 6 * orientation)), place_y(gap - right_scatter), place_z(center(d)),
-    place_x(center(w) + (w / 6 * orientation)), place_y(gap - right_scatter), place_z(center(d)),
+    place_x(center(w) - w / 6), place_y(gap - right_scatter), place_z(center(d)),
+    place_x(center(w) + w / 6), place_y(gap - right_scatter), place_z(center(d)),
     place_x(center(w)), place_y(center(h)), place_z(gap),
   ], 3))
   right_geometry.setAttribute('color', ARROW_ATTR)

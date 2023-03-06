@@ -61,7 +61,7 @@
       'result name': 'XY',
       // animation
       alg: 'none',
-      speed: 5,
+      speed: 25,
       'hide inputs': false,
       'i threads': 1,
       'j threads': 1,
@@ -631,7 +631,7 @@
       let last = 0
       function animate() {
         const t = performance.now()
-        if (params.alg != 'none' && (anim_step || !anim_pause) && (t - last) > (100 / params.speed)) {
+        if (params.alg != 'none' && (anim_step || !anim_pause) && (t - last) > (1000 / params.speed)) {
           obj.bump()
           last = t
           anim_step = false
@@ -700,7 +700,7 @@
 
       const gui_anim = gui.addFolder('animation')
       addChoiceParam(gui_anim, 'alg', vis.ANIM_ALGS)
-      addIntParam(gui_anim, 'speed', 1, 10, _ => { })
+      addIntParam(gui_anim, 'speed', 1, 100, _ => { })
       gui_anim.add({ pause: false }, 'pause').onChange(x => anim_pause = x)
       gui_anim.add({ step: animStep }, 'step')
       addParam(gui_anim, 'hide inputs', x => getObj().hideInputs(x))

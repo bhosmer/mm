@@ -772,7 +772,7 @@ export class MatMul {
 
   getPlacementInfo() {
     return {
-      orientation: this.params.polarity.startsWith('positive') ? 1 : -1,
+      polarity: this.params.polarity.startsWith('positive') ? 1 : -1,
       left: this.params['left placement'].startsWith('left') ? 1 : -1,
       right: this.params['right placement'].startsWith('top') ? 1 : -1,
       result: this.params['result placement'].startsWith('front') ? 1 : -1,
@@ -978,14 +978,14 @@ export class MatMul {
       this.result.params.stretch_absmax = true
       return [this.result]
     }
-    const gap = this.params.gap
+    const { gap, polarity } = this.getPlacementInfo()
     const { z: extz } = this.getExtent()
     const results = []
     this.grid('j', ({ start: j, end: je }) => {
       const result_init = (i, k) => this.dotprod_val(i, k, j, je)
       const data = Array2D.fromInit(this.H, this.W, result_init)
       const result = new Mat(data, this.getAnimMatParams(), true)
-      util.updateProps(result.group.position, { z: extz - je - gap })
+      result.group.position.z = extz - je + 1 - gap
       result.hide()
       results.push(result)
       this.group.add(result.group)
@@ -995,7 +995,7 @@ export class MatMul {
   }
 
   initAnimVmprod(sweep) {
-    const gap = this.params.gap
+    const { gap, polarity } = this.getPlacementInfo()
     const { y: exty, z: extz } = this.getExtent()
     const results = this.getAnimResultMats()
 
@@ -1005,8 +1005,9 @@ export class MatMul {
       const data = Array2D.fromInit(jx, sweep ? 1 : kx, vmpinit)
       const vmp = new Mat(data, this.getAnimMatParams(), true)
       vmp.hide()
-      util.updateProps(vmp.group.position, { x: k, y: gap + i, z: extz - j })
-      vmp.group.rotation.x = -Math.PI / 2
+      const z = polarity < 0 ? extz - j : 0
+      util.updateProps(vmp.group.position, { x: k, y: gap + i, z })
+      vmp.group.rotation.x = polarity * Math.PI / 2
       vmps[[i, j, k]] = vmp
       this.anim_mats.push(vmp)
       this.group.add(vmp.group)
@@ -1155,6 +1156,8 @@ export class MatMul {
   }
 
   initAnimVvprod(sweep) {
+    const gap = this.params.gap
+    const { y: exty, z: extz } = this.getExtent()
     const results = this.getAnimResultMats()
 
     const vvps = {}
@@ -1162,8 +1165,8 @@ export class MatMul {
       const vvpinit = (ii, ki) => this.ijkmul(i + ii, j, k + ki)
       const data = Array2D.fromInit(ix, sweep ? 1 : kx, vvpinit)
       const vvp = new Mat(data, this.getAnimMatParams(), true)
-      util.updateProps(vvp.group.position, { x: k, y: -i, z: j })
-      vvp.group.rotation.x = Math.PI
+      vvp.hide()
+      util.updateProps(vvp.group.position, { y: i, z: extz - gap - j })
       vvps[[i, j, k]] = vvp
       this.anim_mats.push(vvp)
       this.group.add(vvp.group)
@@ -1224,10 +1227,10 @@ export class MatMul {
       }
 
       // update intermediates
-      this.grid('ijk', ({ start: i }, { start: j, extent: jx }, { start: k, extent: kx }) => {
+      this.grid('ijk', ({ start: i }, { start: j, extent: jx, end: je }, { start: k, end: ke, extent: kx }) => {
         const vvp = vvps[[i, j, k]]
         if (curj < jx && curk < kx) {
-          util.updateProps(vvp.group.position, { x: k + curk, z: j + curj })
+          vvp.group.position.z = extz - gap - j - curj
           vvp.reinit((ii, ki) => this.ijkmul(i + ii, j + curj, k + curk + ki))
         }
       })
