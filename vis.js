@@ -863,6 +863,7 @@ export class MatMul {
   }
 
   setRowGuides(light) {
+    light = util.syncProp(this.params, 'row guides', light)
     this.left.setRowGuides(light)
     this.right.setRowGuides(light)
     this.result.setRowGuides(light)
