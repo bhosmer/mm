@@ -1083,8 +1083,9 @@ export class MatMul {
       const data = Array2D.fromInit(sweep ? 1 : ix, jx, mvpinit)
       const mvp = new Mat(data, this.getAnimMatParams(), true)
       mvp.hide()
-      util.updateProps(mvp.group.position, { x: gap + k, y: i, z: extz - j })
-      mvp.group.rotation.y = Math.PI / 2
+      const z = polarity < 0 ? extz - j : j
+      util.updateProps(mvp.group.position, { x: gap + k, y: i, z })
+      mvp.group.rotation.y = polarity * -Math.PI / 2
       mvps[[i, j, k]] = mvp
       this.anim_mats.push(mvp)
       this.group.add(mvp.group)
