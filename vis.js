@@ -557,7 +557,7 @@ export class Mat {
 // MatMul
 //
 
-export const ORIENTATIONS = ['positive', 'negative', 'positive/negative', 'negative/positive']
+export const POLARITIES = ['positive', 'negative', 'positive/negative', 'negative/positive']
 export const LEFT_PLACEMENTS = ['left', 'right', 'left/right', 'right/left']
 export const RIGHT_PLACEMENTS = ['top', 'bottom', 'top/bottom', 'bottom/top']
 export const RESULT_PLACEMENTS = ['front', 'back', 'front/back', 'back/front']
@@ -696,16 +696,15 @@ export class MatMul {
       return invertible.concat(x)[invertible.length - invertible.indexOf(x) - 1]
     }
 
-    this.left.params.polarity = invert(this.params.polarity, ORIENTATIONS)
-    this.right.params.polarity = invert(this.params.polarity, ORIENTATIONS)
+    this.left.params.polarity = invert(this.params.polarity, POLARITIES)
+    this.right.params.polarity = invert(this.params.polarity, POLARITIES)
 
     this.left.params['left placement'] = invert(this.params['left placement'], LEFT_PLACEMENTS)
-    this.right.params['left placement'] = invert(this.params['left placement'], LEFT_PLACEMENTS)
-
     this.left.params['right placement'] = invert(this.params['right placement'], RIGHT_PLACEMENTS)
-    this.right.params['right placement'] = invert(this.params['right placement'], RIGHT_PLACEMENTS)
-
     this.left.params['result placement'] = invert(this.params['result placement'], RESULT_PLACEMENTS)
+
+    this.right.params['left placement'] = invert(this.params['left placement'], LEFT_PLACEMENTS)
+    this.right.params['right placement'] = invert(this.params['right placement'], RIGHT_PLACEMENTS)
     this.right.params['result placement'] = invert(this.params['result placement'], RESULT_PLACEMENTS)
 
     this.initLeftVis()
