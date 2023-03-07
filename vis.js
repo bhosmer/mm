@@ -241,7 +241,6 @@ const ELEM_SIZE = 2000
 const ZERO_COLOR = new THREE.Color(0, 0, 0)
 const COLOR_TEMP = new THREE.Color()
 
-
 function emptyPoints(h, w) {
   const n = h * w
   const points = new Float32Array(n * 3)
@@ -420,6 +419,12 @@ export class Mat {
     this.setColorsAndSizes(r, c, undefined, x => this.colorFromData(x).add(COLOR_TEMP))
   }
 
+  isFacing() {
+    const mat_v = this.group.getWorldDirection(new THREE.Vector3())
+    const cam_v = this.params.camera.getWorldDirection(new THREE.Vector3())
+    return mat_v.angleTo(cam_v) < Math.PI / 2
+  }
+
   setRowGuides(light) {
     light = util.syncProp(this.params, 'row guides', light)
     if (this.row_guide_group) {
@@ -458,6 +463,7 @@ export class Mat {
         // suf += ` (${this.params.depth},${this.params.max_depth},${this.params.height})`
         // suf += this.params.count > 0 ? ` (${this.params.count})` : ''
         // suf += this.params.tag ? ` (${this.params.tag})` : ''
+        suf += this.isFacing() ? '+' : '-'
         const name = this.params.getText(props.name + suf, props.name_color, props.name_size)
         const { h, w } = util.bbhw(name.geometry)
         name.geometry.rotateZ(Math.PI)
@@ -510,7 +516,7 @@ export class Mat {
   updateLabels(spotlight = undefined) {
     spotlight = util.syncProp(this.params, 'spotlight', spotlight)
 
-    if (spotlight == 0) {
+    if (spotlight == 0 || !this.isFacing()) {
       if (this.label_group) {
         this.label_group.clear()
         this.inner_group.remove(this.label_group)

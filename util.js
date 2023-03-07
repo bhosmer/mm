@@ -76,7 +76,7 @@ function castToType(v, t) {
 // things with lines
 //
 
-function lineSeg(start, end, color) {
+export function lineSeg(start, end, color) {
   const material = new THREE.LineBasicMaterial({ color })
   const geometry = new THREE.BufferGeometry().setFromPoints([start, end])
   return new THREE.Line(geometry, material)
