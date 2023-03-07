@@ -227,7 +227,7 @@
         }
 
         // L @ R
-        // obj = new vis.MatMul(fix_shape(getParams()))
+        obj = new vis.MatMul(fix_shape(getParams()))
 
         // 2 levels
 
@@ -367,10 +367,10 @@
         // BOTH inputs are leaves. otherwise will require reorientating the other, non-leaf
         // input, which will cascade down one side of its subtree
         // spacious: repro 3
-        const rrr = { ...getParams(), 'left name': "RRRL", 'right name': "RRRR", 'result name': "RRR" }
-        const rr = { ...getParams(), right_mm: rrr, 'left name': "RRL", 'right name': "RRR", 'result name': "RR" }
-        const r = { ...getParams(), right_mm: rr, 'left name': "RL", 'right name': "RR", 'result name': "R" }
-        obj = new vis.MatMul(fix_shape({ ...getParams(), right_mm: r }))
+        // const rrr = { ...getParams(), 'left name': "RRRL", 'right name': "RRRR", 'result name': "RRR" }
+        // const rr = { ...getParams(), right_mm: rrr, 'left name': "RRL", 'right name': "RRR", 'result name': "RR" }
+        // const r = { ...getParams(), right_mm: rr, 'left name': "RL", 'right name': "RR", 'result name': "R" }
+        // obj = new vis.MatMul(fix_shape({ ...getParams(), right_mm: r }))
 
         // (((LLLL @ LLLR) @ LLR) @ LR) @ (RL @ (RRL @ (RRRL @ RRRR)))
         // pair of long paths... non-alternating layout is still an option

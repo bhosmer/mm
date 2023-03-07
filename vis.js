@@ -691,21 +691,21 @@ export class MatMul {
     this.group.clear()
     this.flow_guide_group = undefined
 
-    function invert(x, opts) {
+    function child(x, opts) {
       const invertible = opts.filter(opt => opt.includes('/'))
       return invertible.concat(x)[invertible.length - invertible.indexOf(x) - 1]
     }
 
-    this.left.params.polarity = invert(this.params.polarity, POLARITIES)
-    this.right.params.polarity = invert(this.params.polarity, POLARITIES)
+    this.left.params.polarity = child(this.params.polarity, POLARITIES)
+    this.right.params.polarity = child(this.params.polarity, POLARITIES)
 
-    this.left.params['left placement'] = invert(this.params['left placement'], LEFT_PLACEMENTS)
-    this.left.params['right placement'] = invert(this.params['right placement'], RIGHT_PLACEMENTS)
-    this.left.params['result placement'] = invert(this.params['result placement'], RESULT_PLACEMENTS)
+    this.left.params['left placement'] = child(this.params['left placement'], LEFT_PLACEMENTS)
+    this.left.params['right placement'] = child(this.params['right placement'], RIGHT_PLACEMENTS)
+    this.left.params['result placement'] = child(this.params['result placement'], RESULT_PLACEMENTS)
 
-    this.right.params['left placement'] = invert(this.params['left placement'], LEFT_PLACEMENTS)
-    this.right.params['right placement'] = invert(this.params['right placement'], RIGHT_PLACEMENTS)
-    this.right.params['result placement'] = invert(this.params['result placement'], RESULT_PLACEMENTS)
+    this.right.params['left placement'] = child(this.params['left placement'], LEFT_PLACEMENTS)
+    this.right.params['right placement'] = child(this.params['right placement'], RIGHT_PLACEMENTS)
+    this.right.params['result placement'] = child(this.params['result placement'], RESULT_PLACEMENTS)
 
     this.initLeftVis()
     this.initRightVis()
@@ -1002,7 +1002,7 @@ export class MatMul {
       const data = Array2D.fromInit(jx, sweep ? 1 : kx, vmpinit)
       const vmp = new Mat(data, this.getAnimMatParams(), true)
       vmp.hide()
-      const z = polarity < 0 ? extz - j : 0
+      const z = polarity < 0 ? extz - j : j
       util.updateProps(vmp.group.position, { x: k, y: gap + i, z })
       vmp.group.rotation.x = polarity * Math.PI / 2
       vmps[[i, j, k]] = vmp
