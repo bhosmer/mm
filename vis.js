@@ -425,6 +425,12 @@ export class Mat {
     return p.angleTo(c) < Math.PI / 2
   }
 
+  isRightSideUp() {
+    const c = new THREE.Vector3(0, 1, 0).applyQuaternion(this.params.camera.quaternion)
+    const p = new THREE.Vector3(0, 1, 0).applyQuaternion(this.group.quaternion)
+    return p.angleTo(c) < Math.PI / 2
+  }
+
   setRowGuides(light) {
     light = util.syncProp(this.params, 'row guides', light)
     if (this.row_guide_group) {
@@ -451,55 +457,34 @@ export class Mat {
   }
 
   setLegends(enabled, props) {
+    if (this.legends_group) {
+      this.inner_group.remove(this.legends_group)
+      this.legends_group.clear()
+    }
     if (enabled) {
-      if (this.legends_group) {
-        this.inner_group.remove(this.legends_group)
-        this.legends_group.clear()
-      }
       this.legends_group = new THREE.Group()
       props = { ...this.getLegendTextProps(), ...props }
+      const facing = this.isFacing()
+      const rsu = this.isRightSideUp()
       if (props.name) {
-        let suf = ''
-        // suf += ` (${this.params.depth},${this.params.max_depth},${this.params.height})`
-        // suf += this.params.count > 0 ? ` (${this.params.count})` : ''
-        // suf += this.params.tag ? ` (${this.params.tag})` : ''
-        suf += this.isFacing() ? '+' : '-'
+        let suf = this.params.tag || ''
         const name = this.params.getText(props.name + suf, props.name_color, props.name_size)
         const { h, w } = util.bbhw(name.geometry)
-        name.geometry.rotateZ(Math.PI)
-        name.geometry.rotateY(Math.PI)
-        name.geometry.translate(util.center(this.W - 1, w), h + util.center(this.H - 1, h), -(1 + h / 2))
+        name.geometry.rotateZ(rsu ? Math.PI : 0)
+        name.geometry.rotateY(facing ? Math.PI : 0)
+        const xdir = facing == rsu ? 1 : -1
+        const ydir = rsu ? 1 : 0
+        const zdir = facing ? 1 : -1
+        name.geometry.translate(
+          util.center(this.W - 1, xdir * w),
+          ydir * h + util.center(this.H - 1, h),
+          -zdir * h / 2
+        )
         this.legends_group.add(name)
-      }
-      if (props.height) {
-        const height = this.params.getText(`${props.height} = ${this.H}`, props.dim_color, props.dim_size)
-        const { h, w } = util.bbhw(height.geometry)
-        height.geometry.rotateX(Math.PI)
-        const zrot = (props.hleft ? -1 : 1) * Math.PI / 2
-        height.geometry.rotateZ(zrot)
-        const spacer = 0.5
-        const xoff = props.hleft ? -h * 1 - spacer : this.W - 1 + h + spacer
-        const yoff = props.hleft ? w + util.center(this.H - 1, w) : util.center(this.H - 1, w)
-        height.geometry.translate(xoff, yoff, 0)
-        this.legends_group.add(height)
-      }
-      if (props.width) {
-        const width = this.params.getText(`${props.width} = ${this.W}`, props.dim_color, props.dim_size)
-        const { h, w } = util.bbhw(width.geometry)
-        width.geometry.rotateX(Math.PI)
-        const spacer = 0.5
-        const xoff = util.center(this.W - 1, w)
-        const yoff = props.wtop ? -h * 1 - spacer : this.H - 1 + h * 1.5 + spacer
-        width.geometry.translate(xoff, yoff, 0)
-        this.legends_group.add(width)
       }
       this.inner_group.add(this.legends_group)
     } else {
-      if (this.legends_group) {
-        this.inner_group.remove(this.legends_group)
-        this.legends_group.clear()
-        this.legends_group = undefined
-      }
+      this.legends_group = undefined
     }
   }
 
@@ -540,16 +525,23 @@ export class Mat {
           if (x != 0) { // declutter
             let label = this.label_cache[index]
             const facing = this.isFacing()
-            if (!label || label.facing != facing) {
+            const rsu = this.isRightSideUp()
+            if (!label || label.facing != facing || label.rsu != rsu) {
               const fsiz = 0.16 - 0.008 * Math.log10(Math.floor(1 + Math.abs(x)))
               label = this.params.getText(`${x.toFixed(4)}`, 0xffffff, fsiz)
               label.value = x
               label.facing = facing
-              const zdir = facing ? -1 : 1
+              label.rsu = rsu
+              const zdir = facing ? 1 : -1
               label.geometry.rotateX(zdir * Math.PI)
               label.geometry.rotateY(facing ? 0 : Math.PI)
+              label.geometry.rotateZ(rsu ? 0 : Math.PI)
               const { h, w } = util.bbhw(label.geometry)
-              label.geometry.translate(util.center(j * 2, -zdir * w), h + util.center(i * 2, h), zdir * 0.25)
+              label.geometry.translate(
+                util.center(j * 2, (rsu ? zdir : -zdir) * w),
+                h + util.center(i * 2, h),
+                -zdir * 0.25
+              )
               this.label_cache[index] = label
             }
             this.label_group.add(label)

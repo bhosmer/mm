@@ -571,12 +571,32 @@
 
       let cam_changing = false
       let label_update_pending = false
+
+      // let camline
+
       const postLabelUpdate = _ => {
         if (!label_update_pending) {
           label_update_pending = true
           setTimeout(function () {
             raycaster.setFromCamera(pointer, camera)
             getObj().updateLabels()
+
+            // temp
+            getObj().setLegends({})
+
+            // const cam_v = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion)
+            // // const cam_v = camera.localToWorld(new THREE.Vector3(0, -1, 0))
+
+            // if (camline) {
+            //   scene.remove(camline)
+            //   camline.clear()
+            // }
+            // camline = new THREE.Group()
+            // const origin = new THREE.Vector3(0, 0, 0)
+            // camline.add(util.lineSeg(origin, cam_v.multiplyScalar(4), new THREE.Color(1, 0, 0)))
+            // scene.add(camline)
+
+
             label_update_pending = false
           }, 5);
         }
