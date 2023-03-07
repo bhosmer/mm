@@ -1165,7 +1165,7 @@ export class MatMul {
       const vvp = new Mat(data, this.getAnimMatParams(), true)
       vvp.hide()
       const z = polarity > 0 ? gap + j : extz - gap - j
-      util.updateProps(vvp.group.position, { y: i, z })
+      util.updateProps(vvp.group.position, { x: k, y: i, z })
       vvps[[i, j, k]] = vvp
       this.anim_mats.push(vvp)
       this.group.add(vvp.group)
