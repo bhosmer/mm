@@ -420,9 +420,9 @@ export class Mat {
   }
 
   isFacing() {
-    const mat_v = this.group.getWorldDirection(new THREE.Vector3())
-    const cam_v = this.params.camera.getWorldDirection(new THREE.Vector3())
-    return mat_v.angleTo(cam_v) < Math.PI / 2
+    const c = this.group.localToWorld(new THREE.Vector3()).sub(this.params.camera.position).normalize()
+    const p = this.group.getWorldDirection(new THREE.Vector3())
+    return p.angleTo(c) < Math.PI / 2
   }
 
   setRowGuides(light) {
@@ -515,47 +515,48 @@ export class Mat {
 
   updateLabels(spotlight = undefined) {
     spotlight = util.syncProp(this.params, 'spotlight', spotlight)
-
-    if (spotlight == 0 || !this.isFacing()) {
+    if (spotlight == 0) {
       if (this.label_group) {
         this.label_group.clear()
         this.inner_group.remove(this.label_group)
         this.label_group = undefined
       }
-      return
-    }
-
-    if (!this.label_group) {
-      this.label_group = new THREE.Group()
-      this.inner_group.add(this.label_group)
-      this.label_cache = []
     } else {
-      this.label_group.clear()
-    }
-
-    this.params.raycaster.params.Points.threshold = spotlight
-    const intersects = this.params.raycaster.intersectObject(this.points)
-    intersects.forEach(x => {
-      const index = x.index
-      const i = Math.floor(index / this.W)
-      const j = index % this.W
-      if (!this.isHidden(i, j)) {
-        const x = this.getData(i, j)
-        if (x != 0) { // declutter
-          let label = this.label_cache[index]
-          if (!label) {
-            const fsiz = 0.16 - 0.008 * Math.log10(Math.floor(1 + Math.abs(x)))
-            label = this.params.getText(`${x.toFixed(4)}`, 0xffffff, fsiz)
-            label.value = x
-            label.geometry.rotateX(Math.PI)
-            const { h, w } = util.bbhw(label.geometry)
-            label.geometry.translate(util.center(j * 2, w), h + util.center(i * 2, h), -0.25)
-            this.label_cache[index] = label
-          }
-          this.label_group.add(label)
-        }
+      if (!this.label_group) {
+        this.label_group = new THREE.Group()
+        this.inner_group.add(this.label_group)
+        this.label_cache = []
+      } else {
+        this.label_group.clear()
       }
-    })
+      this.params.raycaster.params.Points.threshold = spotlight
+      const intersects = this.params.raycaster.intersectObject(this.points)
+      intersects.forEach(x => {
+        const index = x.index
+        const i = Math.floor(index / this.W)
+        const j = index % this.W
+        if (!this.isHidden(i, j)) {
+          const x = this.getData(i, j)
+          if (x != 0) { // declutter
+            let label = this.label_cache[index]
+            const facing = this.isFacing()
+            if (!label || label.facing != facing) {
+              const fsiz = 0.16 - 0.008 * Math.log10(Math.floor(1 + Math.abs(x)))
+              label = this.params.getText(`${x.toFixed(4)}`, 0xffffff, fsiz)
+              label.value = x
+              label.facing = facing
+              const zdir = facing ? -1 : 1
+              label.geometry.rotateX(zdir * Math.PI)
+              label.geometry.rotateY(facing ? 0 : Math.PI)
+              const { h, w } = util.bbhw(label.geometry)
+              label.geometry.translate(util.center(j * 2, -zdir * w), h + util.center(i * 2, h), zdir * 0.25)
+              this.label_cache[index] = label
+            }
+            this.label_group.add(label)
+          }
+        }
+      })
+    }
   }
 }
 
