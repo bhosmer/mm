@@ -855,24 +855,6 @@ export class MatMul {
     return this.params.getGlobalAbsmax ? this.params.getGlobalAbsmax() : this.getAbsmax()
   }
 
-  hideInputs(hide) {
-    if (this.params.alg != 'none') {
-      if (this.params['hide inputs']) {
-        if (!hide) {
-          this.params['hide inputs'] = false
-          this.left.show()
-          this.right.show()
-        }
-      } else {
-        if (hide) {
-          this.params['hide inputs'] = true
-          this.left.hide()
-          this.right.hide()
-        }
-      }
-    }
-  }
-
   setRowGuides(light) {
     light = util.syncProp(this.params, 'row guides', light)
     this.left.setRowGuides(light)
@@ -930,11 +912,6 @@ export class MatMul {
       return
     }
 
-    if (this.params['hide inputs']) {
-      this.left.hide()
-      this.right.hide()
-    }
-
     const bumps = {
       'dotprod (row major)': () => this.initAnimVmprod(true),
       'dotprod (col major)': () => this.initAnimMvprod(true),
@@ -961,17 +938,17 @@ export class MatMul {
         right_done = false
         this.right.initAnimation(() => right_done = true)
       }
-      const fuse = can_fuse()
+      const fuse = this.params.fuse && can_fuse()
       const result_bump = bumps[this.params.alg]()
       this.bump = () => {
         left_done || this.left.bump()
         right_done || this.right.bump();
         (fuse || (left_done && right_done)) && result_bump()
       }
+      this.result.hide()
     }
 
     this.anim_cb = cb || this.start
-
     this.start()
   }
 
@@ -1087,27 +1064,26 @@ export class MatMul {
       })
 
       // update input hilights
-      if (!this.params['hide inputs']) {
-        if (sweep) {
-          this.grid('k', ({ start: k, extent: kx }) => {
-            if (oldk < kx) {
-              this.right.setColorsAndSizes(undefined, k + oldk)
-            }
-            if (curk < kx) {
-              this.right.bumpColor(undefined, k + curk)
-            }
-          })
-        }
-        if (oldi != curi) {
-          this.grid('i', ({ start: i, extent: ix }) => {
-            if (oldi < ix) {
-              this.left.setColorsAndSizes(i + oldi, undefined)
-            }
-            if (curi < ix) {
-              this.left.bumpColor(i + curi, undefined)
-            }
-          })
-        }
+      if (sweep) {
+        this.grid('k', ({ start: k, extent: kx }) => {
+          if (oldk < kx) {
+            this.right.setColorsAndSizes(undefined, k + oldk)
+          }
+          if (curk < kx) {
+            this.right.bumpColor(undefined, k + curk)
+          }
+        })
+      }
+
+      if (oldi != curi) {
+        this.grid('i', ({ start: i, extent: ix }) => {
+          if (oldi < ix) {
+            this.left.setColorsAndSizes(i + oldi, undefined)
+          }
+          if (curi < ix) {
+            this.left.bumpColor(i + curi, undefined)
+          }
+        })
       }
 
       // update intermediates
@@ -1168,27 +1144,26 @@ export class MatMul {
       })
 
       // update input hilights
-      if (!this.params['hide inputs']) {
-        if (sweep) {
-          this.grid('i', ({ start: i, extent: ix }) => {
-            if (oldi < ix) {
-              this.left.setColorsAndSizes(i + oldi, undefined)
-            }
-            if (curi < ix) {
-              this.left.bumpColor(i + curi, undefined)
-            }
-          })
-        }
-        if (oldk != curk) {
-          this.grid('k', ({ start: k, extent: kx }) => {
-            if (oldk < kx) {
-              this.right.setColorsAndSizes(undefined, k + oldk)
-            }
-            if (curk < kx) {
-              this.right.bumpColor(undefined, k + curk)
-            }
-          })
-        }
+      if (sweep) {
+        this.grid('i', ({ start: i, extent: ix }) => {
+          if (oldi < ix) {
+            this.left.setColorsAndSizes(i + oldi, undefined)
+          }
+          if (curi < ix) {
+            this.left.bumpColor(i + curi, undefined)
+          }
+        })
+      }
+
+      if (oldk != curk) {
+        this.grid('k', ({ start: k, extent: kx }) => {
+          if (oldk < kx) {
+            this.right.setColorsAndSizes(undefined, k + oldk)
+          }
+          if (curk < kx) {
+            this.right.bumpColor(undefined, k + curk)
+          }
+        })
       }
 
       // update intermediates
@@ -1247,35 +1222,34 @@ export class MatMul {
       })
 
       // update input highlights
-      if (!this.params['hide inputs']) {
-        if (sweep) {
-          this.grid('jk', ({ start: j, extent: jx }, { start: k, extent: kx }) => {
-            if (oldj < jx && oldk < kx) {
-              this.right.setColorsAndSizes(j + oldj, k + oldk)
-            }
-            if (curj < jx && curk < kx) {
-              this.right.bumpColor(j + curj, k + curk)
-            }
-          })
-        } else {
-          this.grid('j', ({ start: j, extent: jx }) => {
-            if (oldj < jx) {
-              this.right.setColorsAndSizes(j + oldj, undefined)
-            }
-            if (curj < jx) {
-              this.right.bumpColor(j + curj, undefined)
-            }
-          })
-        }
+      if (sweep) {
+        this.grid('jk', ({ start: j, extent: jx }, { start: k, extent: kx }) => {
+          if (oldj < jx && oldk < kx) {
+            this.right.setColorsAndSizes(j + oldj, k + oldk)
+          }
+          if (curj < jx && curk < kx) {
+            this.right.bumpColor(j + curj, k + curk)
+          }
+        })
+      } else {
         this.grid('j', ({ start: j, extent: jx }) => {
           if (oldj < jx) {
-            this.left.setColorsAndSizes(undefined, j + oldj)
+            this.right.setColorsAndSizes(j + oldj, undefined)
           }
           if (curj < jx) {
-            this.left.bumpColor(undefined, j + curj)
+            this.right.bumpColor(j + curj, undefined)
           }
         })
       }
+
+      this.grid('j', ({ start: j, extent: jx }) => {
+        if (oldj < jx) {
+          this.left.setColorsAndSizes(undefined, j + oldj)
+        }
+        if (curj < jx) {
+          this.left.bumpColor(undefined, j + curj)
+        }
+      })
 
       // update intermediates
       this.grid('ijk', ({ start: i }, { start: j, extent: jx, end: je }, { start: k, end: ke, extent: kx }) => {

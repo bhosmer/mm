@@ -61,8 +61,8 @@
       'result name': 'XY',
       // animation
       alg: 'none',
+      fuse: true,
       speed: 25,
-      'hide inputs': false,
       'i blocks': 1,
       'j blocks': 1,
       'k blocks': 1,
@@ -251,9 +251,9 @@
         // 3 levels
 
         // ((LLL @ LLR) @ LR) @ R
-        const ll = { ...getParams(), 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
-        const l = { ...getParams(), left_mm: ll, 'right name': "LR", 'result name': "L" }
-        obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
+        // const ll = { ...getParams(), 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
+        // const l = { ...getParams(), left_mm: ll, 'right name': "LR", 'result name': "L" }
+        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
 
         // (LL @ (LRL @ LRR)) @ R
         // spacious: here orientation is CORRECT. test any orientation fix against this
@@ -357,11 +357,11 @@
         // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
 
         // ((((LLLLL @ LLLLR) @ LLLR) @ LLR) @ LR) @ R
-        // const llll = { ...getParams(), 'left name': "LLLLL", 'right name': "LLLLR", 'result name': "LLLL" }
-        // const lll = { ...getParams(), left_mm: llll, 'right name': "LLLR", 'result name': "LLL" }
-        // const ll = { ...getParams(), left_mm: lll, 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
-        // const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", 'result name': "L" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
+        const llll = { ...getParams(), 'left name': "LLLLL", 'right name': "LLLLR", 'result name': "LLLL" }
+        const lll = { ...getParams(), left_mm: llll, 'right name': "LLLR", 'result name': "LLL" }
+        const ll = { ...getParams(), left_mm: lll, 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
+        const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", 'result name': "L" }
+        obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
 
         // L @ (RL @ (RRL @ (RRRL @ RRRR)))
         // note here (and elsewhere) that flipping leaf inputs around is only trivial when 
@@ -734,10 +734,10 @@
 
       const gui_anim = gui.addFolder('animation')
       addChoiceParam(gui_anim, 'alg', vis.ANIM_ALGS)
+      addParam(gui_anim, 'fuse')
       addIntParam(gui_anim, 'speed', 1, 100, _ => { })
       gui_anim.add({ pause: false }, 'pause').onChange(x => anim_pause = x)
       gui_anim.add({ step: animStep }, 'step')
-      addParam(gui_anim, 'hide inputs', x => getObj().hideInputs(x))
       addIntParam(gui_anim, 'i blocks', 1, 16)
       addIntParam(gui_anim, 'j blocks', 1, 16)
       addIntParam(gui_anim, 'k blocks', 1, 16)
