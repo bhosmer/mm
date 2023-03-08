@@ -926,33 +926,32 @@ export class MatMul {
   // animation
 
   initAnimation(cb) {
-    if (this.params.alg != 'none') {
-      if (this.params['hide inputs']) {
-        this.left.hide()
-        this.right.hide()
-      }
+    if (this.params.alg == 'none') {
+      return
     }
 
-    const go = () => {
-      if (this.params.alg == 'dotprod (row major)') {
-        this.initAnimVmprod(true)
-      } else if (this.params.alg == 'dotprod (col major)') {
-        this.initAnimMvprod(true)
-      } else if (this.params.alg == 'axpy') {
-        this.initAnimVvprod(true)
-      } else if (this.params.alg == 'mvprod') {
-        this.initAnimMvprod(false)
-      } else if (this.params.alg == 'vmprod') {
-        this.initAnimVmprod(false)
-      } else if (this.params.alg == 'vvprod') {
-        this.initAnimVvprod(false)
-      }
+    if (this.params['hide inputs']) {
+      this.left.hide()
+      this.right.hide()
+    }
+
+    const bumps = {
+      'dotprod (row major)': () => this.initAnimVmprod(true),
+      'dotprod (col major)': () => this.initAnimMvprod(true),
+      'axpy': () => this.initAnimVvprod(true),
+      'mvprod': () => this.initAnimMvprod(false),
+      'vmprod': () => this.initAnimVmprod(false),
+      'vvprod': () => this.initAnimVvprod(false),
+    }
+
+    const can_fuse = () => {
+      const alg = this.params.alg
+      const lalg = this.params.left_mm ? this.params.left_mm.alg : 'none'
+      const ralg = this.params.right_mm ? this.params.right_mm.alg : 'none'
+      return alg == 'vmprod' && lalg == 'vmprod' && ralg == 'none'
     }
 
     this.start = () => {
-      if (this.params.alg != 'none') {
-        this.result.hide()
-      }
       let left_done = true, right_done = true
       if (this.params.left_mm) {
         left_done = false
@@ -962,10 +961,12 @@ export class MatMul {
         right_done = false
         this.right.initAnimation(() => right_done = true)
       }
+      const fuse = can_fuse()
+      const result_bump = bumps[this.params.alg]()
       this.bump = () => {
         left_done || this.left.bump()
-        right_done || this.right.bump()
-        !left_done || !right_done || go()
+        right_done || this.right.bump();
+        (fuse || (left_done && right_done)) && result_bump()
       }
     }
 
@@ -1057,7 +1058,7 @@ export class MatMul {
     let curk = sweep ? ksize - 1 : 0
     let done = -1
 
-    this.bump = () => {
+    return () => {
       // update indexes
       const [oldi, oldk] = [curi, curk]
       if (sweep) {
@@ -1146,7 +1147,7 @@ export class MatMul {
     let curi = sweep ? isize - 1 : 0
     let curk = ksize - 1
 
-    this.bump = () => {
+    return () => {
       // update indexes
       const [oldi, oldk] = [curi, curk]
       if (sweep) {
@@ -1226,7 +1227,7 @@ export class MatMul {
     let curj = jsize - 1
     let curk = sweep ? ksize - 1 : 0
 
-    this.bump = () => {
+    return () => {
       // update indexes
       const [oldj, oldk] = [curj, curk]
       curj = (curj + 1) % jsize
