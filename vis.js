@@ -469,7 +469,6 @@ export class Mat {
       const rsu = this.isRightSideUp()
       if (props.name) {
         let suf = this.params.tag || ''
-        suf += this.isRightSideUp() ? '+' : '-'
         const name = this.params.getText(props.name + suf, props.name_color, props.name_size)
         const { h, w } = util.bbhw(name.geometry)
         name.geometry.rotateZ(rsu ? Math.PI : 0)
@@ -678,6 +677,14 @@ export class MatMul {
     return this.result.getData(i, j)
   }
 
+  setColorsAndSizes(r = undefined, c = undefined, size = undefined, color = undefined) {
+    this.result.setColorsAndSizes(r, c, size, color)
+  }
+
+  bumpColor(r = undefined, c = undefined) {
+    this.result.bumpColor(r, c)
+  }
+
   ijkmul(i, j, k) {
     return this.left.getData(i, j) * this.right.getData(j, k)
   }
@@ -697,6 +704,7 @@ export class MatMul {
 
     this.group.clear()
     this.flow_guide_group = undefined
+    this.anim_mats = []
 
     function child(x, opts) {
       const invertible = opts.filter(opt => opt.includes('/'))
@@ -719,7 +727,6 @@ export class MatMul {
     this.initResultVis()
 
     this.setFlowGuide()
-    this.initAnimation()
     this.setRowGuides()
   }
 
@@ -849,7 +856,7 @@ export class MatMul {
   }
 
   hideInputs(hide) {
-    if (this.anim_alg != 'none') {
+    if (this.params.alg != 'none') {
       if (this.params['hide inputs']) {
         if (!hide) {
           this.params['hide inputs'] = false
@@ -918,54 +925,76 @@ export class MatMul {
 
   // animation
 
-  initAnimation() {
-    this.anim_alg = this.params.alg || 'none'
-    this.anim_mats = []
-
-    if (this.anim_alg != 'none') {
+  initAnimation(cb) {
+    if (this.params.alg != 'none') {
       if (this.params['hide inputs']) {
         this.left.hide()
         this.right.hide()
       }
-      this.result.hide()
+    }
 
-      if (this.anim_alg == 'dotprod (row major)') {
+    const go = () => {
+      if (this.params.alg == 'dotprod (row major)') {
         this.initAnimVmprod(true)
-      } else if (this.anim_alg == 'dotprod (col major)') {
+      } else if (this.params.alg == 'dotprod (col major)') {
         this.initAnimMvprod(true)
-      } else if (this.anim_alg == 'axpy') {
+      } else if (this.params.alg == 'axpy') {
         this.initAnimVvprod(true)
-      } else if (this.anim_alg == 'mvprod') {
+      } else if (this.params.alg == 'mvprod') {
         this.initAnimMvprod(false)
-      } else if (this.anim_alg == 'vmprod') {
+      } else if (this.params.alg == 'vmprod') {
         this.initAnimVmprod(false)
-      } else if (this.anim_alg == 'vvprod') {
+      } else if (this.params.alg == 'vvprod') {
         this.initAnimVvprod(false)
       }
     }
+
+    this.start = () => {
+      if (this.params.alg != 'none') {
+        this.result.hide()
+      }
+      let left_done = true, right_done = true
+      if (this.params.left_mm) {
+        left_done = false
+        this.left.initAnimation(() => left_done = true)
+      }
+      if (this.params.right_mm) {
+        right_done = false
+        this.right.initAnimation(() => right_done = true)
+      }
+      this.bump = () => {
+        left_done || this.left.bump()
+        right_done || this.right.bump()
+        !left_done || !right_done || go()
+      }
+    }
+
+    this.anim_cb = cb || this.start
+
+    this.start()
   }
 
-  getThreadInfo() {
-    const ni = Math.min(this.params['i threads'], this.H)
-    const nj = Math.min(this.params['j threads'], this.D)
-    const nk = Math.min(this.params['k threads'], this.W)
+  getBlockInfo() {
+    const ni = Math.min(this.params['i blocks'], this.H)
+    const nj = Math.min(this.params['j blocks'], this.D)
+    const nk = Math.min(this.params['k blocks'], this.W)
     return {
-      i: { n: ni, block: Math.ceil(this.H / ni), max: this.H },
-      j: { n: nj, block: Math.ceil(this.D / nj), max: this.D },
-      k: { n: nk, block: Math.ceil(this.W / nk), max: this.W },
+      i: { n: ni, size: Math.ceil(this.H / ni), max: this.H },
+      j: { n: nj, size: Math.ceil(this.D / nj), max: this.D },
+      k: { n: nk, size: Math.ceil(this.W / nk), max: this.W },
     }
   }
 
   grid(dims, f) {
-    const info = this.getThreadInfo()
+    const info = this.getBlockInfo()
     const infos = Array.from(dims).map(d => info[d])
     const loop = (args, infos, f) => infos.length == 0 ?
       f(...args) :
       [...Array(infos[0].n).keys()].map(index => {
-        const { block, max } = infos[0]
-        const start = index * block
-        if (start < max) {  // dead final block when block * n - max > block
-          const end = Math.min(start + block, max)
+        const { size, max } = infos[0]
+        const start = index * size
+        if (start < max) {  // dead final block when size * n - max > size
+          const end = Math.min(start + size, max)
           const extent = end - start
           loop([...args, { index, start, end, extent }], infos.slice(1), f)
         }
@@ -978,7 +1007,7 @@ export class MatMul {
   }
 
   getAnimResultMats() {
-    if (this.getThreadInfo().j.n == 1) {
+    if (this.getBlockInfo().j.n == 1) {
       this.result.params.stretch_absmax = true
       return [this.result]
     }
@@ -1017,24 +1046,39 @@ export class MatMul {
       this.group.add(vmp.group)
     })
 
-    const { i: { block: iblock }, k: { block: kblock } } = this.getThreadInfo()
-    let curi = iblock - 1
-    let curk = sweep ? kblock - 1 : 0
+    const shutdown = () => {
+      this.group.remove(vmps.group)
+      this.anim_mats.map(m => m.group.clear())
+      this.anim_mats = []
+    }
+
+    const { i: { size: isize }, k: { size: ksize } } = this.getBlockInfo()
+    let curi = isize - 1
+    let curk = sweep ? ksize - 1 : 0
+    let done = -1
 
     this.bump = () => {
       // update indexes
       const [oldi, oldk] = [curi, curk]
       if (sweep) {
-        curk = (curk + 1) % kblock
+        curk = (curk + 1) % ksize
       }
       if (curk == 0) {
-        curi = (curi + 1) % iblock
+        curi = (curi + 1) % isize
       }
 
       // update result mats
       if (curi == 0 && curk == 0) {
+        done++
+        if (done == 1 && this.anim_cb) {
+          shutdown()
+          this.anim_cb()
+          return
+        }
+        done = 0
         results.forEach(r => r.hide())
       }
+
       this.grid('ik', ({ start: i, extent: ix }, { start: k, end: ke, extent: kx }) => {
         if (curi < ix && curk < kx) {
           results.forEach(r => r.show(i + curi, sweep ? k + curk : [k, ke]))
@@ -1098,18 +1142,18 @@ export class MatMul {
       this.group.add(mvp.group)
     })
 
-    const { i: { block: iblock }, k: { block: kblock } } = this.getThreadInfo()
-    let curi = sweep ? iblock - 1 : 0
-    let curk = kblock - 1
+    const { i: { size: isize }, k: { size: ksize } } = this.getBlockInfo()
+    let curi = sweep ? isize - 1 : 0
+    let curk = ksize - 1
 
     this.bump = () => {
       // update indexes
       const [oldi, oldk] = [curi, curk]
       if (sweep) {
-        curi = (curi + 1) % iblock
+        curi = (curi + 1) % isize
       }
       if (curi == 0) {
-        curk = (curk + 1) % kblock
+        curk = (curk + 1) % ksize
       }
 
       // update result mats
@@ -1178,16 +1222,16 @@ export class MatMul {
       this.group.add(vvp.group)
     })
 
-    const { j: { block: jblock }, k: { block: kblock } } = this.getThreadInfo()
-    let curj = jblock - 1
-    let curk = sweep ? kblock - 1 : 0
+    const { j: { size: jsize }, k: { size: ksize } } = this.getBlockInfo()
+    let curj = jsize - 1
+    let curk = sweep ? ksize - 1 : 0
 
     this.bump = () => {
       // update indexes
       const [oldj, oldk] = [curj, curk]
-      curj = (curj + 1) % jblock
+      curj = (curj + 1) % jsize
       if (curj == 0 && sweep) {
-        curk = (curk + 1) % kblock
+        curk = (curk + 1) % ksize
       }
 
       // update result mats

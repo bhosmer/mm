@@ -63,9 +63,9 @@
       alg: 'none',
       speed: 25,
       'hide inputs': false,
-      'i threads': 1,
-      'j threads': 1,
-      'k threads': 1,
+      'i blocks': 1,
+      'j blocks': 1,
+      'k blocks': 1,
       // layout
       polarity: 'negative',
       'left placement': 'left',
@@ -251,9 +251,9 @@
         // 3 levels
 
         // ((LLL @ LLR) @ LR) @ R
-        // const ll = { ...getParams(), 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
-        // const l = { ...getParams(), left_mm: ll, 'right name': "LR", 'result name': "L" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
+        const ll = { ...getParams(), 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
+        const l = { ...getParams(), left_mm: ll, 'right name': "LR", 'result name': "L" }
+        obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
 
         // (LL @ (LRL @ LRR)) @ R
         // spacious: here orientation is CORRECT. test any orientation fix against this
@@ -494,37 +494,37 @@
         // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
 
         // 5 levels saturated
-        const llll = { ...getParams(), 'left name': "LLLLL", 'right name': "LLLLR", 'result name': "LLLL" }
-        const lllr = { ...getParams(), 'left name': "LLLRL", 'right name': "LLLRR", 'result name': "LLLR" }
-        const lll = { ...getParams(), left_mm: llll, right_mm: lllr, 'result name': "LLL" }
-        const llrl = { ...getParams(), 'left name': "LLRLL", 'right name': "LLRLR", 'result name': "LLRL" }
-        const llrr = { ...getParams(), 'left name': "LLRRL", 'right name': "LLRRR", 'result name': "LLRR" }
-        const llr = { ...getParams(), left_mm: llrl, right_mm: llrr, 'result name': "LLR" }
-        const ll = { ...getParams(), left_mm: lll, right_mm: llr, 'result name': "LL" }
-        const lrll = { ...getParams(), 'left name': "LRLLL", 'right name': "LRLLR", 'result name': "LRLL" }
-        const lrlr = { ...getParams(), 'left name': "LRLRL", 'right name': "LRLRR", 'result name': "LRLR" }
-        const lrl = { ...getParams(), left_mm: lrll, right_mm: lrlr, 'result name': "LRL" }
-        const lrrl = { ...getParams(), 'left name': "LRRLL", 'right name': "LRRLR", 'result name': "LRRL" }
-        const lrrr = { ...getParams(), 'left name': "LRRRL", 'right name': "LRRRR", 'result name': "LRRR" }
-        const lrr = { ...getParams(), left_mm: lrrl, right_mm: lrrr, 'result name': "LRR" }
-        const lr = { ...getParams(), left_mm: lrl, right_mm: lrr, 'result name': "LR" }
-        const l = { ...getParams(), left_mm: ll, right_mm: lr, 'result name': "L" }
-        const rlll = { ...getParams(), 'left name': "RLLLL", 'right name': "RLLLR", 'result name': "RLLL" }
-        const rllr = { ...getParams(), 'left name': "RLLRL", 'right name': "RLLRR", 'result name': "RLLR" }
-        const rll = { ...getParams(), left_mm: rlll, right_mm: rllr, 'result name': "RLL" }
-        const rlrl = { ...getParams(), 'left name': "RLRLL", 'right name': "RLRLR", 'result name': "RLRL" }
-        const rlrr = { ...getParams(), 'left name': "RLRRL", 'right name': "RLRRR", 'result name': "RLRR" }
-        const rlr = { ...getParams(), left_mm: rlrl, right_mm: rlrr, 'result name': "RLR" }
-        const rl = { ...getParams(), left_mm: rll, right_mm: rlr, 'result name': "RL" }
-        const rrll = { ...getParams(), 'left name': "RRLLL", 'right name': "RRLLR", 'result name': "RRLL" }
-        const rrlr = { ...getParams(), 'left name': "RRLRL", 'right name': "RRLRR", 'result name': "RRLR" }
-        const rrl = { ...getParams(), left_mm: rrll, right_mm: rrlr, 'result name': "RRL" }
-        const rrrl = { ...getParams(), 'left name': "RRRLL", 'right name': "RRRLR", 'result name': "RRRL" }
-        const rrrr = { ...getParams(), 'left name': "RRRRL", 'right name': "RRRRR", 'result name': "RRRR" }
-        const rrr = { ...getParams(), left_mm: rrrl, right_mm: rrrr, 'result name': "RRR" }
-        const rr = { ...getParams(), left_mm: rrl, right_mm: rrr, 'result name': "RR" }
-        const r = { ...getParams(), left_mm: rl, right_mm: rr, 'result name': "R" }
-        obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
+        // const llll = { ...getParams(), 'left name': "LLLLL", 'right name': "LLLLR", 'result name': "LLLL" }
+        // const lllr = { ...getParams(), 'left name': "LLLRL", 'right name': "LLLRR", 'result name': "LLLR" }
+        // const lll = { ...getParams(), left_mm: llll, right_mm: lllr, 'result name': "LLL" }
+        // const llrl = { ...getParams(), 'left name': "LLRLL", 'right name': "LLRLR", 'result name': "LLRL" }
+        // const llrr = { ...getParams(), 'left name': "LLRRL", 'right name': "LLRRR", 'result name': "LLRR" }
+        // const llr = { ...getParams(), left_mm: llrl, right_mm: llrr, 'result name': "LLR" }
+        // const ll = { ...getParams(), left_mm: lll, right_mm: llr, 'result name': "LL" }
+        // const lrll = { ...getParams(), 'left name': "LRLLL", 'right name': "LRLLR", 'result name': "LRLL" }
+        // const lrlr = { ...getParams(), 'left name': "LRLRL", 'right name': "LRLRR", 'result name': "LRLR" }
+        // const lrl = { ...getParams(), left_mm: lrll, right_mm: lrlr, 'result name': "LRL" }
+        // const lrrl = { ...getParams(), 'left name': "LRRLL", 'right name': "LRRLR", 'result name': "LRRL" }
+        // const lrrr = { ...getParams(), 'left name': "LRRRL", 'right name': "LRRRR", 'result name': "LRRR" }
+        // const lrr = { ...getParams(), left_mm: lrrl, right_mm: lrrr, 'result name': "LRR" }
+        // const lr = { ...getParams(), left_mm: lrl, right_mm: lrr, 'result name': "LR" }
+        // const l = { ...getParams(), left_mm: ll, right_mm: lr, 'result name': "L" }
+        // const rlll = { ...getParams(), 'left name': "RLLLL", 'right name': "RLLLR", 'result name': "RLLL" }
+        // const rllr = { ...getParams(), 'left name': "RLLRL", 'right name': "RLLRR", 'result name': "RLLR" }
+        // const rll = { ...getParams(), left_mm: rlll, right_mm: rllr, 'result name': "RLL" }
+        // const rlrl = { ...getParams(), 'left name': "RLRLL", 'right name': "RLRLR", 'result name': "RLRL" }
+        // const rlrr = { ...getParams(), 'left name': "RLRRL", 'right name': "RLRRR", 'result name': "RLRR" }
+        // const rlr = { ...getParams(), left_mm: rlrl, right_mm: rlrr, 'result name': "RLR" }
+        // const rl = { ...getParams(), left_mm: rll, right_mm: rlr, 'result name': "RL" }
+        // const rrll = { ...getParams(), 'left name': "RRLLL", 'right name': "RRLLR", 'result name': "RRLL" }
+        // const rrlr = { ...getParams(), 'left name': "RRLRL", 'right name': "RRLRR", 'result name': "RRLR" }
+        // const rrl = { ...getParams(), left_mm: rrll, right_mm: rrlr, 'result name': "RRL" }
+        // const rrrl = { ...getParams(), 'left name': "RRRLL", 'right name': "RRRLR", 'result name': "RRRL" }
+        // const rrrr = { ...getParams(), 'left name': "RRRRL", 'right name': "RRRRR", 'result name': "RRRR" }
+        // const rrr = { ...getParams(), left_mm: rrrl, right_mm: rrrr, 'result name': "RRR" }
+        // const rr = { ...getParams(), left_mm: rrl, right_mm: rrr, 'result name': "RR" }
+        // const r = { ...getParams(), left_mm: rl, right_mm: rr, 'result name': "R" }
+        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
 
         // ---
 
@@ -557,6 +557,7 @@
 
         getObj().setLegends({})
         getObj().updateLabels()
+        getObj().initAnimation()
       }
 
       // renderer, composer
@@ -737,9 +738,9 @@
       gui_anim.add({ pause: false }, 'pause').onChange(x => anim_pause = x)
       gui_anim.add({ step: animStep }, 'step')
       addParam(gui_anim, 'hide inputs', x => getObj().hideInputs(x))
-      addIntParam(gui_anim, 'i threads', 1, 16)
-      addIntParam(gui_anim, 'j threads', 1, 16)
-      addIntParam(gui_anim, 'k threads', 1, 16)
+      addIntParam(gui_anim, 'i blocks', 1, 16)
+      addIntParam(gui_anim, 'j blocks', 1, 16)
+      addIntParam(gui_anim, 'k blocks', 1, 16)
 
       const gui_layout = gui.addFolder('layout')
       addChoiceParam(gui_layout, 'polarity', vis.POLARITIES)
