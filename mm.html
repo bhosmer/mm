@@ -138,7 +138,7 @@
 
     // camera
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 5, 10000);
-    const pointer = new THREE.Vector2(0, 0)
+    const pointer = new THREE.Vector2(window.innerWidth / 2, window.innerHeight / 2)
 
     // raycaster, used for spotlight intersections
     const raycaster = new THREE.Raycaster()
@@ -228,7 +228,7 @@
         }
 
         // L @ R
-        obj = new vis.MatMul(fix_shape(getParams()))
+        // obj = new vis.MatMul(fix_shape(getParams()))
 
         // 2 levels
 
@@ -494,37 +494,37 @@
         // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
 
         // 5 levels saturated
-        // const llll = { ...getParams(), 'left name': "LLLLL", 'right name': "LLLLR", 'result name': "LLLL" }
-        // const lllr = { ...getParams(), 'left name': "LLLRL", 'right name': "LLLRR", 'result name': "LLLR" }
-        // const lll = { ...getParams(), left_mm: llll, right_mm: lllr, 'result name': "LLL" }
-        // const llrl = { ...getParams(), 'left name': "LLRLL", 'right name': "LLRLR", 'result name': "LLRL" }
-        // const llrr = { ...getParams(), 'left name': "LLRRL", 'right name': "LLRRR", 'result name': "LLRR" }
-        // const llr = { ...getParams(), left_mm: llrl, right_mm: llrr, 'result name': "LLR" }
-        // const ll = { ...getParams(), left_mm: lll, right_mm: llr, 'result name': "LL" }
-        // const lrll = { ...getParams(), 'left name': "LRLLL", 'right name': "LRLLR", 'result name': "LRLL" }
-        // const lrlr = { ...getParams(), 'left name': "LRLRL", 'right name': "LRLRR", 'result name': "LRLR" }
-        // const lrl = { ...getParams(), left_mm: lrll, right_mm: lrlr, 'result name': "LRL" }
-        // const lrrl = { ...getParams(), 'left name': "LRRLL", 'right name': "LRRLR", 'result name': "LRRL" }
-        // const lrrr = { ...getParams(), 'left name': "LRRRL", 'right name': "LRRRR", 'result name': "LRRR" }
-        // const lrr = { ...getParams(), left_mm: lrrl, right_mm: lrrr, 'result name': "LRR" }
-        // const lr = { ...getParams(), left_mm: lrl, right_mm: lrr, 'result name': "LR" }
-        // const l = { ...getParams(), left_mm: ll, right_mm: lr, 'result name': "L" }
-        // const rlll = { ...getParams(), 'left name': "RLLLL", 'right name': "RLLLR", 'result name': "RLLL" }
-        // const rllr = { ...getParams(), 'left name': "RLLRL", 'right name': "RLLRR", 'result name': "RLLR" }
-        // const rll = { ...getParams(), left_mm: rlll, right_mm: rllr, 'result name': "RLL" }
-        // const rlrl = { ...getParams(), 'left name': "RLRLL", 'right name': "RLRLR", 'result name': "RLRL" }
-        // const rlrr = { ...getParams(), 'left name': "RLRRL", 'right name': "RLRRR", 'result name': "RLRR" }
-        // const rlr = { ...getParams(), left_mm: rlrl, right_mm: rlrr, 'result name': "RLR" }
-        // const rl = { ...getParams(), left_mm: rll, right_mm: rlr, 'result name': "RL" }
-        // const rrll = { ...getParams(), 'left name': "RRLLL", 'right name': "RRLLR", 'result name': "RRLL" }
-        // const rrlr = { ...getParams(), 'left name': "RRLRL", 'right name': "RRLRR", 'result name': "RRLR" }
-        // const rrl = { ...getParams(), left_mm: rrll, right_mm: rrlr, 'result name': "RRL" }
-        // const rrrl = { ...getParams(), 'left name': "RRRLL", 'right name': "RRRLR", 'result name': "RRRL" }
-        // const rrrr = { ...getParams(), 'left name': "RRRRL", 'right name': "RRRRR", 'result name': "RRRR" }
-        // const rrr = { ...getParams(), left_mm: rrrl, right_mm: rrrr, 'result name': "RRR" }
-        // const rr = { ...getParams(), left_mm: rrl, right_mm: rrr, 'result name': "RR" }
-        // const r = { ...getParams(), left_mm: rl, right_mm: rr, 'result name': "R" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
+        const llll = { ...getParams(), 'left name': "LLLLL", 'right name': "LLLLR", 'result name': "LLLL" }
+        const lllr = { ...getParams(), 'left name': "LLLRL", 'right name': "LLLRR", 'result name': "LLLR" }
+        const lll = { ...getParams(), left_mm: llll, right_mm: lllr, 'result name': "LLL" }
+        const llrl = { ...getParams(), 'left name': "LLRLL", 'right name': "LLRLR", 'result name': "LLRL" }
+        const llrr = { ...getParams(), 'left name': "LLRRL", 'right name': "LLRRR", 'result name': "LLRR" }
+        const llr = { ...getParams(), left_mm: llrl, right_mm: llrr, 'result name': "LLR" }
+        const ll = { ...getParams(), left_mm: lll, right_mm: llr, 'result name': "LL" }
+        const lrll = { ...getParams(), 'left name': "LRLLL", 'right name': "LRLLR", 'result name': "LRLL" }
+        const lrlr = { ...getParams(), 'left name': "LRLRL", 'right name': "LRLRR", 'result name': "LRLR" }
+        const lrl = { ...getParams(), left_mm: lrll, right_mm: lrlr, 'result name': "LRL" }
+        const lrrl = { ...getParams(), 'left name': "LRRLL", 'right name': "LRRLR", 'result name': "LRRL" }
+        const lrrr = { ...getParams(), 'left name': "LRRRL", 'right name': "LRRRR", 'result name': "LRRR" }
+        const lrr = { ...getParams(), left_mm: lrrl, right_mm: lrrr, 'result name': "LRR" }
+        const lr = { ...getParams(), left_mm: lrl, right_mm: lrr, 'result name': "LR" }
+        const l = { ...getParams(), left_mm: ll, right_mm: lr, 'result name': "L" }
+        const rlll = { ...getParams(), 'left name': "RLLLL", 'right name': "RLLLR", 'result name': "RLLL" }
+        const rllr = { ...getParams(), 'left name': "RLLRL", 'right name': "RLLRR", 'result name': "RLLR" }
+        const rll = { ...getParams(), left_mm: rlll, right_mm: rllr, 'result name': "RLL" }
+        const rlrl = { ...getParams(), 'left name': "RLRLL", 'right name': "RLRLR", 'result name': "RLRL" }
+        const rlrr = { ...getParams(), 'left name': "RLRRL", 'right name': "RLRRR", 'result name': "RLRR" }
+        const rlr = { ...getParams(), left_mm: rlrl, right_mm: rlrr, 'result name': "RLR" }
+        const rl = { ...getParams(), left_mm: rll, right_mm: rlr, 'result name': "RL" }
+        const rrll = { ...getParams(), 'left name': "RRLLL", 'right name': "RRLLR", 'result name': "RRLL" }
+        const rrlr = { ...getParams(), 'left name': "RRLRL", 'right name': "RRLRR", 'result name': "RRLR" }
+        const rrl = { ...getParams(), left_mm: rrll, right_mm: rrlr, 'result name': "RRL" }
+        const rrrl = { ...getParams(), 'left name': "RRRLL", 'right name': "RRRLR", 'result name': "RRRL" }
+        const rrrr = { ...getParams(), 'left name': "RRRRL", 'right name': "RRRRR", 'result name': "RRRR" }
+        const rrr = { ...getParams(), left_mm: rrrl, right_mm: rrrr, 'result name': "RRR" }
+        const rr = { ...getParams(), left_mm: rrl, right_mm: rrr, 'result name': "RR" }
+        const r = { ...getParams(), left_mm: rl, right_mm: rr, 'result name': "R" }
+        obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
 
         // ---
 
@@ -554,8 +554,10 @@
         obj.center()
 
         scene.add(obj.group)
+
+        getObj().setLegends({})
+        getObj().updateLabels()
       }
-      initObj()
 
       // renderer, composer
 
@@ -579,10 +581,14 @@
           label_update_pending = true
           setTimeout(function () {
             raycaster.setFromCamera(pointer, camera)
-            getObj().updateLabels()
 
             // temp
+            getObj().params.scene = scene
+
+            // temp            
             getObj().setLegends({})
+
+            getObj().updateLabels()
 
             // const cam_v = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion)
             // // const cam_v = camera.localToWorld(new THREE.Vector3(0, -1, 0))
@@ -618,7 +624,11 @@
         if (camera.position.x != params.xcam ||
           camera.position.y != params.ycam ||
           camera.position.z != params.zcam) {
-          setParams({ xcam: camera.position.x, ycam: camera.position.y, zcam: camera.position.z })
+          setParams({
+            xcam: camera.position.x,
+            ycam: camera.position.y,
+            zcam: camera.position.z
+          })
         }
       }, false)
 
@@ -648,6 +658,8 @@
       initGui(getObj, initObj, initAxes)
 
       // let's go
+
+      initObj()
 
       let last = 0
       function animate() {
@@ -745,7 +757,7 @@
       addNumParam(gui_vis, 'row guides', 0.0, 1.0, x => getObj().setRowGuides(x))
       addNumParam(gui_vis, 'flow guides', 0.0, 1.0, x => getObj().setFlowGuide(x))
       addParam(gui_vis, 'interior spotlight', x => getObj().updateLabels(getParams()))
-      addParam(gui_vis, 'axes', x => initAxes(x))
+      addParam(gui_vis, 'axes', x => initAxes(getObj().params.axes = x))
 
       const gui_colors = gui.addFolder('colors and sizes')
       addChoiceParam(gui_colors, 'sensitivity', vis.SENSITIVITIES)

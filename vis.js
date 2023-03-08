@@ -421,13 +421,14 @@ export class Mat {
 
   isFacing() {
     const c = this.group.localToWorld(new THREE.Vector3()).sub(this.params.camera.position).normalize()
-    const p = this.group.getWorldDirection(new THREE.Vector3())
-    return p.angleTo(c) < Math.PI / 2
+    const m = this.group.getWorldDirection(new THREE.Vector3())
+    return m.angleTo(c) < Math.PI / 2
   }
 
   isRightSideUp() {
+    const q = new THREE.Quaternion()
+    const p = new THREE.Vector3(0, -1, 0).applyQuaternion(this.group.getWorldQuaternion(q))
     const c = new THREE.Vector3(0, 1, 0).applyQuaternion(this.params.camera.quaternion)
-    const p = new THREE.Vector3(0, 1, 0).applyQuaternion(this.group.quaternion)
     return p.angleTo(c) < Math.PI / 2
   }
 
@@ -468,6 +469,7 @@ export class Mat {
       const rsu = this.isRightSideUp()
       if (props.name) {
         let suf = this.params.tag || ''
+        suf += this.isRightSideUp() ? '+' : '-'
         const name = this.params.getText(props.name + suf, props.name_color, props.name_size)
         const { h, w } = util.bbhw(name.geometry)
         name.geometry.rotateZ(rsu ? Math.PI : 0)
@@ -613,7 +615,8 @@ export class MatMul {
         const f = getInitFunc(init, min, max, sparsity)
         return Array2D.fromInit(this.H, this.D, f)
       })()
-      this.left = new Mat(data, this.getLeafParams(), false)
+      const params = { ...this.getLeafParams(), name: this.params['left name'] }
+      this.left = new Mat(data, params, false)
     }
   }
 
@@ -629,18 +632,23 @@ export class MatMul {
         const f = getInitFunc(name, min, max, sparsity)
         return Array2D.fromInit(this.D, this.W, f)
       })()
-      this.right = new Mat(data, this.getLeafParams(), false)
+      const params = { ...this.getLeafParams(), name: this.params['right name'] }
+      this.right = new Mat(data, params, false)
     }
   }
 
   initResult() {
     const result_init = (i, j) => this.dotprod_val(i, j)
     const data = Array2D.fromInit(this.H, this.W, result_init, this.params.epilog)
-    const params = this.getLeafParams()
-    params.height = this.params.height
-    params.depth = this.params.depth
-    params.max_depth = this.params.max_depth
-    params.count = this.params.count
+    const params = {
+      ...this.getLeafParams(),
+      name: this.params['result name'],
+      // TODO clean up
+      height: this.params.height,
+      depth: this.params.depth,
+      max_depth: this.params.max_depth,
+      count: this.params.count
+    }
     this.result = new Mat(data, params, false)
   }
 
