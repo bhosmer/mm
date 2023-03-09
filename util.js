@@ -92,6 +92,13 @@ export function axes() {
   return group
 }
 
+const CORNER_COLOR = new THREE.Uint8BufferAttribute([
+  255, 255, 255, 128,
+  255, 255, 255, 128,
+  255, 255, 255, 128,
+], 4)
+CORNER_COLOR.normalized = true
+
 export function rowGuide(h, w, light = 1.0) {
   const rstride = Math.max(1, Math.floor(h / 8))
   const cstride = Math.max(1, Math.floor(w / 8))
@@ -110,7 +117,17 @@ export function rowGuide(h, w, light = 1.0) {
     draw(i, 0, i, w - 1)
   }
 
-  draw(rstride, 0, 0, cstride)
+  // draw(rstride, 0, 0, cstride)
+  const corner_geometry = new THREE.BufferGeometry()
+  corner_geometry.setAttribute('position', new THREE.Float32BufferAttribute([
+    0, 0, 0,
+    0, rstride, 0,
+    cstride, 0, 0,
+  ], 3))
+  CORNER_COLOR.array[3] = CORNER_COLOR.array[7] = CORNER_COLOR.array[3] = 255 * light
+  CORNER_COLOR.needsUpdate = true
+  corner_geometry.setAttribute('color', CORNER_COLOR)
+  group.add(new THREE.Mesh(corner_geometry, MMGUIDE_MATERIAL));
 
   return group
 }
@@ -119,16 +136,16 @@ export function rowGuide(h, w, light = 1.0) {
 // mm flow guide arrow
 // 
 
-const ARROW_ATTR = new THREE.Uint8BufferAttribute([
+const ARROW_COLOR = new THREE.Uint8BufferAttribute([
   255, 128, 128, 255,
   128, 255, 128, 255,
   0, 128, 255, 255,
 ], 4)
-ARROW_ATTR.normalized = true
+ARROW_COLOR.normalized = true
 
 export function flowGuide(h, d, w, placement, light = 1.0) {
-  ARROW_ATTR.array[3] = ARROW_ATTR.array[7] = ARROW_ATTR.array[3] = 255 * light
-  ARROW_ATTR.needsUpdate = true
+  ARROW_COLOR.array[3] = ARROW_COLOR.array[7] = ARROW_COLOR.array[3] = 255 * light
+  ARROW_COLOR.needsUpdate = true
 
   const { polarity, left, right, result, gap, left_scatter, right_scatter } = placement
   const extent = x => x + gap * 2 - 1
@@ -146,7 +163,7 @@ export function flowGuide(h, d, w, placement, light = 1.0) {
     place_left(gap - left_scatter), center(h) + h / 8, place_result(center(d)),
     place_left(center(w)), place_right(center(h)), place_result(gap),
   ], 3))
-  left_geometry.setAttribute('color', ARROW_ATTR)
+  left_geometry.setAttribute('color', ARROW_COLOR)
   group.add(new THREE.Mesh(left_geometry, MMGUIDE_MATERIAL));
 
   const right_geometry = new THREE.BufferGeometry()
@@ -155,7 +172,7 @@ export function flowGuide(h, d, w, placement, light = 1.0) {
     center(w) + w / 8, place_right(gap - right_scatter), place_result(center(d)),
     center(w), place_right(center(h)), place_result(gap),
   ], 3))
-  right_geometry.setAttribute('color', ARROW_ATTR)
+  right_geometry.setAttribute('color', ARROW_COLOR)
   group.add(new THREE.Mesh(right_geometry, MMGUIDE_MATERIAL));
 
   return group
