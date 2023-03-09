@@ -677,6 +677,18 @@ export class MatMul {
     return this.result.getData(i, j)
   }
 
+  show(r = undefined, c = undefined) {
+    this.left.show(r, c)
+    this.right.show(r, c)
+    this.result.show(r, c)
+  }
+
+  hide(r = undefined, c = undefined) {
+    this.left.hide(r, c)
+    this.right.hide(r, c)
+    this.result.hide(r, c)
+  }
+
   setColorsAndSizes(r = undefined, c = undefined, size = undefined, color = undefined) {
     this.result.setColorsAndSizes(r, c, size, color)
   }
@@ -855,6 +867,20 @@ export class MatMul {
     return this.params.getGlobalAbsmax ? this.params.getGlobalAbsmax() : this.getAbsmax()
   }
 
+  hideInputs(hide) {
+    util.syncProp(this.params, 'hide inputs', hide)
+    if (this.params.left_mm) {
+      this.left.hideInputs(hide)
+    } else if (this.params.alg != 'none') {
+      hide ? this.left.hide() : this.left.show()
+    }
+    if (this.params.right_mm) {
+      this.right.hideInputs(hide)
+    } else if (this.params.alg != 'none') {
+      hide ? this.right.hide() : this.right.show()
+    }
+  }
+
   setRowGuides(light) {
     light = util.syncProp(this.params, 'row guides', light)
     this.left.setRowGuides(light)
@@ -921,15 +947,45 @@ export class MatMul {
       'vvprod': () => this.initAnimVvprod(false),
     }
 
-    const can_fuse = () => {
-      const alg = this.params.alg
-      const lalg = this.params.left_mm ? this.params.left_mm.alg : 'none'
-      const ralg = this.params.right_mm ? this.params.right_mm.alg : 'none'
-      return alg == 'vmprod' && lalg == 'vmprod' && ralg == 'none'
-    }
-
     this.start = () => {
+      if (this.params['hide inputs']) {
+        this.left.hide()
+        this.right.hide()
+      } else {
+        this.left.show()
+        this.right.show()
+      }
+
       let left_done = true, right_done = true
+
+      this.alg_join = () => {
+        const alg = this.params.alg
+        const lalg = this.params.left_mm && !left_done ? this.left.alg_join() : 'none'
+        const ralg = this.params.right_mm && !right_done ? this.right.alg_join() : 'none'
+        let res
+        if (lalg == 'none' && ralg == 'none') {
+          res = alg
+        } else if (ralg == 'none') {
+          res = lalg == 'vmprod' && alg == 'vmprod' ? 'vmprod' :
+            lalg == 'mvprod' && alg == 'vvprod' ? 'vvprod' :
+              'mixed'
+        } else if (lalg == 'none') {
+          res = ralg == 'mvprod' && alg == 'mvprod' ? 'mvprod' :
+            ralg == 'vmprod' && alg == 'vvprod' ? 'vvprod' :
+              'mixed'
+        } else {
+          res = 'mixed'
+        }
+        console.log(`HEY alg_join ${this.params['result name']} ${left_done} ${right_done} ${lalg} ${ralg} ${alg} ${res}`)
+        return res
+      }
+
+      const can_fuse = (left_done, right_done) => {
+        const res = this.alg_join(left_done, right_done) != 'mixed'
+        console.log(`HEY can_fuse ${this.params['result name']} ${left_done} ${right_done} ${res}`)
+        return res
+      }
+
       if (this.params.left_mm) {
         left_done = false
         this.left.initAnimation(() => left_done = true)
@@ -938,11 +994,11 @@ export class MatMul {
         right_done = false
         this.right.initAnimation(() => right_done = true)
       }
-      const fuse = this.params.fuse && can_fuse()
       const result_bump = bumps[this.params.alg]()
       this.bump = () => {
         left_done || this.left.bump()
-        right_done || this.right.bump();
+        right_done || this.right.bump()
+        const fuse = this.params.fuse && can_fuse(left_done, right_done);
         (fuse || (left_done && right_done)) && result_bump()
       }
       this.result.hide()
@@ -1064,26 +1120,27 @@ export class MatMul {
       })
 
       // update input hilights
-      if (sweep) {
-        this.grid('k', ({ start: k, extent: kx }) => {
-          if (oldk < kx) {
-            this.right.setColorsAndSizes(undefined, k + oldk)
-          }
-          if (curk < kx) {
-            this.right.bumpColor(undefined, k + curk)
-          }
-        })
-      }
-
-      if (oldi != curi) {
-        this.grid('i', ({ start: i, extent: ix }) => {
-          if (oldi < ix) {
-            this.left.setColorsAndSizes(i + oldi, undefined)
-          }
-          if (curi < ix) {
-            this.left.bumpColor(i + curi, undefined)
-          }
-        })
+      if (!this.params['hide inputs']) {
+        if (sweep) {
+          this.grid('k', ({ start: k, extent: kx }) => {
+            if (oldk < kx) {
+              this.right.setColorsAndSizes(undefined, k + oldk)
+            }
+            if (curk < kx) {
+              this.right.bumpColor(undefined, k + curk)
+            }
+          })
+        }
+        if (oldi != curi) {
+          this.grid('i', ({ start: i, extent: ix }) => {
+            if (oldi < ix) {
+              this.left.setColorsAndSizes(i + oldi, undefined)
+            }
+            if (curi < ix) {
+              this.left.bumpColor(i + curi, undefined)
+            }
+          })
+        }
       }
 
       // update intermediates
@@ -1119,9 +1176,16 @@ export class MatMul {
       this.group.add(mvp.group)
     })
 
+    const shutdown = () => {
+      this.group.remove(mvps.group)
+      this.anim_mats.map(m => m.group.clear())
+      this.anim_mats = []
+    }
+
     const { i: { size: isize }, k: { size: ksize } } = this.getBlockInfo()
     let curi = sweep ? isize - 1 : 0
     let curk = ksize - 1
+    let done = -1
 
     return () => {
       // update indexes
@@ -1135,8 +1199,16 @@ export class MatMul {
 
       // update result mats
       if (curi == 0 && curk == 0) {
+        done++
+        if (done == 1 && this.anim_cb) {
+          shutdown()
+          this.anim_cb()
+          return
+        }
+        done = 0
         results.forEach(r => r.hide())
       }
+
       this.grid('ik', ({ start: i, end: ie, extent: ix }, { start: k, extent: kx }) => {
         if (curi < ix && curk < kx) {
           results.forEach(r => r.show(sweep ? i + curi : [i, ie], k + curk))
@@ -1144,26 +1216,27 @@ export class MatMul {
       })
 
       // update input hilights
-      if (sweep) {
-        this.grid('i', ({ start: i, extent: ix }) => {
-          if (oldi < ix) {
-            this.left.setColorsAndSizes(i + oldi, undefined)
-          }
-          if (curi < ix) {
-            this.left.bumpColor(i + curi, undefined)
-          }
-        })
-      }
-
-      if (oldk != curk) {
-        this.grid('k', ({ start: k, extent: kx }) => {
-          if (oldk < kx) {
-            this.right.setColorsAndSizes(undefined, k + oldk)
-          }
-          if (curk < kx) {
-            this.right.bumpColor(undefined, k + curk)
-          }
-        })
+      if (!this.params['hide inputs']) {
+        if (sweep) {
+          this.grid('i', ({ start: i, extent: ix }) => {
+            if (oldi < ix) {
+              this.left.setColorsAndSizes(i + oldi, undefined)
+            }
+            if (curi < ix) {
+              this.left.bumpColor(i + curi, undefined)
+            }
+          })
+        }
+        if (oldk != curk) {
+          this.grid('k', ({ start: k, extent: kx }) => {
+            if (oldk < kx) {
+              this.right.setColorsAndSizes(undefined, k + oldk)
+            }
+            if (curk < kx) {
+              this.right.bumpColor(undefined, k + curk)
+            }
+          })
+        }
       }
 
       // update intermediates
@@ -1222,34 +1295,35 @@ export class MatMul {
       })
 
       // update input highlights
-      if (sweep) {
-        this.grid('jk', ({ start: j, extent: jx }, { start: k, extent: kx }) => {
-          if (oldj < jx && oldk < kx) {
-            this.right.setColorsAndSizes(j + oldj, k + oldk)
-          }
-          if (curj < jx && curk < kx) {
-            this.right.bumpColor(j + curj, k + curk)
-          }
-        })
-      } else {
+      if (!this.params['hide inputs']) {
+        if (sweep) {
+          this.grid('jk', ({ start: j, extent: jx }, { start: k, extent: kx }) => {
+            if (oldj < jx && oldk < kx) {
+              this.right.setColorsAndSizes(j + oldj, k + oldk)
+            }
+            if (curj < jx && curk < kx) {
+              this.right.bumpColor(j + curj, k + curk)
+            }
+          })
+        } else {
+          this.grid('j', ({ start: j, extent: jx }) => {
+            if (oldj < jx) {
+              this.right.setColorsAndSizes(j + oldj, undefined)
+            }
+            if (curj < jx) {
+              this.right.bumpColor(j + curj, undefined)
+            }
+          })
+        }
         this.grid('j', ({ start: j, extent: jx }) => {
           if (oldj < jx) {
-            this.right.setColorsAndSizes(j + oldj, undefined)
+            this.left.setColorsAndSizes(undefined, j + oldj)
           }
           if (curj < jx) {
-            this.right.bumpColor(j + curj, undefined)
+            this.left.bumpColor(undefined, j + curj)
           }
         })
       }
-
-      this.grid('j', ({ start: j, extent: jx }) => {
-        if (oldj < jx) {
-          this.left.setColorsAndSizes(undefined, j + oldj)
-        }
-        if (curj < jx) {
-          this.left.bumpColor(undefined, j + curj)
-        }
-      })
 
       // update intermediates
       this.grid('ijk', ({ start: i }, { start: j, extent: jx, end: je }, { start: k, end: ke, extent: kx }) => {

@@ -63,6 +63,7 @@
       alg: 'none',
       fuse: true,
       speed: 25,
+      'hide inputs': false,
       'i blocks': 1,
       'j blocks': 1,
       'k blocks': 1,
@@ -357,11 +358,11 @@
         // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
 
         // ((((LLLLL @ LLLLR) @ LLLR) @ LLR) @ LR) @ R
-        const llll = { ...getParams(), 'left name': "LLLLL", 'right name': "LLLLR", 'result name': "LLLL" }
-        const lll = { ...getParams(), left_mm: llll, 'right name': "LLLR", 'result name': "LLL" }
-        const ll = { ...getParams(), left_mm: lll, 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
-        const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", 'result name': "L" }
-        obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
+        // const llll = { ...getParams(), 'left name': "LLLLL", 'right name': "LLLLR", 'result name': "LLLL" }
+        // const lll = { ...getParams(), left_mm: llll, 'right name': "LLLR", 'result name': "LLL" }
+        // const ll = { ...getParams(), left_mm: lll, 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
+        // const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", 'result name': "L" }
+        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
 
         // L @ (RL @ (RRL @ (RRRL @ RRRR)))
         // note here (and elsewhere) that flipping leaf inputs around is only trivial when 
@@ -533,12 +534,12 @@
         // spacious: repro 1 in.t
         // note: could actually get away with all-right-at-bottom here... good example of where collision
         // detection would help UX, like to gray out layout options that collide
-        // const q = { ...getParams(), I: 64, J: 128, K: 32, 'left name': "in", 'right name': "wQ", 'result name': "Q" }
-        // const kt = { ...getParams(), I: 32, J: 128, K: 64, 'left name': "wK.t", 'right name': "in.t", 'result name': "K.t" }
-        // const attn = { ...getParams(), I: 64, J: 32, K: 64, left_mm: q, right_mm: kt, 'left name': "Q", 'right name': "Kt", 'result name': "attn" }
-        // const v = { ...getParams(), I: 64, J: 128, K: 32, 'left name': "in", 'right name': "wV", 'result name': "V" }
-        // const out = { ...getParams(), I: 64, J: 64, K: 32, left_mm: attn, right_mm: v, 'left name': "attn", 'right name': "V", 'result name': "out" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), I: 64, J: 32, K: 128, left_mm: out, 'right name': 'wO', 'result name': 'out2' }))
+        const q = { ...getParams(), I: 64, J: 128, K: 32, 'left name': "in", 'right name': "wQ", 'result name': "Q" }
+        const kt = { ...getParams(), I: 32, J: 128, K: 64, 'left name': "wK.t", 'right name': "in.t", 'result name': "K.t" }
+        const attn = { ...getParams(), I: 64, J: 32, K: 64, left_mm: q, right_mm: kt, 'left name': "Q", 'right name': "Kt", 'result name': "attn" }
+        const v = { ...getParams(), I: 64, J: 128, K: 32, 'left name': "in", 'right name': "wV", 'result name': "V" }
+        const out = { ...getParams(), I: 64, J: 64, K: 32, left_mm: attn, right_mm: v, 'left name': "attn", 'right name': "V", 'result name': "out" }
+        obj = new vis.MatMul(fix_shape({ ...getParams(), I: 64, J: 32, K: 128, left_mm: out, 'right name': 'wO', 'result name': 'out2' }))
 
         // mha reassociated (worse)
         // ((in @ wQ) @ (wK.t @ in.t)) @ ((in @ wV) @ wO)
@@ -734,10 +735,11 @@
 
       const gui_anim = gui.addFolder('animation')
       addChoiceParam(gui_anim, 'alg', vis.ANIM_ALGS)
-      addParam(gui_anim, 'fuse')
       addIntParam(gui_anim, 'speed', 1, 100, _ => { })
       gui_anim.add({ pause: false }, 'pause').onChange(x => anim_pause = x)
       gui_anim.add({ step: animStep }, 'step')
+      addParam(gui_anim, 'fuse')
+      addParam(gui_anim, 'hide inputs', x => getObj().hideInputs(x))
       addIntParam(gui_anim, 'i blocks', 1, 16)
       addIntParam(gui_anim, 'j blocks', 1, 16)
       addIntParam(gui_anim, 'k blocks', 1, 16)
