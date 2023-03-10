@@ -197,6 +197,7 @@
       function initObj() {
         if (obj) {
           scene.remove(obj.group)
+          obj.disposeAll()
         }
 
         // temp: takes root shape and adjusts children so nothing blows up
@@ -252,9 +253,9 @@
         // 3 levels
 
         // ((LLL @ LLR) @ LR) @ R
-        // const ll = { ...getParams(), 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
-        // const l = { ...getParams(), left_mm: ll, 'right name': "LR", 'result name': "L" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
+        const ll = { ...getParams(), 'left name': "LLL", 'right name': "LLR", 'result name': "LL" }
+        const l = { ...getParams(), left_mm: ll, 'right name': "LR", 'result name': "L" }
+        obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
 
         // (LL @ (LRL @ LRR)) @ R
         // spacious: here orientation is CORRECT. test any orientation fix against this
@@ -534,12 +535,23 @@
         // spacious: repro 1 in.t
         // note: could actually get away with all-right-at-bottom here... good example of where collision
         // detection would help UX, like to gray out layout options that collide
-        const q = { ...getParams(), I: 64, J: 128, K: 32, 'left name': "in", 'right name': "wQ", 'result name': "Q" }
-        const kt = { ...getParams(), I: 32, J: 128, K: 64, 'left name': "wK.t", 'right name': "in.t", 'result name': "K.t" }
-        const attn = { ...getParams(), I: 64, J: 32, K: 64, left_mm: q, right_mm: kt, 'left name': "Q", 'right name': "Kt", 'result name': "attn" }
-        const v = { ...getParams(), I: 64, J: 128, K: 32, 'left name': "in", 'right name': "wV", 'result name': "V" }
-        const out = { ...getParams(), I: 64, J: 64, K: 32, left_mm: attn, right_mm: v, 'left name': "attn", 'right name': "V", 'result name': "out" }
-        obj = new vis.MatMul(fix_shape({ ...getParams(), I: 64, J: 32, K: 128, left_mm: out, 'right name': 'wO', 'result name': 'out2' }))
+        // const q = { ...getParams(), I: 64, J: 128, K: 32, 'left name': "in", 'right name': "wQ", 'result name': "Q" }
+        // const kt = { ...getParams(), I: 32, J: 128, K: 64, 'left name': "wK.t", 'right name': "in.t", 'result name': "K.t" }
+        // const attn = { ...getParams(), I: 64, J: 32, K: 64, left_mm: q, right_mm: kt, 'left name': "Q", 'right name': "Kt", 'result name': "attn" }
+        // const v = { ...getParams(), I: 64, J: 128, K: 32, 'left name': "in", 'right name': "wV", 'result name': "V" }
+        // const out = { ...getParams(), I: 64, J: 64, K: 32, left_mm: attn, right_mm: v, 'left name': "attn", 'right name': "V", 'result name': "out" }
+        // obj = new vis.MatMul(fix_shape({ ...getParams(), I: 64, J: 32, K: 128, left_mm: out, 'right name': 'wO', 'result name': 'out2' }))
+
+        // const attn = { ...getParams(), I: 64, J: 32, K: 64, 'left name': "Q", 'right name': "K.t", 'result name': "attn" }
+        // obj = new vis.MatMul(fix_shape({
+        //   ...getParams(), I: 64, J: 64, K: 32, left_mm: attn, 'right name': 'V', 'result name': 'out',
+        // }))
+
+        // const attn = { ...getParams(), I: 64, J: 32, K: 64, 'left name': "Q", 'right name': "K.t", 'result name': "attn" }
+        // obj = new vis.MatMul(fix_shape({
+        //   ...getParams(), I: 64, J: 64, K: 32, left_mm: attn, 'right name': 'V', 'result name': 'out',
+        //   alg: 'vvprod',
+        // }))
 
         // mha reassociated (worse)
         // ((in @ wQ) @ (wK.t @ in.t)) @ ((in @ wV) @ wO)
@@ -556,7 +568,7 @@
 
         scene.add(obj.group)
 
-        getObj().setLegends({})
+        getObj().setLegends()
         getObj().updateLabels()
         getObj().initAnimation()
       }
@@ -576,35 +588,13 @@
       let cam_changing = false
       let label_update_pending = false
 
-      // let camline
-
       const postLabelUpdate = _ => {
         if (!label_update_pending) {
           label_update_pending = true
           setTimeout(function () {
             raycaster.setFromCamera(pointer, camera)
-
-            // temp
-            getObj().params.scene = scene
-
-            // temp            
-            getObj().setLegends({})
-
+            getObj().setLegends()
             getObj().updateLabels()
-
-            // const cam_v = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion)
-            // // const cam_v = camera.localToWorld(new THREE.Vector3(0, -1, 0))
-
-            // if (camline) {
-            //   scene.remove(camline)
-            //   camline.clear()
-            // }
-            // camline = new THREE.Group()
-            // const origin = new THREE.Vector3(0, 0, 0)
-            // camline.add(util.lineSeg(origin, cam_v.multiplyScalar(4), new THREE.Color(1, 0, 0)))
-            // scene.add(camline)
-
-
             label_update_pending = false
           }, 5);
         }

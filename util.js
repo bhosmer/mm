@@ -93,8 +93,8 @@ export function axes() {
 }
 
 const CORNER_COLOR = new THREE.Uint8BufferAttribute([
-  255, 255, 255, 128,
-  255, 255, 255, 128,
+  128, 128, 128, 64,
+  128, 128, 128, 64,
   255, 255, 255, 128,
 ], 4)
 CORNER_COLOR.normalized = true
@@ -120,9 +120,9 @@ export function rowGuide(h, w, light = 1.0) {
   // draw(rstride, 0, 0, cstride)
   const corner_geometry = new THREE.BufferGeometry()
   corner_geometry.setAttribute('position', new THREE.Float32BufferAttribute([
-    0, 0, 0,
     0, rstride, 0,
     cstride, 0, 0,
+    0, 0, 0,
   ], 3))
   CORNER_COLOR.array[3] = CORNER_COLOR.array[7] = CORNER_COLOR.array[3] = 255 * light
   CORNER_COLOR.needsUpdate = true
@@ -212,4 +212,14 @@ export function syncProp(obj, k, v) {
   }
   obj[k] = v
   return v
+}
+
+//
+// misc THREE utils
+//
+
+export function disposeAndClear(obj) {
+  obj.children && obj.children.map(disposeAndClear)
+  obj.geometry && obj.geometry.dispose()
+  obj.clear()
 }
