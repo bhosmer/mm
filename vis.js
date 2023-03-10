@@ -953,13 +953,13 @@ export class MatMul {
       return
     }
 
-    const inits = {
-      'dotprod (row major)': () => this.initAnimVmprod(true),
-      'dotprod (col major)': () => this.initAnimMvprod(true),
-      'axpy': () => this.initAnimVvprod(true),
-      'mvprod': () => this.initAnimMvprod(false),
-      'vmprod': () => this.initAnimVmprod(false),
-      'vvprod': () => this.initAnimVvprod(false),
+    const starts = {
+      'dotprod (row major)': () => this.startVmprod(true),
+      'dotprod (col major)': () => this.startMvprod(true),
+      'axpy': () => this.startVvprod(true),
+      'mvprod': () => this.startMvprod(false),
+      'vmprod': () => this.startVmprod(false),
+      'vvprod': () => this.startVvprod(false),
     }
 
     let left_done = true, right_done = true
@@ -1002,7 +1002,7 @@ export class MatMul {
         this.right.initAnimation(() => right_done = true)
       }
 
-      const result_bump = inits[this.params.alg]()
+      const result_bump = starts[this.params.alg]()
 
       this.bump = () => {
         left_done || this.left.bump()
@@ -1091,7 +1091,7 @@ export class MatMul {
     return results
   }
 
-  initAnimVmprod(sweep) {
+  startVmprod(sweep) {
     const { gap, polarity } = this.getPlacementInfo()
     const { y: exty, z: extz } = this.getExtent()
     const results = this.getAnimResultMats()
@@ -1125,7 +1125,25 @@ export class MatMul {
         curi = (curi + 1) % isize
       }
 
-      // update result mats
+      // update old input hilights
+      if (!this.params['hide inputs']) {
+        if (sweep) {
+          this.grid('k', ({ start: k, extent: kx }) => {
+            if (oldk < kx) {
+              this.right.setColorsAndSizes(undefined, k + oldk)
+            }
+          })
+        }
+        if (oldi != curi) {
+          this.grid('i', ({ start: i, extent: ix }) => {
+            if (oldi < ix) {
+              this.left.setColorsAndSizes(i + oldi, undefined)
+            }
+          })
+        }
+      }
+
+      // end of cycle - exit or re-hide result mats
       if (curi == 0 && curk == 0) {
         done++
         if (done == 1) {
@@ -1143,13 +1161,10 @@ export class MatMul {
         }
       })
 
-      // update input hilights
+      // update new input hilights
       if (!this.params['hide inputs']) {
         if (sweep) {
           this.grid('k', ({ start: k, extent: kx }) => {
-            if (oldk < kx) {
-              this.right.setColorsAndSizes(undefined, k + oldk)
-            }
             if (curk < kx) {
               this.right.bumpColor(undefined, k + curk)
             }
@@ -1157,9 +1172,6 @@ export class MatMul {
         }
         if (oldi != curi) {
           this.grid('i', ({ start: i, extent: ix }) => {
-            if (oldi < ix) {
-              this.left.setColorsAndSizes(i + oldi, undefined)
-            }
             if (curi < ix) {
               this.left.bumpColor(i + curi, undefined)
             }
@@ -1181,7 +1193,7 @@ export class MatMul {
     }
   }
 
-  initAnimMvprod(sweep) {
+  startMvprod(sweep) {
     const { gap, polarity } = this.getPlacementInfo()
     const { y: exty, z: extz } = this.getExtent()
     const results = this.getAnimResultMats()
@@ -1271,7 +1283,7 @@ export class MatMul {
     }
   }
 
-  initAnimVvprod(sweep) {
+  startVvprod(sweep) {
     const { gap, polarity } = this.getPlacementInfo()
     const { y: exty, z: extz } = this.getExtent()
     const results = this.getAnimResultMats()
