@@ -1127,7 +1127,6 @@ export class MatMul {
 
       // update result mats
       if (curi == 0 && curk == 0) {
-        results.forEach(r => r.hide())
         done++
         if (done == 1) {
           this.shutdownAnim()
@@ -1135,6 +1134,7 @@ export class MatMul {
           return
         }
         done = 0
+        results.forEach(r => r.hide())
       }
 
       this.grid('ik', ({ start: i, extent: ix }, { start: k, end: ke, extent: kx }) => {
