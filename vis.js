@@ -968,28 +968,24 @@ export class MatMul {
       const alg = this.params.alg
       const lalg = this.params.left_mm && !left_done ? this.left.alg_join() : 'none'
       const ralg = this.params.right_mm && !right_done ? this.right.alg_join() : 'none'
-      let res
       if (lalg == 'none' && ralg == 'none') {
-        res = alg
-      } else if (ralg == 'none') {
-        res = lalg == 'vmprod' && alg == 'vmprod' ? 'vmprod' :
+        return alg
+      }
+      if (ralg == 'none') {
+        return lalg == 'vmprod' && alg == 'vmprod' ? 'vmprod' :
           lalg == 'mvprod' && alg == 'vvprod' ? 'vvprod' :
             'mixed'
-      } else if (lalg == 'none') {
-        res = ralg == 'mvprod' && alg == 'mvprod' ? 'mvprod' :
+      }
+      if (lalg == 'none') {
+        return ralg == 'mvprod' && alg == 'mvprod' ? 'mvprod' :
           ralg == 'vmprod' && alg == 'vvprod' ? 'vvprod' :
             'mixed'
-      } else {
-        res = 'mixed'
       }
-      // console.log(`HEY alg_join ${this.params['result name']} ${left_done} ${right_done} ${lalg} ${ralg} ${alg} ${res}`)
-      return res
+      return 'mixed'
     }
 
     const can_fuse = () => {
-      const res = this.alg_join() != 'mixed'
-      // console.log(`HEY can_fuse ${this.params['result name']} ${left_done} ${right_done} ${res}`)
-      return res
+      return this.alg_join() != 'mixed'
     }
 
     const start = () => {
@@ -1126,7 +1122,7 @@ export class MatMul {
       }
 
       // update old input hilights
-      if (!this.params['hide inputs']) {
+      if (done == 0 && !this.params['hide inputs']) {
         if (sweep) {
           this.grid('k', ({ start: k, extent: kx }) => {
             if (oldk < kx) {

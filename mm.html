@@ -536,7 +536,10 @@
         // note: could actually get away with all-right-at-bottom here... good example of where collision
         // detection would help UX, like to gray out layout options that collide
         const q = { ...getParams(), I: 64, J: 128, K: 32, 'left name': "in", 'right name': "wQ", 'result name': "Q" }
-        const kt = { ...getParams(), I: 32, J: 128, K: 64, 'left name': "wK.t", 'right name': "in.t", 'result name': "K.t" }
+        const kt = {
+          ...getParams(), I: 32, J: 128, K: 64, 'left name': "wK.t", 'right name': "in.t", 'result name': "K.t",
+          alg: 'mvprod'
+        }
         const attn = { ...getParams(), I: 64, J: 32, K: 64, left_mm: q, right_mm: kt, 'left name': "Q", 'right name': "Kt", 'result name': "attn" }
         const v = { ...getParams(), I: 64, J: 128, K: 32, 'left name': "in", 'right name': "wV", 'result name': "V" }
         const out = { ...getParams(), I: 64, J: 64, K: 32, left_mm: attn, right_mm: v, 'left name': "attn", 'right name': "V", 'result name': "out" }
