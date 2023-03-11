@@ -959,42 +959,52 @@ export class MatMul {
       return
     }
 
-    const starts = {
-      'dotprod (row major)': () => this.startVmprod(true),
-      'dotprod (col major)': () => this.startMvprod(true),
-      'axpy': () => this.startVvprod(true),
-      'mvprod': () => this.startMvprod(false),
-      'vmprod': () => this.startVmprod(false),
-      'vvprod': () => this.startVvprod(false),
+    const bumps = {
+      'dotprod (row major)': () => this.getVmprodBump(true),
+      'dotprod (col major)': () => this.getMvprodBump(true),
+      'axpy': () => this.getVvprodBump(true),
+      'mvprod': () => this.getMvprodBump(false),
+      'vmprod': () => this.getVmprodBump(false),
+      'vvprod': () => this.getVvprodBump(false),
     }
 
     let left_done = true, right_done = true
 
     this.alg_join = () => {
       const alg = this.params.alg
-      const lalg = this.params.left_mm && !left_done ? this.left.alg_join() : 'none'
-      const ralg = this.params.right_mm && !right_done ? this.right.alg_join() : 'none'
-      if (lalg == 'none' && ralg == 'none') {
-        return alg
-      }
-      if (ralg == 'none') {
-        return lalg == 'vmprod' && alg == 'vmprod' ? 'vmprod' :
-          lalg == 'mvprod' && alg == 'vvprod' ? 'vvprod' :
+
+      const lalg = this.params.left_mm && !left_done ?
+        (this.left.getIndex() == this.getIndex() ? this.left.alg_join() : 'mixed') :
+        'none'
+
+      const ralg = this.params.right_mm && !right_done ?
+        (this.right.getIndex() == this.getIndex() ? this.right.alg_join() : 'mixed') :
+        'none'
+
+      return (lalg == 'none' && ralg == 'none') ? alg :
+        (ralg == 'none') ?
+          (lalg == 'vmprod' && alg == 'vmprod' ? 'vmprod' :
+            lalg == 'mvprod' && alg == 'vvprod' ? 'vvprod' :
+              'mixed') :
+          (lalg == 'none') ?
+            (ralg == 'mvprod' && alg == 'mvprod' ? 'mvprod' :
+              ralg == 'vmprod' && alg == 'vvprod' ? 'vvprod' :
+                'mixed') :
             'mixed'
-      }
-      if (lalg == 'none') {
-        return ralg == 'mvprod' && alg == 'mvprod' ? 'mvprod' :
-          ralg == 'vmprod' && alg == 'vvprod' ? 'vvprod' :
-            'mixed'
-      }
-      return 'mixed'
     }
 
-    const can_fuse = () => {
-      return this.alg_join() != 'mixed'
-    }
+    const can_fuse = () => this.alg_join() != 'mixed'
 
     const start = () => {
+      const result_bump = bumps[this.params.alg]()
+
+      this.bump = () => {
+        const go = left_done && right_done || this.params.fuse && can_fuse()
+        left_done || this.left.bump()
+        right_done || this.right.bump()
+        go && result_bump()
+      }
+
       if (this.params.left_mm) {
         left_done = false
         this.left.initAnimation(() => left_done = true)
@@ -1002,15 +1012,6 @@ export class MatMul {
       if (this.params.right_mm) {
         right_done = false
         this.right.initAnimation(() => right_done = true)
-      }
-
-      const result_bump = starts[this.params.alg]()
-
-      this.bump = () => {
-        left_done || this.left.bump()
-        right_done || this.right.bump()
-        const fuse = this.params.fuse && can_fuse();
-        (fuse || (left_done && right_done)) && result_bump()
       }
 
       if (this.params['hide inputs']) {
@@ -1092,7 +1093,7 @@ export class MatMul {
     return results
   }
 
-  startVmprod(sweep) {
+  getVmprodBump(sweep) {
     const { gap, polarity } = this.getPlacementInfo()
     const results = this.getAnimResultMats()
 
@@ -1113,6 +1114,8 @@ export class MatMul {
     const { i: { size: isize }, k: { size: ksize } } = this.getBlockInfo()
     let curi = -1
     let curk = sweep ? -1 : 0
+
+    this.getIndex = () => curi
 
     return () => {
       // update indexes
@@ -1168,7 +1171,7 @@ export class MatMul {
     }
   }
 
-  startMvprod(sweep) {
+  getMvprodBump(sweep) {
     const { gap, polarity } = this.getPlacementInfo()
     const results = this.getAnimResultMats()
 
@@ -1189,6 +1192,8 @@ export class MatMul {
     const { i: { size: isize }, k: { size: ksize } } = this.getBlockInfo()
     let curk = -1
     let curi = sweep ? -1 : 0
+
+    this.getIndex = () => curk
 
     return () => {
       // update indexes
@@ -1244,7 +1249,7 @@ export class MatMul {
     }
   }
 
-  startVvprod(sweep) {
+  getVvprodBump(sweep) {
     const { gap, polarity } = this.getPlacementInfo()
     const { z: extz } = this.getExtent()
     const results = this.getAnimResultMats()
@@ -1265,6 +1270,8 @@ export class MatMul {
     const { j: { size: jsize }, k: { size: ksize } } = this.getBlockInfo()
     let curj = -1
     let curk = sweep ? -1 : 0
+
+    this.getIndex = () => curj
 
     return () => {
       // update indexes
