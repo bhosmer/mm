@@ -734,6 +734,12 @@ export class MatMul {
       return invertible.concat(x)[invertible.length - invertible.indexOf(x) - 1]
     }
 
+    // ---
+
+
+
+    // ---
+
     this.left.params.polarity = child(this.params.polarity, POLARITIES)
     this.right.params.polarity = child(this.params.polarity, POLARITIES)
 
@@ -1050,13 +1056,10 @@ export class MatMul {
     loop([], infos, f)
   }
 
-  getAnimMatParams(local_sens) {
+  getAnimMatParams() {
     const params = { ...this.getLeafParams() }
-    if (local_sens) {
-      params.sensitivity = 'local'
-    } else {
-      params.stretch_absmax = true
-    }
+    params.sensitivity = 'local'
+    params.stretch_absmax = true
     return params
   }
 
