@@ -1014,16 +1014,12 @@ export class MatMul {
       this.result.hide()
     }
 
-    this.onAnimDone = cb || start
-    start()
-  }
+    this.onAnimDone = () => {
+      this.clearAnimMats()
+      cb ? cb() : start()
+    }
 
-  shutdownAnim() {
-    this.anim_mats.map(m => {
-      this.group.remove(m.group)
-      util.disposeAndClear(m.group)
-    })
-    this.anim_mats = []
+    start()
   }
 
   getBlockInfo() {
@@ -1055,8 +1051,6 @@ export class MatMul {
   }
 
   getAnimMatParams(local_sens) {
-    // @@@@@@@@
-    // return { ...this.getLeafParams(), stretch_absmax: true }
     const params = { ...this.getLeafParams() }
     if (local_sens) {
       params.sensitivity = 'local'
@@ -1064,6 +1058,14 @@ export class MatMul {
       params.stretch_absmax = true
     }
     return params
+  }
+
+  clearAnimMats() {
+    this.anim_mats.map(m => {
+      this.group.remove(m.group)
+      util.disposeAndClear(m.group)
+    })
+    this.anim_mats = []
   }
 
   getAnimResultMats() {
@@ -1089,7 +1091,6 @@ export class MatMul {
 
   startVmprod(sweep) {
     const { gap, polarity } = this.getPlacementInfo()
-    const { y: exty, z: extz } = this.getExtent()
     const results = this.getAnimResultMats()
 
     const vmps = {}
@@ -1098,7 +1099,7 @@ export class MatMul {
       const data = Array2D.fromInit(jx, sweep ? 1 : kx, vmpinit)
       const vmp = new Mat(data, this.getAnimMatParams(), true)
       vmp.hide()
-      const z = polarity < 0 ? extz - j : j
+      const z = polarity < 0 ? this.getExtent().z - j : j
       util.updateProps(vmp.group.position, { x: k, y: gap + i, z })
       vmp.group.rotation.x = polarity * Math.PI / 2
       vmps[[i, j, k]] = vmp
@@ -1107,72 +1108,42 @@ export class MatMul {
     })
 
     const { i: { size: isize }, k: { size: ksize } } = this.getBlockInfo()
-    let curi = isize - 1
-    let curk = sweep ? ksize - 1 : 0
-    let done = -1
+    let curi = -1
+    let curk = sweep ? -1 : 0
 
     return () => {
       // update indexes
       const [oldi, oldk] = [curi, curk]
-      if (sweep) {
-        curk = (curk + 1) % ksize
-      }
-      if (curk == 0) {
-        curi = (curi + 1) % isize
-      }
+      sweep && (curk = (curk + 1) % ksize)
+      curk == 0 && curi++
 
-      // update old input hilights
-      if (done == 0 && !this.params['hide inputs']) {
-        if (sweep) {
-          this.grid('k', ({ start: k, extent: kx }) => {
-            if (oldk < kx) {
-              this.right.setColorsAndSizes(undefined, k + oldk)
-            }
-          })
-        }
-        if (oldi != curi) {
-          this.grid('i', ({ start: i, extent: ix }) => {
-            if (oldi < ix) {
-              this.left.setColorsAndSizes(i + oldi, undefined)
-            }
-          })
-        }
+      // clear old input hilights
+      if (oldi >= 0 && !this.params['hide inputs']) {
+        sweep && this.grid('k', ({ start: k, extent: kx }) => {
+          oldk < kx && this.right.setColorsAndSizes(undefined, k + oldk)
+        })
+        oldi != curi && this.grid('i', ({ start: i, extent: ix }) => {
+          oldi < ix && this.left.setColorsAndSizes(i + oldi, undefined)
+        })
       }
 
-      // end of cycle - exit or re-hide result mats
-      if (curi == 0 && curk == 0) {
-        done++
-        if (done == 1) {
-          this.shutdownAnim()
-          this.onAnimDone()
-          return
-        }
-        done = 0
-        results.forEach(r => r.hide())
+      // end of cycle
+      if (curi == isize && curk == sweep ? ksize : 0) {
+        this.onAnimDone()
+        return
       }
 
-      this.grid('ik', ({ start: i, extent: ix }, { start: k, end: ke, extent: kx }) => {
-        if (curi < ix && curk < kx) {
-          results.forEach(r => r.show(i + curi, sweep ? k + curk : [k, ke]))
-        }
-      })
+      // start of cycle
+      curi == 0 && curk == 0 && results.forEach(r => r.hide())
 
-      // update new input hilights
+      // new input hilights
       if (!this.params['hide inputs']) {
-        if (sweep) {
-          this.grid('k', ({ start: k, extent: kx }) => {
-            if (curk < kx) {
-              this.right.bumpColor(undefined, k + curk)
-            }
-          })
-        }
-        if (oldi != curi) {
-          this.grid('i', ({ start: i, extent: ix }) => {
-            if (curi < ix) {
-              this.left.bumpColor(i + curi, undefined)
-            }
-          })
-        }
+        sweep && this.grid('k', ({ start: k, extent: kx }) => {
+          curk < kx && this.right.bumpColor(undefined, k + curk)
+        })
+        oldi != curi && this.grid('i', ({ start: i, extent: ix }) => {
+          curi < ix && this.left.bumpColor(i + curi, undefined)
+        })
       }
 
       // update intermediates
@@ -1184,6 +1155,11 @@ export class MatMul {
         }
       })
 
+      // reveal new results
+      this.grid('ik', ({ start: i, extent: ix }, { start: k, end: ke, extent: kx }) => {
+        curi < ix && curk < kx && results.forEach(r => r.show(i + curi, sweep ? k + curk : [k, ke]))
+      })
+
       // update labels
       this.updateLabels()
     }
@@ -1191,7 +1167,6 @@ export class MatMul {
 
   startMvprod(sweep) {
     const { gap, polarity } = this.getPlacementInfo()
-    const { y: exty, z: extz } = this.getExtent()
     const results = this.getAnimResultMats()
 
     const mvps = {}
@@ -1200,7 +1175,7 @@ export class MatMul {
       const data = Array2D.fromInit(sweep ? 1 : ix, jx, mvpinit)
       const mvp = new Mat(data, this.getAnimMatParams(), true)
       mvp.hide()
-      const z = polarity < 0 ? extz - j : j
+      const z = polarity < 0 ? this.getExtent().z - j : j
       util.updateProps(mvp.group.position, { x: gap + k, y: i, z })
       mvp.group.rotation.y = polarity * -Math.PI / 2
       mvps[[i, j, k]] = mvp
@@ -1209,60 +1184,42 @@ export class MatMul {
     })
 
     const { i: { size: isize }, k: { size: ksize } } = this.getBlockInfo()
-    let curi = sweep ? isize - 1 : 0
-    let curk = ksize - 1
-    let done = -1
+    let curk = -1
+    let curi = sweep ? -1 : 0
 
     return () => {
       // update indexes
       const [oldi, oldk] = [curi, curk]
-      if (sweep) {
-        curi = (curi + 1) % isize
-      }
-      if (curi == 0) {
-        curk = (curk + 1) % ksize
-      }
+      sweep && (curi = (curi + 1) % isize)
+      curi == 0 && curk++
 
-      // update result mats
-      if (curi == 0 && curk == 0) {
-        done++
-        if (done == 1) {
-          this.shutdownAnim()
-          this.onAnimDone()
-          return
-        }
-        done = 0
-        results.forEach(r => r.hide())
+      // clear old input hilights
+      if (oldk >= 0 && !this.params['hide inputs']) {
+        sweep && this.grid('i', ({ start: i, extent: ix }) => {
+          oldi < ix && this.left.setColorsAndSizes(i + oldi, undefined)
+        })
+        oldk != curk && this.grid('k', ({ start: k, extent: kx }) => {
+          oldk < kx && this.right.setColorsAndSizes(undefined, k + oldk)
+        })
       }
 
-      this.grid('ik', ({ start: i, end: ie, extent: ix }, { start: k, extent: kx }) => {
-        if (curi < ix && curk < kx) {
-          results.forEach(r => r.show(sweep ? i + curi : [i, ie], k + curk))
-        }
-      })
+      // end of cycle
+      if (curk == ksize && curi == sweep ? isize : 0) {
+        this.onAnimDone()
+        return
+      }
 
-      // update input hilights
+      // start of cycle
+      curk == 0 && curi == 0 && results.forEach(r => r.hide())
+
+      // new input hilights
       if (!this.params['hide inputs']) {
-        if (sweep) {
-          this.grid('i', ({ start: i, extent: ix }) => {
-            if (oldi < ix) {
-              this.left.setColorsAndSizes(i + oldi, undefined)
-            }
-            if (curi < ix) {
-              this.left.bumpColor(i + curi, undefined)
-            }
-          })
-        }
-        if (oldk != curk) {
-          this.grid('k', ({ start: k, extent: kx }) => {
-            if (oldk < kx) {
-              this.right.setColorsAndSizes(undefined, k + oldk)
-            }
-            if (curk < kx) {
-              this.right.bumpColor(undefined, k + curk)
-            }
-          })
-        }
+        sweep && this.grid('i', ({ start: i, extent: ix }) => {
+          curi < ix && this.left.bumpColor(i + curi, undefined)
+        })
+        oldk != curk && this.grid('k', ({ start: k, extent: kx }) => {
+          curk < kx && this.right.bumpColor(undefined, k + curk)
+        })
       }
 
       // update intermediates
@@ -1274,6 +1231,11 @@ export class MatMul {
         }
       })
 
+      // reveal new results
+      this.grid('ik', ({ start: i, end: ie, extent: ix }, { start: k, extent: kx }) => {
+        curi < ix && curk < kx && results.forEach(r => r.show(sweep ? i + curi : [i, ie], k + curk))
+      })
+
       // update labels
       this.updateLabels()
     }
@@ -1281,7 +1243,7 @@ export class MatMul {
 
   startVvprod(sweep) {
     const { gap, polarity } = this.getPlacementInfo()
-    const { y: exty, z: extz } = this.getExtent()
+    const { z: extz } = this.getExtent()
     const results = this.getAnimResultMats()
 
     const vvps = {}
@@ -1298,64 +1260,52 @@ export class MatMul {
     })
 
     const { j: { size: jsize }, k: { size: ksize } } = this.getBlockInfo()
-    let curj = jsize - 1
-    let curk = sweep ? ksize - 1 : 0
-    let done = -1
+    let curj = -1
+    let curk = sweep ? -1 : 0
 
     return () => {
       // update indexes
       const [oldj, oldk] = [curj, curk]
-      curj = (curj + 1) % jsize
-      if (curj == 0 && sweep) {
-        curk = (curk + 1) % ksize
+      curj++
+      if (sweep && curj % jsize == 0) {
+        curj = 0
+        curk++
       }
 
-      // update result mats
-      if (curj == 0 && curk == 0) {
-        done++
-        if (done == 1) {
-          this.shutdownAnim()
-          this.onAnimDone()
-          return
-        }
-        done = 0
-        results.forEach(r => r.hide())
-      }
-      this.grid('jk', ({ start: j, extent: jx, index: ji }, { start: k, end: ke, extent: kx }) => {
-        if (curj < jx && curk < kx) {
-          const f = (ii, ki) => this.dotprod_val(ii, ki, j, j + curj + 1)
-          results[ji].reinit(f, undefined, undefined, sweep ? k + curk : [k, ke])
-        }
-      })
-
-      // update input highlights
-      if (!this.params['hide inputs']) {
-        if (sweep) {
+      // clear old input highlights
+      if (oldj >= 0 && !this.params['hide inputs']) {
+        sweep ?
           this.grid('jk', ({ start: j, extent: jx }, { start: k, extent: kx }) => {
-            if (oldj < jx && oldk < kx) {
-              this.right.setColorsAndSizes(j + oldj, k + oldk)
-            }
-            if (curj < jx && curk < kx) {
-              this.right.bumpColor(j + curj, k + curk)
-            }
-          })
-        } else {
+            oldj < jx && oldk < kx && this.right.setColorsAndSizes(j + oldj, k + oldk)
+          }) :
           this.grid('j', ({ start: j, extent: jx }) => {
-            if (oldj < jx) {
-              this.right.setColorsAndSizes(j + oldj, undefined)
-            }
-            if (curj < jx) {
-              this.right.bumpColor(j + curj, undefined)
-            }
+            oldj < jx && this.right.setColorsAndSizes(j + oldj, undefined)
           })
-        }
         this.grid('j', ({ start: j, extent: jx }) => {
-          if (oldj < jx) {
-            this.left.setColorsAndSizes(undefined, j + oldj)
-          }
-          if (curj < jx) {
-            this.left.bumpColor(undefined, j + curj)
-          }
+          oldj < jx && this.left.setColorsAndSizes(undefined, j + oldj)
+        })
+      }
+
+      // end of cycle
+      if (sweep ? curk == ksize : curj == jsize) {
+        this.onAnimDone()
+        return
+      }
+
+      // start of cycle
+      curk == 0 && curj == 0 && results.forEach(r => r.hide())
+
+      // new input highlights
+      if (oldj >= 0 && !this.params['hide inputs']) {
+        sweep ?
+          this.grid('jk', ({ start: j, extent: jx }, { start: k, extent: kx }) => {
+            curj < jx && curk < kx && this.right.bumpColor(j + curj, k + curk)
+          }) :
+          this.grid('j', ({ start: j, extent: jx }) => {
+            curj < jx && this.right.bumpColor(j + curj, undefined)
+          })
+        this.grid('j', ({ start: j, extent: jx }) => {
+          curj < jx && this.left.bumpColor(undefined, j + curj)
         })
       }
 
@@ -1364,8 +1314,16 @@ export class MatMul {
         const vvp = vvps[[i, j, k]]
         if (curj < jx && curk < kx) {
           const z = polarity > 0 ? gap + j + curj : extz - gap - j - curj
-          vvp.group.position.z = z
+          util.updateProps(vvp.group.position, { x: k + curk, z })
           vvp.reinit((ii, ki) => this.ijkmul(i + ii, j + curj, k + curk + ki))
+        }
+      })
+
+      // accumulate new results
+      this.grid('jk', ({ start: j, extent: jx, index: ji }, { start: k, end: ke, extent: kx }) => {
+        if (curj < jx && curk < kx) {
+          const f = (ii, ki) => this.dotprod_val(ii, ki, j, j + curj + 1)
+          results[ji].reinit(f, undefined, undefined, sweep ? k + curk : [k, ke])
         }
       })
 
