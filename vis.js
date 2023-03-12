@@ -564,13 +564,9 @@ export class Mat {
 //
 
 export const POLARITIES = ['positive', 'negative', 'positive/negative', 'negative/positive']
-export const LEFT_PLACEMENTS = ['left', 'right', 'left/right', 'right/left',
-  'left/left/right/right']
-export const RIGHT_PLACEMENTS = ['top', 'bottom', 'top/bottom', 'bottom/top',
-  'top/top/bottom/bottom']
-export const RESULT_PLACEMENTS = ['front', 'back', 'front/back', 'back/front',
-  'front/back/back/front']
-
+export const LEFT_PLACEMENTS = ['left', 'right', 'left/right', 'right/left']
+export const RIGHT_PLACEMENTS = ['top', 'bottom', 'top/bottom', 'bottom/top']
+export const RESULT_PLACEMENTS = ['front', 'back', 'front/back', 'back/front']
 export const SENSITIVITIES = ['local', 'global']
 export const ANIM_ALGS = ['none', 'dotprod (row major)', 'dotprod (col major)', 'axpy', 'vmprod', 'mvprod', 'vvprod']
 
@@ -737,48 +733,15 @@ export class MatMul {
       return sep == -1 ? x : x.slice(sep + 1) + '/' + x.slice(0, sep)
     }
 
-    // ---
-
-    // -/+ L T/B F/B (orig)
-
-    // -/+ L/R T F/B (orig)
-
     this.left.params.polarity = next(this.params.polarity)
-    this.right.params.polarity = next(this.params.polarity)
-
-
-    this.left.params['left placement'] = 'left/right'
+    this.left.params['left placement'] = next(this.params['left placement'])
     this.left.params['right placement'] = next(this.params['right placement'])
+    this.left.params['result placement'] = next(this.params['result placement'])
 
-
+    this.right.params.polarity = next(this.params.polarity)
     this.right.params['left placement'] = next(this.params['left placement'])
-    this.right.params['right placement'] = 'top/bottom'
-
-    // console.log(`HEY ${this.group.name} ${this.left.params['left placement']}`)
-    this.left.params['result placement'] = this.left.params['right placement'].startsWith('bottom') ?
-      'back/front' : next(this.params['result placement'])
-    this.right.params['result placement'] = this.right.params['left placement'].startsWith('right') ?
-      'back/front' : next(this.params['result placement'])
-
-
-    this.left.params.tag = this.params['left placement']
-    this.right.params.tag = this.params['right placement']
-    this.result.params.tag = this.params['result placement']
-
-
-    // ---
-
-    // this.left.params.polarity = next(this.params.polarity)
-    // this.left.params['left placement'] = next(this.params['left placement'])
-    // this.left.params['right placement'] = next(this.params['right placement'])
-    // this.left.params['result placement'] = next(this.params['result placement'])
-
-    // this.right.params.polarity = next(this.params.polarity)
-    // this.right.params['left placement'] = next(this.params['left placement'])
-    // this.right.params['right placement'] = next(this.params['right placement'])
-    // this.right.params['result placement'] = next(this.params['result placement'])
-
-    // ---
+    this.right.params['right placement'] = next(this.params['right placement'])
+    this.right.params['result placement'] = next(this.params['result placement'])
 
     this.initLeftVis()
     this.initRightVis()
