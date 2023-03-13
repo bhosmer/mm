@@ -288,6 +288,8 @@ export class Mat {
     this.group = new THREE.Group()
     this.group.name = `${this.params.name}.group`
     this.group.add(this.inner_group)
+
+    this.setLegends()
   }
 
   setColorsAndSizes(r = undefined, c = undefined, size = undefined, color = undefined) {
@@ -448,47 +450,32 @@ export class Mat {
 
   setFlowGuide(light) { }
 
-  getLegendTextProps() {
-    const sa_geo = Math.cbrt(Math.max(5, this.H) * Math.max(this.W, 5))
-    return {
-      name_color: 0xccccff,
-      name_size: sa_geo / 2,
-      dim_color: 0x00aaff,
-      dim_size: sa_geo / 8,
+  setLegends(enabled) {
+    enabled = util.syncProp(this.params, 'legends', enabled)
+    if (this.name_text) {
+      this.inner_group.remove(this.name_text)
+      util.disposeAndClear(this.name_text)
     }
-  }
-
-  setLegends(enabled, props) {
-    if (this.legends_group) {
-      this.inner_group.remove(this.legends_group)
-      util.disposeAndClear(this.legends_group)
-    }
-    if (enabled) {
-      this.legends_group = new THREE.Group()
-      this.legends_group.name = `${this.params.name}.legends_group`
-      props = { ...this.getLegendTextProps(), ...props }
+    if (enabled && this.params.name) {
+      const color = 0xCCCCFF
+      const size = Math.cbrt(Math.max(5, this.H) * Math.max(this.W, 5)) / 2
       const facing = this.isFacing()
       const rsu = this.isRightSideUp()
-      if (props.name) {
-        let suf = this.params.tag ? ` (${this.params.tag}` : ''
-        const name = this.params.getText(props.name + suf, props.name_color, props.name_size)
-        name.name = `${this.params.name}.name`
-        const { h, w } = util.bbhw(name.geometry)
-        name.geometry.rotateZ(rsu ? Math.PI : 0)
-        name.geometry.rotateY(facing ? Math.PI : 0)
-        const xdir = facing == rsu ? 1 : -1
-        const ydir = rsu ? 1 : 0
-        const zdir = facing ? 1 : -1
-        name.geometry.translate(
-          util.center(this.W - 1, xdir * w),
-          ydir * h + util.center(this.H - 1, h),
-          -zdir * h / 2
-        )
-        this.legends_group.add(name)
-      }
-      this.inner_group.add(this.legends_group)
-    } else {
-      this.legends_group = undefined
+      let suf = this.params.tag ? ` (${this.params.tag}` : ''
+      this.name_text = this.params.getText(this.params.name + suf, color, size)
+      this.name_text.name = `${this.params.name}.name`
+      const { h, w } = util.bbhw(this.name_text.geometry)
+      this.name_text.geometry.rotateZ(rsu ? Math.PI : 0)
+      this.name_text.geometry.rotateY(facing ? Math.PI : 0)
+      const xdir = facing == rsu ? 1 : -1
+      const ydir = rsu ? 1 : 0
+      const zdir = facing ? 1 : -1
+      this.name_text.geometry.translate(
+        util.center(this.W - 1, xdir * w),
+        ydir * h + util.center(this.H - 1, h),
+        -zdir * h / 2
+      )
+      this.inner_group.add(this.name_text)
     }
   }
 
@@ -766,9 +753,6 @@ export class MatMul {
         this.getExtent().x + this.getLeftScatter()
     }
     this.group.add(this.left.group)
-
-    // TODO push down
-    this.setLeftLegends()
   }
 
   initRightVis() {
@@ -786,9 +770,6 @@ export class MatMul {
         this.getExtent().y + this.getRightScatter()
     }
     this.group.add(this.right.group)
-
-    // TODO push down 
-    this.setRightLegends()
   }
 
   initResultVis() {
@@ -797,9 +778,6 @@ export class MatMul {
       this.getExtent().z :
       0
     this.group.add(this.result.group)
-
-    // TODO push down
-    this.setResultLegends()
   }
 
   getPlacementInfo() {
@@ -897,47 +875,11 @@ export class MatMul {
     this.result.setRowGuides(light)
   }
 
-  setLeftLegends() {
-    const props = {
-      name: this.params['left name'] || "X",
-      height: "i",
-      width: "j",
-      hleft: true,
-      wtop: false,
-      ...(this.params.left_legend || {})
-    }
-    this.left.setLegends(this.params.legends, props)
-  }
-
-  setRightLegends() {
-    const props = {
-      name: this.params['right name'] || "Y",
-      height: "j",
-      width: "k",
-      hleft: false,
-      wtop: true,
-      ...(this.params.right_legend || {})
-    }
-    this.right.setLegends(this.params.legends, props)
-  }
-
-  setResultLegends() {
-    const props = {
-      name: this.params['result name'] || "XY",
-      height: "i",
-      width: "k",
-      hleft: false,
-      wtop: false,
-      ...(this.params.result_legend || {})
-    }
-    this.result.setLegends(this.params.legends, props)
-  }
-
-  setLegends(params = {}) {
-    util.updateProps(this.params, params)
-    this.setLeftLegends()
-    this.setRightLegends()
-    this.setResultLegends()
+  setLegends(enabled = undefined) {
+    util.syncProp(this.params, 'legends', enabled)
+    this.left.setLegends(enabled)
+    this.right.setLegends(enabled)
+    this.result.setLegends(enabled)
   }
 
   // animation

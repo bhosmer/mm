@@ -147,7 +147,7 @@
     raycaster.params.Points.threshold = 0
     raycaster.setFromCamera(pointer, camera)
 
-    // object params plus context
+    // object params plus env stuff for text, spotlight, isFacing etc
     function getParams() {
       return {
         getText: getText,
@@ -710,18 +710,18 @@
       addNumParam(gui_left, 'left min', -1.0, 1.0)
       addNumParam(gui_left, 'left max', 0.0, 1.0)
       addNumParam(gui_left, 'left sparsity', 0.0, 1.0)
-      addParam(gui_left, 'left name', _ => getObj().setLegends(getParams()))
+      // addParam(gui_left, 'left name', _ => getObj().setLegends(getParams()))
 
       const gui_right = gui_data.addFolder('right')
       addChoiceParam(gui_right, 'right init', vis.INITS)
       addNumParam(gui_right, 'right min', -1.0, 1.0)
       addNumParam(gui_right, 'right max', 0.0, 1.0)
       addNumParam(gui_right, 'right sparsity', 0.0, 1.0)
-      addParam(gui_right, 'right name', _ => getObj().setLegends(getParams()))
+      // addParam(gui_right, 'right name', _ => getObj().setLegends(getParams()))
 
       const gui_result = gui_data.addFolder('result')
       addChoiceParam(gui_result, 'epilog', vis.EPILOGS)
-      addParam(gui_result, 'result name', _ => getObj().setLegends(getParams()))
+      // addParam(gui_result, 'result name', _ => getObj().setLegends(getParams()))
 
       const gui_anim = gui.addFolder('animation')
       addChoiceParam(gui_anim, 'alg', vis.ANIM_ALGS)
@@ -745,7 +745,7 @@
       addNumParam(gui_layout, 'blast', -2.0, 2.0)
 
       const gui_vis = gui.addFolder('vis')
-      addParam(gui_vis, 'legends', x => getObj().setLegends(getParams()))
+      addParam(gui_vis, 'legends', x => getObj().setLegends(x))
       addIntParam(gui_vis, 'spotlight', 0, 10, x => getObj().updateLabels(getParams()))
       addNumParam(gui_vis, 'row guides', 0.0, 1.0, x => getObj().setRowGuides(x))
       addNumParam(gui_vis, 'flow guides', 0.0, 1.0, x => getObj().setFlowGuide(x))
