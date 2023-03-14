@@ -71,11 +71,11 @@ export const INITS = Object.keys(INIT_FUNCS)
 
 const USE_RANGE = ['rows', 'cols', 'row major', 'col major', 'uniform', 'gaussian']
 
-function useRange(name) {
+export function useRange(name) {
   return USE_RANGE.indexOf(name) >= 0
 }
 
-function getInitFunc(name, min = 0, max = 1, sparsity = 0) {
+function getInitFunc(name, min = 0, max = 1, dropout = 0) {
   const f = INIT_FUNCS[name]
   if (!f) {
     throw Error(`unrecognized initializer ${name}`)
@@ -83,15 +83,15 @@ function getInitFunc(name, min = 0, max = 1, sparsity = 0) {
   const scaled = useRange(name) && (min != 0 || max != 1) ?
     (i, j, h, w) => min + Math.max(0, max - min) * f(i, j, h, w) :
     f
-  const sparse = sparsity > 0 ?
-    (i, j, h, w) => Math.random() > sparsity ? scaled(i, j, h, w) : 0 :
+  const sparse = dropout > 0 ?
+    (i, j, h, w) => Math.random() > dropout ? scaled(i, j, h, w) : 0 :
     scaled
   return sparse
 }
 
 function initFuncFromParams(init_params) {
-  const { name, min, max, sparsity } = init_params
-  return getInitFunc(name, min, max, sparsity)
+  const { name, min, max, dropout } = init_params
+  return getInitFunc(name, min, max, dropout)
 }
 
 // epilogs
@@ -607,8 +607,8 @@ export class MatMul {
         const init = this.params['left init']
         const min = this.params['left min']
         const max = this.params['left max']
-        const sparsity = this.params['left sparsity']
-        const f = getInitFunc(init, min, max, sparsity)
+        const dropout = this.params['left dropout']
+        const f = getInitFunc(init, min, max, dropout)
         return Array2D.fromInit(this.H, this.D, f)
       })()
       const params = { ...this.getLeafParams(), name: this.params['left name'] }
@@ -624,8 +624,8 @@ export class MatMul {
         const name = this.params['right init']
         const min = this.params['right min']
         const max = this.params['right max']
-        const sparsity = this.params['right sparsity']
-        const f = getInitFunc(name, min, max, sparsity)
+        const dropout = this.params['right dropout']
+        const f = getInitFunc(name, min, max, dropout)
         return Array2D.fromInit(this.D, this.W, f)
       })()
       const params = { ...this.getLeafParams(), name: this.params['right name'] }

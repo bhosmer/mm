@@ -209,7 +209,6 @@ export function syncProp(obj, k, v) {
   return v
 }
 
-
 // {a: {b: 0, c: {d: 1}}} => {a$b: 0, a$c$d: 1}
 // NOTE empty subobjects get sent into space
 export function flatten(obj, sep = '$') {
@@ -233,6 +232,22 @@ export function unflatten(obj, sep = '$') {
     return obj
   }
   return Object.entries(obj).reduce(add, {})
+}
+
+// {my_prop_name: x} => {'my prop name': x}
+export function spaces(obj) {
+  return Object.entries(obj).reduce(
+    (acc, [k, v]) => ({ ...acc, [k.replaceAll('_', ' ')]: v }),
+    {}
+  )
+}
+
+// {'my prop name': x} => {my_prop_name: x}
+export function unders(obj) {
+  return Object.entries(obj).reduce(
+    (acc, [k, v]) => ({ ...acc, [k.replaceAll(' ', '_')]: v }),
+    {}
+  )
 }
 
 //
