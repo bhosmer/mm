@@ -96,8 +96,15 @@ function initFuncFromParams(init_params) {
 
 // epilogs
 
-export const EPILOGS = ['none', 'x/J', 'x/sqrt(J)', 'softmax(x/sqrt(J))', 'tanh', 'relu', 'layernorm']
-
+export const EPILOGS = [
+  'none',
+  'x/depth',
+  'x/sqrt(depth)',
+  'softmax(x/sqrt(depth))',
+  'tanh',
+  'relu',
+  'layernorm',
+]
 
 function softmax_(h, w, data) {
   let ptr = 0
@@ -563,11 +570,11 @@ export class MatMul {
   constructor(params, init_vis = true) {
     this.params = { ...params }
     this.group = new THREE.Group()
-    this.group.name = `${this.params['result name']}.group`
+    this.group.name = `${this.params.name}.group`
 
-    this.H = params.I
-    this.D = params.J
-    this.W = params.K
+    this.H = params.height
+    this.D = params.depth
+    this.W = params.width
 
     this.initLeft()
     this.initRight()
@@ -638,7 +645,6 @@ export class MatMul {
     const data = Array2D.fromInit(this.H, this.W, result_init, this.params.epilog)
     const params = {
       ...this.getLeafParams(),
-      name: this.params['result name'],
       // TODO clean up
       height: this.params.height,
       depth: this.params.depth,
@@ -663,8 +669,8 @@ export class MatMul {
       throw Error(`HEY dotprod_val(${i}, ${k}, ${minj}, ${maxj}) is NaN`)
     }
     const epi = this.params.epilog
-    return epi == 'x/J' ? x / this.D :
-      epi == 'x/sqrt(J)' || epi == 'softmax(x/sqrt(J))' ? x / Math.sqrt(this.D) :
+    return epi == 'x/depth' ? x / this.D :
+      epi == 'x/sqrt(depth)' || epi == 'softmax(x/sqrt(depth))' ? x / Math.sqrt(this.D) :
         epi == 'tanh' ? Math.tanh(x) :
           epi == 'relu' ? Math.max(0, x) :
             x
