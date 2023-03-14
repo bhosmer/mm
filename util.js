@@ -193,11 +193,6 @@ export function center(x, y = 0) {
   return (x - y) / 2
 }
 
-export function locate(y, x) {
-  ['x', 'y', 'z'].map(d => y.rotation[d] = x.rotation[d]);
-  ['x', 'y', 'z'].map(d => y.position[d] = x.position[d])
-}
-
 //
 // misc object utils
 //
@@ -212,6 +207,32 @@ export function syncProp(obj, k, v) {
   }
   obj[k] = v
   return v
+}
+
+
+// {a: {b: 0, c: {d: 1}}} => {a$b: 0, a$c$d: 1}
+// NOTE empty subobjects get sent into space
+export function flatten(obj, sep = '$') {
+  const f = (obj, pre) => Object.entries(obj).reduce((acc, [k, v]) => ({
+    ...acc,
+    ...(typeof v === 'object' ? f(obj[k], pre + k + sep) : { [pre + k]: v })
+  }), {})
+  return f(obj, '')
+}
+
+// {a$b: 0, a$c$d: 1} => {a: {b: 0, c: {d: 1}}}
+export function unflatten(obj, sep = '$') {
+  const add = (obj, [k, v]) => {
+    const i = k.indexOf(sep)
+    if (i >= 0) {
+      const [base, suf] = [k.slice(0, i), k.slice(i + 1)]
+      obj[base] = add(obj[base] || {}, [suf, v])
+    } else {
+      obj[k] = v
+    }
+    return obj
+  }
+  return Object.entries(obj).reduce(add, {})
 }
 
 //
