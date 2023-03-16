@@ -98,9 +98,9 @@ function initFuncFromParams(init_params) {
 
 export const EPILOGS = [
   'none',
-  'x/depth',
-  'x/sqrt(depth)',
-  'softmax(x/sqrt(depth))',
+  'x/j',
+  'x/sqrt(j)',
+  'softmax(x/sqrt(j))',
   'tanh',
   'relu',
   'layernorm',
@@ -266,8 +266,9 @@ function emptyPoints(h, w) {
 
 export class Mat {
 
-  constructor(data, params, init_vis) {
-    this.params = { ...params }
+  constructor(data, params, context, init_viz) {
+    this.params = util.copyTree(params)
+    this.context = context
 
     this.data = data
     this.H = data.h
@@ -277,19 +278,19 @@ export class Mat {
     this.points = emptyPoints(this.H, this.W)
     this.points.name = `${this.params.name}.points`
 
-    if (init_vis) {
-      this.initVis()
+    if (init_viz) {
+      this.initViz()
     }
   }
 
-  initVis() {
+  initViz() {
     this.setColorsAndSizes()
 
     this.inner_group = new THREE.Group()
     this.inner_group.name = `${this.params.name}.inner_group`
     this.inner_group.add(this.points)
 
-    const gap = this.params.gap
+    const gap = this.params.layout.gap
     util.updateProps(this.inner_group.position, { x: gap, y: gap })
 
     this.group = new THREE.Group()
@@ -315,9 +316,10 @@ export class Mat {
   }
 
   getExtent() {
+    const gap = this.params.layout.gap
     return this._extents || (this._extents = {
-      x: this.W + 2 * this.params.gap - 1,
-      y: this.H + 2 * this.params.gap - 1,
+      x: this.W + 2 * gap - 1,
+      y: this.H + 2 * gap - 1,
       z: 0,
     })
   }
@@ -327,7 +329,7 @@ export class Mat {
       throw Error(`HEY sizeFromData(${x})`)
     }
 
-    const local_sens = this.params.sensitivity == 'local'
+    const local_sens = this.params.viz.sensitivity == 'local'
     const absx = Math.abs(x)
     const absmax = local_sens ? this.absmax : this.getGlobalAbsmax()
 
@@ -336,7 +338,7 @@ export class Mat {
     }
 
     const vol = absmax == 0 ? 0 : absx / absmax
-    const zsize = this.params['min size'] * ELEM_SIZE
+    const zsize = this.params.viz['min size'] * ELEM_SIZE
     const size = zsize + (ELEM_SIZE - zsize) * Math.cbrt(vol)
 
     if (absx > absmax || size < 0 || size > ELEM_SIZE || isNaN(size)) {
@@ -351,7 +353,8 @@ export class Mat {
       throw Error(`HEY colorFromData(${x})`)
     }
 
-    const local_sens = this.params.sensitivity == 'local'
+    const viz = this.params.viz
+    const local_sens = viz.sensitivity == 'local'
     const absx = Math.abs(x)
     const absmax = local_sens ? this.absmax : this.getGlobalAbsmax()
 
@@ -360,12 +363,12 @@ export class Mat {
     }
 
     const hue_vol = absmax == 0 ? 0 : x / absmax
-    const gap = this.params['hue gap'] * Math.sign(x)
-    const hue = (this.params['zero hue'] + gap + (Math.cbrt(hue_vol) * this.params['hue spread'])) % 1
+    const gap = viz['hue gap'] * Math.sign(x)
+    const hue = (viz['zero hue'] + gap + (Math.cbrt(hue_vol) * viz['hue spread'])) % 1
 
     const light_vol = absmax == 0 ? 0 : absx / absmax
-    const range = this.params['max light'] - this.params['min light']
-    const light = this.params['min light'] + range * Math.cbrt(light_vol)
+    const range = viz['max light'] - viz['min light']
+    const light = viz['min light'] + range * Math.cbrt(light_vol)
 
     return COLOR_TEMP.setHSL(hue, 1.0, light)
   }
@@ -431,7 +434,7 @@ export class Mat {
   }
 
   isFacing() {
-    const c = this.group.localToWorld(new THREE.Vector3()).sub(this.params.camera.position).normalize()
+    const c = this.group.localToWorld(new THREE.Vector3()).sub(this.context.camera.position).normalize()
     const m = this.group.getWorldDirection(new THREE.Vector3())
     return m.angleTo(c) < Math.PI / 2
   }
@@ -439,12 +442,12 @@ export class Mat {
   isRightSideUp() {
     const q = new THREE.Quaternion()
     const p = new THREE.Vector3(0, -1, 0).applyQuaternion(this.group.getWorldQuaternion(q))
-    const c = new THREE.Vector3(0, 1, 0).applyQuaternion(this.params.camera.quaternion)
+    const c = new THREE.Vector3(0, 1, 0).applyQuaternion(this.context.camera.quaternion)
     return p.angleTo(c) < Math.PI / 2
   }
 
   setRowGuides(light) {
-    light = util.syncProp(this.params, 'row guides', light)
+    light = util.syncProp(this.params.deco, 'row guides', light)
     if (this.row_guide_group) {
       this.inner_group.remove(this.row_guide_group)
       util.disposeAndClear(this.row_guide_group)
@@ -457,19 +460,24 @@ export class Mat {
 
   setFlowGuide(light) { }
 
+  setName(name) {
+    util.syncProp(this.params, 'name', name)
+    this.setLegends()
+  }
+
   setLegends(enabled) {
-    enabled = util.syncProp(this.params, 'legends', enabled)
+    enabled = util.syncProp(this.params.deco, 'legends', enabled)
     if (this.name_text) {
       this.inner_group.remove(this.name_text)
       util.disposeAndClear(this.name_text)
     }
     if (enabled && this.params.name) {
       const color = 0xCCCCFF
-      const size = Math.cbrt(Math.max(5, this.H) * Math.max(this.W, 5)) / 2
+      const size = Math.cbrt(Math.max(5, this.H) * Math.max(this.W, 5)) / 3
       const facing = this.isFacing()
       const rsu = this.isRightSideUp()
       let suf = this.params.tag ? ` (${this.params.tag}` : ''
-      this.name_text = this.params.getText(this.params.name + suf, color, size)
+      this.name_text = this.context.getText(this.params.name + suf, color, size)
       this.name_text.name = `${this.params.name}.name`
       const { h, w } = util.bbhw(this.name_text.geometry)
       this.name_text.geometry.rotateZ(rsu ? Math.PI : 0)
@@ -498,7 +506,7 @@ export class Mat {
   }
 
   updateLabels(spotlight = undefined) {
-    spotlight = util.syncProp(this.params, 'spotlight', spotlight)
+    spotlight = util.syncProp(this.params.deco, 'spotlight', spotlight)
     if (spotlight == 0) {
       if (this.label_group) {
         this.inner_group.remove(this.label_group)
@@ -514,8 +522,8 @@ export class Mat {
       } else {
         util.disposeAndClear(this.label_group)
       }
-      this.params.raycaster.params.Points.threshold = spotlight
-      const intersects = this.params.raycaster.intersectObject(this.points)
+      this.context.raycaster.params.Points.threshold = spotlight
+      const intersects = this.context.raycaster.intersectObject(this.points)
       intersects.forEach(x => {
         const index = x.index
         const i = Math.floor(index / this.W)
@@ -528,7 +536,7 @@ export class Mat {
             const rsu = this.isRightSideUp()
             if (!label || label.facing != facing || label.rsu != rsu) {
               const fsiz = 0.16 - 0.008 * Math.log10(Math.floor(1 + Math.abs(x)))
-              label = this.params.getText(`${x.toFixed(4)}`, 0xffffff, fsiz)
+              label = this.context.getText(`${x.toFixed(4)}`, 0xffffff, fsiz)
               label.name = `${this.params.name}.label[${i}, ${j}]`
               label.value = x
               label.facing = facing
@@ -567,21 +575,23 @@ export const ANIM_ALGS = ['none', 'dotprod (row major)', 'dotprod (col major)', 
 
 export class MatMul {
 
-  constructor(params, init_vis = true) {
-    this.params = { ...params }
+  constructor(params, context, init_viz = true) {
+    this.params = util.copyTree(params)
+    this.context = context
+
     this.group = new THREE.Group()
     this.group.name = `${this.params.name}.group`
 
-    this.H = params.height
-    this.D = params.depth
-    this.W = params.width
+    this.H = params.i
+    this.D = params.j
+    this.W = params.k
 
     this.initLeft()
     this.initRight()
     this.initResult()
 
-    if (init_vis) {
-      this.initVis()
+    if (init_viz) {
+      this.initViz()
     }
   }
 
@@ -589,69 +599,55 @@ export class MatMul {
     util.disposeAndClear(this.group)
   }
 
-  prepChildParams(params) {
-    params.getGlobalAbsmax = this.getGlobalAbsmax.bind(this)
-    return params
-  }
-
-  getLeafParams() {
-    // TODO transfer only what's needed from parent
+  prepChildParams(base = this.params) {
     return {
-      ...this.params,
+      ...base,
       getGlobalAbsmax: this.getGlobalAbsmax.bind(this),
-      depth: this.params.depth + 1,
-      max_depth: this.params.depth + 1,
-      height: 0,
-      count: 0,
+      ...(base != this.params ? {
+        anim: this.params.anim,
+        deco: this.params.deco,
+        layout: this.params.layout,
+        viz: this.params.viz,
+      } : {}),
     }
   }
 
   initLeft() {
-    if (this.params.left_mm) {
-      this.left = new MatMul(this.prepChildParams(this.params.left_mm), false)
+    const left_params = this.prepChildParams(this.params.left)
+    if (left_params.matmul) {
+      this.left = new MatMul(left_params, this.context, false)
     } else {
-      const data = this.params.left_data || (_ => {
-        const init = this.params['left init']
-        const min = this.params['left min']
-        const max = this.params['left max']
-        const dropout = this.params['left dropout']
-        const f = getInitFunc(init, min, max, dropout)
-        return Array2D.fromInit(this.H, this.D, f)
-      })()
-      const params = { ...this.getLeafParams(), name: this.params['left name'] }
-      this.left = new Mat(data, params, false)
+      const { init, min, max, dropout } = left_params
+      const f = getInitFunc(init, min, max, dropout)
+      const data = Array2D.fromInit(this.H, this.D, f)
+      this.left = new Mat(data, left_params, this.context, false)
     }
   }
 
   initRight() {
-    if (this.params.right_mm) {
-      this.right = new MatMul(this.prepChildParams(this.params.right_mm), false)
+    const right_params = this.prepChildParams(this.params.right)
+    if (right_params.matmul) {
+      this.right = new MatMul(right_params, this.context, false)
     } else {
-      const data = this.params.right_data || (_ => {
-        const name = this.params['right init']
-        const min = this.params['right min']
-        const max = this.params['right max']
-        const dropout = this.params['right dropout']
-        const f = getInitFunc(name, min, max, dropout)
-        return Array2D.fromInit(this.D, this.W, f)
-      })()
-      const params = { ...this.getLeafParams(), name: this.params['right name'] }
-      this.right = new Mat(data, params, false)
+      const { init, min, max, dropout } = right_params
+      const f = getInitFunc(init, min, max, dropout)
+      const data = Array2D.fromInit(this.D, this.W, f)
+      this.right = new Mat(data, right_params, this.context, false)
     }
   }
 
   initResult() {
     const result_init = (i, j) => this.dotprod_val(i, j)
     const data = Array2D.fromInit(this.H, this.W, result_init, this.params.epilog)
-    const params = {
-      ...this.getLeafParams(),
-      // TODO clean up
-      height: this.params.height,
-      depth: this.params.depth,
-      max_depth: this.params.max_depth,
-      count: this.params.count
-    }
-    this.result = new Mat(data, params, false)
+    // const params = {
+    //   ...this.getLeafParams(),
+    //   // TODO clean up
+    //   // node_height: this.params.node_height,
+    //   // node_depth: this.params.node_depth,
+    //   // max_depth: this.params.max_depth,
+    //   // count: this.params.count
+    // }
+    this.result = new Mat(data, this.prepChildParams(), this.context, false)
   }
 
   dotprod_val(i, k, minj = undefined, maxj = undefined) {
@@ -669,8 +665,8 @@ export class MatMul {
       throw Error(`HEY dotprod_val(${i}, ${k}, ${minj}, ${maxj}) is NaN`)
     }
     const epi = this.params.epilog
-    return epi == 'x/depth' ? x / this.D :
-      epi == 'x/sqrt(depth)' || epi == 'softmax(x/sqrt(depth))' ? x / Math.sqrt(this.D) :
+    return epi == 'x/j' ? x / this.D :
+      epi == 'x/sqrt(j)' || epi == 'softmax(x/sqrt(j))' ? x / Math.sqrt(this.D) :
         epi == 'tanh' ? Math.tanh(x) :
           epi == 'relu' ? Math.max(0, x) :
             x
@@ -705,16 +701,17 @@ export class MatMul {
   }
 
   getExtent() {
+    const gap = this.params.layout.gap
     return this._extents || (this._extents = {
-      x: this.W + 2 * this.params.gap - 1,
-      y: this.H + 2 * this.params.gap - 1,
-      z: this.D + 2 * this.params.gap - 1,
+      x: this.W + 2 * gap - 1,
+      y: this.H + 2 * gap - 1,
+      z: this.D + 2 * gap - 1,
     })
   }
 
-  initVis(params = undefined) {
+  initViz(params = undefined) {
     if (params) {
-      this.params = { ...params }
+      this.params = util.copyTree(params)
     }
 
     util.disposeAndClear(this.group)
@@ -726,15 +723,15 @@ export class MatMul {
       return sep == -1 ? x : x.slice(sep + 1) + '/' + x.slice(0, sep)
     }
 
-    this.left.params.polarity = next(this.params.polarity)
-    this.left.params['left placement'] = next(this.params['left placement'])
-    this.left.params['right placement'] = next(this.params['right placement'])
-    this.left.params['result placement'] = next(this.params['result placement'])
+    this.left.params.layout.polarity = next(this.params.layout.polarity)
+    this.left.params.layout['left placement'] = next(this.params.layout['left placement'])
+    this.left.params.layout['right placement'] = next(this.params.layout['right placement'])
+    this.left.params.layout['result placement'] = next(this.params.layout['result placement'])
 
-    this.right.params.polarity = next(this.params.polarity)
-    this.right.params['left placement'] = next(this.params['left placement'])
-    this.right.params['right placement'] = next(this.params['right placement'])
-    this.right.params['result placement'] = next(this.params['result placement'])
+    this.right.params.layout.polarity = next(this.params.layout.polarity)
+    this.right.params.layout['left placement'] = next(this.params.layout['left placement'])
+    this.right.params.layout['right placement'] = next(this.params.layout['right placement'])
+    this.right.params.layout['result placement'] = next(this.params.layout['result placement'])
 
     this.initLeftVis()
     this.initRightVis()
@@ -745,16 +742,16 @@ export class MatMul {
   }
 
   initLeftVis() {
-    this.left.initVis()
-    if (this.params.polarity.startsWith('positive')) {
+    this.left.initViz()
+    if (this.params.layout.polarity.startsWith('positive')) {
       this.left.group.rotation.y = -Math.PI / 2
-      this.left.group.position.x = this.params['left placement'].startsWith('left') ?
+      this.left.group.position.x = this.params.layout['left placement'].startsWith('left') ?
         -this.getLeftScatter() :
         this.getExtent().x + this.left.getExtent().z + this.getLeftScatter()
     } else { // negative
       this.left.group.rotation.y = Math.PI / 2
       this.left.group.position.z = this.getExtent().z
-      this.left.group.position.x = this.params['left placement'].startsWith('left') ?
+      this.left.group.position.x = this.params.layout['left placement'].startsWith('left') ?
         -(this.left.getExtent().z + this.getLeftScatter()) :
         this.getExtent().x + this.getLeftScatter()
     }
@@ -762,16 +759,16 @@ export class MatMul {
   }
 
   initRightVis() {
-    this.right.initVis()
-    if (this.params.polarity.startsWith('positive')) {
+    this.right.initViz()
+    if (this.params.layout.polarity.startsWith('positive')) {
       this.right.group.rotation.x = Math.PI / 2
-      this.right.group.position.y = this.params['right placement'].startsWith('top') ?
+      this.right.group.position.y = this.params.layout['right placement'].startsWith('top') ?
         -this.getRightScatter() :
         this.getExtent().y + this.right.getExtent().z + this.getRightScatter()
     } else { // negative
       this.right.group.rotation.x = -Math.PI / 2
       this.right.group.position.z = this.getExtent().z
-      this.right.group.position.y = this.params['right placement'].startsWith('top') ?
+      this.right.group.position.y = this.params.layout['right placement'].startsWith('top') ?
         -(this.right.getExtent().z + this.getRightScatter()) :
         this.getExtent().y + this.getRightScatter()
     }
@@ -779,8 +776,8 @@ export class MatMul {
   }
 
   initResultVis() {
-    this.result.initVis()
-    this.result.group.position.z = this.params['result placement'].startsWith('back') ?
+    this.result.initViz()
+    this.result.group.position.z = this.params.layout['result placement'].startsWith('back') ?
       this.getExtent().z :
       0
     this.group.add(this.result.group)
@@ -788,19 +785,19 @@ export class MatMul {
 
   getPlacementInfo() {
     return {
-      polarity: this.params.polarity.startsWith('positive') ? 1 : -1,
-      left: this.params['left placement'].startsWith('left') ? 1 : -1,
-      right: this.params['right placement'].startsWith('top') ? 1 : -1,
-      result: this.params['result placement'].startsWith('front') ? 1 : -1,
-      gap: this.params.gap,
+      polarity: this.params.layout.polarity.startsWith('positive') ? 1 : -1,
+      left: this.params.layout['left placement'].startsWith('left') ? 1 : -1,
+      right: this.params.layout['right placement'].startsWith('top') ? 1 : -1,
+      result: this.params.layout['result placement'].startsWith('front') ? 1 : -1,
+      gap: this.params.layout.gap,
       left_scatter: this.getLeftScatter(),
       right_scatter: this.getRightScatter(),
     }
   }
 
   setFlowGuide(light = undefined) {
-    if (light != this.params['flow guides']) {
-      light = util.syncProp(this.params, 'flow guides', light)
+    if (light != this.params.deco['flow guides']) {
+      light = util.syncProp(this.params.deco, 'flow guides', light)
       if (this.flow_guide_group) {
         this.group.remove(this.flow_guide_group)
         util.disposeAndClear(this.flow_guide_group)
@@ -816,8 +813,8 @@ export class MatMul {
   }
 
   scatterFromCount(count) {
-    const blast = (count >= this.params.molecule) ? count ** this.params.blast : 0
-    return this.params.scatter * blast
+    const blast = (count >= this.params.layout.molecule) ? count ** this.params.layout.blast : 0
+    return this.params.layout.scatter * blast
   }
 
   getLeftScatter() {
@@ -830,16 +827,16 @@ export class MatMul {
 
   updateLabels(params = undefined) {
     if (params) {
-      this.params.spotlight = params.spotlight
-      this.params['interior spotlight'] = params['interior spotlight']
+      this.params.deco.spotlight = params.deco.spotlight
+      this.params.deco['interior spotlight'] = params.deco['interior spotlight']
     }
 
-    const spotlight = this.params.spotlight
+    const spotlight = this.params.deco.spotlight
     this.left.updateLabels(spotlight)
     this.right.updateLabels(spotlight)
     this.result.updateLabels(spotlight)
 
-    const interior_spotlight = this.params['interior spotlight'] ? spotlight : 0
+    const interior_spotlight = this.params.deco['interior spotlight'] ? spotlight : 0
     this.anim_mats.map(m => m.updateLabels(interior_spotlight))
   }
 
@@ -861,28 +858,33 @@ export class MatMul {
   }
 
   hideInputs(hide) {
-    util.syncProp(this.params, 'hide inputs', hide)
-    if (this.params.left_mm) {
+    util.syncProp(this.params.anim, 'hide inputs', hide)
+    if (this.params.left.matmul) {
       this.left.hideInputs(hide)
-    } else if (this.params.alg != 'none') {
+    } else if (this.params.anim.alg != 'none') {
       hide ? this.left.hide() : this.left.show()
     }
-    if (this.params.right_mm) {
+    if (this.params.right.matmul) {
       this.right.hideInputs(hide)
-    } else if (this.params.alg != 'none') {
+    } else if (this.params.anim.alg != 'none') {
       hide ? this.right.hide() : this.right.show()
     }
   }
 
   setRowGuides(light) {
-    light = util.syncProp(this.params, 'row guides', light)
+    light = util.syncProp(this.params.deco, 'row guides', light)
     this.left.setRowGuides(light)
     this.right.setRowGuides(light)
     this.result.setRowGuides(light)
   }
 
+  setName(name) {
+    name = util.syncProp(this.params, 'name', name)
+    this.result.setName(name)
+  }
+
   setLegends(enabled = undefined) {
-    util.syncProp(this.params, 'legends', enabled)
+    util.syncProp(this.params.deco, 'legends', enabled)
     this.left.setLegends(enabled)
     this.right.setLegends(enabled)
     this.result.setLegends(enabled)
@@ -891,10 +893,10 @@ export class MatMul {
   // animation
 
   initAnimation(cb) {
-    if (this.params.alg == 'none') {
-      if (this.params['hide inputs']) {
-        !this.left_mm && this.left.show()
-        !this.right_mm && this.right.show()
+    if (this.params.anim.alg == 'none') {
+      if (this.params.anim['hide inputs']) {
+        !this.params.left.matmul && this.left.show()
+        !this.params.right.matmul && this.right.show()
       }
       return
     }
@@ -913,11 +915,11 @@ export class MatMul {
     this.alg_join = () => {
       const alg = this.params.alg
 
-      const lalg = this.params.left_mm && !left_done ?
+      const lalg = this.params.left.matmul && !left_done ?
         (this.left.getIndex() == this.getIndex() ? this.left.alg_join() : 'mixed') :
         'none'
 
-      const ralg = this.params.right_mm && !right_done ?
+      const ralg = this.params.right.matmul && !right_done ?
         (this.right.getIndex() == this.getIndex() ? this.right.alg_join() : 'mixed') :
         'none'
 
@@ -936,25 +938,25 @@ export class MatMul {
     const can_fuse = () => this.alg_join() != 'mixed'
 
     const start = () => {
-      const result_bump = bumps[this.params.alg]()
+      const result_bump = bumps[this.params.anim.alg]()
 
       this.bump = () => {
-        const go = left_done && right_done || this.params.fuse && can_fuse()
+        const go = left_done && right_done || this.params.anim.fuse && can_fuse()
         left_done || this.left.bump()
         right_done || this.right.bump()
         go && result_bump()
       }
 
-      if (this.params.left_mm) {
+      if (this.params.left.matmul) {
         left_done = false
         this.left.initAnimation(() => left_done = true)
       }
-      if (this.params.right_mm) {
+      if (this.params.right.matmul) {
         right_done = false
         this.right.initAnimation(() => right_done = true)
       }
 
-      if (this.params['hide inputs']) {
+      if (this.params.anim['hide inputs']) {
         this.left.hide()
         this.right.hide()
       }
@@ -970,9 +972,9 @@ export class MatMul {
   }
 
   getBlockInfo() {
-    const ni = Math.min(this.params['i blocks'], this.H)
-    const nj = Math.min(this.params['j blocks'], this.D)
-    const nk = Math.min(this.params['k blocks'], this.W)
+    const ni = Math.min(this.params.anim['i blocks'], this.H)
+    const nj = Math.min(this.params.anim['j blocks'], this.D)
+    const nk = Math.min(this.params.anim['k blocks'], this.W)
     return {
       i: { n: ni, size: Math.ceil(this.H / ni), max: this.H },
       j: { n: nj, size: Math.ceil(this.D / nj), max: this.D },
@@ -998,8 +1000,8 @@ export class MatMul {
   }
 
   getAnimMatParams() {
-    const params = { ...this.getLeafParams() }
-    params.sensitivity = 'local'
+    const params = util.copyTree(this.prepChildParams())
+    params.layout.sensitivity = 'local'
     params.stretch_absmax = true
     return params
   }
@@ -1023,7 +1025,7 @@ export class MatMul {
     this.grid('j', ({ start: j, end: je }) => {
       const result_init = (i, k) => this.dotprod_val(i, k, j, je)
       const data = Array2D.fromInit(this.H, this.W, result_init)
-      const result = new Mat(data, this.getAnimMatParams(), true)
+      const result = new Mat(data, this.getAnimMatParams(), this.context, true)
       result.group.position.z = polarity > 0 ? j + gap : extz - je + 1 - gap
       result.hide()
       results.push(result)
@@ -1041,7 +1043,7 @@ export class MatMul {
     this.grid('ijk', ({ start: i }, { start: j, extent: jx }, { start: k, extent: kx }) => {
       const vmpinit = (ji, ki) => this.ijkmul(i, j + ji, k + ki)
       const data = Array2D.fromInit(jx, sweep ? 1 : kx, vmpinit)
-      const vmp = new Mat(data, this.getAnimMatParams(), true)
+      const vmp = new Mat(data, this.getAnimMatParams(), this.context, true)
       vmp.hide()
       const z = polarity < 0 ? this.getExtent().z - j : j
       util.updateProps(vmp.group.position, { x: k, y: gap + i, z })
@@ -1064,7 +1066,7 @@ export class MatMul {
       curk == 0 && curi++
 
       // clear old input hilights
-      if (oldi >= 0 && !this.params['hide inputs']) {
+      if (oldi >= 0 && !this.params.anim['hide inputs']) {
         sweep && this.grid('k', ({ start: k, extent: kx }) => {
           oldk < kx && this.right.setColorsAndSizes(undefined, k + oldk)
         })
@@ -1083,7 +1085,7 @@ export class MatMul {
       curi == 0 && curk == 0 && results.forEach(r => r.hide())
 
       // new input hilights
-      if (!this.params['hide inputs']) {
+      if (!this.params.anim['hide inputs']) {
         sweep && this.grid('k', ({ start: k, extent: kx }) => {
           curk < kx && this.right.bumpColor(undefined, k + curk)
         })
@@ -1119,7 +1121,7 @@ export class MatMul {
     this.grid('ijk', ({ start: i, extent: ix }, { start: j, extent: jx }, { start: k }) => {
       const mvpinit = (ii, ji) => this.ijkmul(i + ii, j + ji, k)
       const data = Array2D.fromInit(sweep ? 1 : ix, jx, mvpinit)
-      const mvp = new Mat(data, this.getAnimMatParams(), true)
+      const mvp = new Mat(data, this.getAnimMatParams(), this.context, true)
       mvp.hide()
       const z = polarity < 0 ? this.getExtent().z - j : j
       util.updateProps(mvp.group.position, { x: gap + k, y: i, z })
@@ -1142,7 +1144,7 @@ export class MatMul {
       curi == 0 && curk++
 
       // clear old input hilights
-      if (oldk >= 0 && !this.params['hide inputs']) {
+      if (oldk >= 0 && !this.params.anim['hide inputs']) {
         sweep && this.grid('i', ({ start: i, extent: ix }) => {
           oldi < ix && this.left.setColorsAndSizes(i + oldi, undefined)
         })
@@ -1161,7 +1163,7 @@ export class MatMul {
       curk == 0 && curi == 0 && results.forEach(r => r.hide())
 
       // new input hilights
-      if (!this.params['hide inputs']) {
+      if (!this.params.anim['hide inputs']) {
         sweep && this.grid('i', ({ start: i, extent: ix }) => {
           curi < ix && this.left.bumpColor(i + curi, undefined)
         })
@@ -1198,7 +1200,7 @@ export class MatMul {
     this.grid('ijk', ({ start: i, extent: ix }, { start: j }, { start: k, extent: kx }) => {
       const vvpinit = (ii, ki) => this.ijkmul(i + ii, j, k + ki)
       const data = Array2D.fromInit(ix, sweep ? 1 : kx, vvpinit)
-      const vvp = new Mat(data, this.getAnimMatParams(), true)
+      const vvp = new Mat(data, this.getAnimMatParams(), this.context, true)
       vvp.hide()
       const z = polarity > 0 ? gap + j : extz - gap - j
       util.updateProps(vvp.group.position, { x: k, y: i, z })
@@ -1223,7 +1225,7 @@ export class MatMul {
       }
 
       // clear old input highlights
-      if (oldj >= 0 && !this.params['hide inputs']) {
+      if (oldj >= 0 && !this.params.anim['hide inputs']) {
         sweep ?
           this.grid('jk', ({ start: j, extent: jx }, { start: k, extent: kx }) => {
             oldj < jx && oldk < kx && this.right.setColorsAndSizes(j + oldj, k + oldk)
@@ -1246,7 +1248,7 @@ export class MatMul {
       curk == 0 && curj == 0 && results.forEach(r => r.hide())
 
       // new input highlights
-      if (oldj >= 0 && !this.params['hide inputs']) {
+      if (oldj >= 0 && !this.params.anim['hide inputs']) {
         sweep ?
           this.grid('jk', ({ start: j, extent: jx }, { start: k, extent: kx }) => {
             curj < jx && curk < kx && this.right.bumpColor(j + curj, k + curk)

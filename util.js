@@ -43,12 +43,13 @@ export function updateFromSearchParams(obj, searchParams, strict = false) {
     }
   }
 
+  const flattened = flatten(obj)
   for (const [k, v] of searchParams.entries()) {
-    if (k in obj) {
-      const t = typeof obj[k]
+    if (k in flattened) {
+      const t = typeof flattened[k]
       const x = castToType(v, t)
       if (x !== undefined) {
-        obj[k] = x
+        flattened[k] = x
       } else {
         err(`don't know how to cast param '${k}' to type ${t}`)
       }
@@ -56,6 +57,8 @@ export function updateFromSearchParams(obj, searchParams, strict = false) {
       err(`unknown param '${k}'`)
     }
   }
+
+  updateProps(obj, unflatten(flattened))
 }
 
 // we only know a limited set of value types for simplicity
@@ -100,8 +103,6 @@ const CORNER_COLOR = new THREE.Uint8BufferAttribute([
 CORNER_COLOR.normalized = true
 
 export function rowGuide(h, w, light = 1.0) {
-  const rstride = Math.max(1, Math.floor(h / 8))
-  const cstride = Math.max(1, Math.floor(w / 8))
   const group = new THREE.Group()
   const color = new THREE.Color()
 
@@ -112,16 +113,18 @@ export function rowGuide(h, w, light = 1.0) {
     group.add(lineSeg(start, end, color))
   }
 
+  draw(0, 0, h - 1, 0)
+  draw(0, w - 1, h - 1, w - 1)
+
+  const rstride = Math.max(1, (h - 1) / 8)
   for (let i = 0; i < h; i += rstride) {
-    draw(i, 0, Math.min(i + rstride, h - 1), 0)
     draw(i, 0, i, w - 1)
   }
 
-  // draw(rstride, 0, 0, cstride)
   const corner_geometry = new THREE.BufferGeometry()
   corner_geometry.setAttribute('position', new THREE.Float32BufferAttribute([
-    0, rstride, 0,
-    cstride, 0, 0,
+    0, h / 8, 0,
+    w / 8, 0, 0,
     0, 0, 0,
   ], 3))
   CORNER_COLOR.array[3] = CORNER_COLOR.array[7] = CORNER_COLOR.array[3] = 255 * light
@@ -210,8 +213,9 @@ export function syncProp(obj, k, v) {
 }
 
 // {a: {b: 0, c: {d: 1}}} => {a$b: 0, a$c$d: 1}
-// NOTE empty subobjects get sent into space
-export function flatten(obj, sep = '$') {
+// NOTE only handles our nested params - nothing null 
+// or undefined, no arrays, no empty subobjects, etc
+export function flatten(obj, sep = '.') {
   const f = (obj, pre) => Object.entries(obj).reduce((acc, [k, v]) => ({
     ...acc,
     ...(typeof v === 'object' ? f(obj[k], pre + k + sep) : { [pre + k]: v })
@@ -220,7 +224,7 @@ export function flatten(obj, sep = '$') {
 }
 
 // {a$b: 0, a$c$d: 1} => {a: {b: 0, c: {d: 1}}}
-export function unflatten(obj, sep = '$') {
+export function unflatten(obj, sep = '.') {
   const add = (obj, [k, v]) => {
     const i = k.indexOf(sep)
     if (i >= 0) {
@@ -232,6 +236,11 @@ export function unflatten(obj, sep = '$') {
     return obj
   }
   return Object.entries(obj).reduce(add, {})
+}
+
+// deepish - copies nested objects but not arrays
+export function copyTree(obj) {
+  return unflatten({ ...flatten(obj) })
 }
 
 // {my_prop_name: x} => {'my prop name': x}

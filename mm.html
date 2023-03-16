@@ -26,7 +26,7 @@
 
   <script type="module">
     import * as THREE from 'three'
-    import * as vis from './vis.js'
+    import * as viz from './viz.js'
     import * as util from './util.js'
 
     import { FontLoader } from 'https://threejs.org/examples/jsm/loaders/FontLoader.js'
@@ -36,107 +36,117 @@
     import { EffectComposer } from 'https://threejs.org/examples/jsm/postprocessing/EffectComposer.js'
     import { RenderPass } from 'https://threejs.org/examples/jsm/postprocessing/RenderPass.js'
 
-    const init_dims = { height: 32, depth: 32, width: 32 }
-
-
+    const init_dims = { i: 32, j: 32, k: 32 }
 
     const params = {
-      name: 'XY',
+      name: 'X @ Y',
       // shape
-      height: init_dims.height,
-      depth: init_dims.depth,
-      width: init_dims.width,
-      // left: {
-      //   name: 'X',
-      //   init: 'row major',
-      //   min: -1,
-      //   max: 1,
-      //   dropout: 0,
-      // },
-      // right: {
-      //   name: 'Y',
-      //   init: 'col major',
-      //   min: -1,
-      //   max: 1,
-      //   dropout: 0,
-      // },
+      i: init_dims.i,
+      j: init_dims.j,
+      k: init_dims.k,
+
+      left: {
+        name: 'X',
+        matmul: false,
+        init: 'row major',
+        min: -1,
+        max: 1,
+        dropout: 0,
+      },
+
+      right: {
+        name: 'Y',
+        matmul: false,
+        init: 'col major',
+        min: -1,
+        max: 1,
+        dropout: 0,
+      },
+
       epilog: 'none',
 
       // ---
 
       // shape
-      // I: init_dims.height,
-      // J: init_dims.depth,
-      // K: init_dims.width,
+      // I: init_dims.i,
+      // J: init_dims.j,
+      // K: init_dims.k,
       // data
       // left arg
-      'left init': 'row major',
-      'left min': -1,
-      'left max': 1,
-      'left dropout': 0,
-      'left name': 'X',
+      // 'left init': 'row major',
+      // 'left min': -1,
+      // 'left max': 1,
+      // 'left dropout': 0,
+      // 'left name': 'X',
       // right arg
-      'right init': 'col major',
-      'right min': -1,
-      'right max': 1,
-      'right dropout': 0,
-      'right name': 'Y',
+      // 'right init': 'col major',
+      // 'right min': -1,
+      // 'right max': 1,
+      // 'right dropout': 0,
+      // 'right name': 'Y',
       // result
       // epilog: 'none',
       // 'result name': 'XY',
 
       // ---
 
-      // animation
-      alg: 'none',
-      fuse: true,
-      speed: 25,
-      'hide inputs': false,
-      'i blocks': 1,
-      'j blocks': 1,
-      'k blocks': 1,
-      // layout
-      polarity: 'negative',
-      'left placement': 'left',
-      'right placement': 'top',
-      'result placement': 'front',
-      gap: 1,
-      scatter: 0,
-      molecule: 3,
-      blast: 0,
-      // viz      
-      legends: true,
-      spotlight: 1,
-      'row guides': 0.5,
-      'flow guides': 0.0,
-      'interior spotlight': false,
-      axes: false,
-      // colors and sizes
-      sensitivity: 'global',
-      'min size': 0.15,
-      'min light': 0.25,
-      'max light': 0.6,
-      'zero hue': 0.77,
-      'hue gap': 0.2,
-      'hue spread': 0.01,
-      // set from orbit control
-      xcam: -init_dims.height * 2,
-      ycam: init_dims.depth * 2,
-      zcam: init_dims.width * 2,
+      anim: {
+        alg: 'none',
+        fuse: true,
+        speed: 25,
+        'hide inputs': false,
+        'i blocks': 1,
+        'j blocks': 1,
+        'k blocks': 1,
+      },
+      layout: {
+        polarity: 'negative',
+        'left placement': 'left',
+        'right placement': 'top',
+        'result placement': 'front',
+        gap: 1,
+        scatter: 0,
+        molecule: 3,
+        blast: 0,
+      },
+      deco: {
+        legends: true,
+        spotlight: 1,
+        'row guides': 0.5,
+        'flow guides': 0.0,
+        'interior spotlight': false,
+        axes: false,
+      },
+      viz: {
+        sensitivity: 'global',
+        'min size': 0.15,
+        'min light': 0.25,
+        'max light': 0.6,
+        'zero hue': 0.77,
+        'hue gap': 0.2,
+        'hue spread': 0.01,
+      },
+      cam: {
+        // set from orbit control
+        x: -init_dims.i * 2,
+        y: init_dims.j * 2,
+        z: init_dims.k * 2,
+      }
     }
 
     // update URL with param changes
 
     let address_bar_update_pending = false
-    function setParams(obj) {
+    function setParams(obj, p = params) {
       for (const k in obj) {
-        params[k] = obj[k]
+        p[k] = obj[k]
       }
       // throttle address bar update
       if (!address_bar_update_pending) {
         address_bar_update_pending = true
         setTimeout(function () {
-          const url = `${window.location.pathname}?${new URLSearchParams(params)}`
+          const search_params = new URLSearchParams(util.flatten(params))
+          const url = `${window.location.pathname}?${search_params}`
           window.history.replaceState({}, '', url)
           address_bar_update_pending = false
         }, 250);
@@ -176,12 +186,11 @@
     raycaster.setFromCamera(pointer, camera)
 
     // object params plus env stuff for text, spotlight, isFacing etc
-    function getParams() {
+    function getContext() {
       return {
         getText: getText,
         raycaster: raycaster,
         camera: camera,
-        ...params,
       }
     }
 
@@ -203,7 +212,7 @@
       util.updateFromSearchParams(params, new URL(window.location).searchParams)
 
       // set camera position
-      camera.position.set(params.xcam, params.ycam, params.zcam)
+      camera.position.set(params.cam.x, params.cam.y, params.cam.z)
 
       // axes
       const axes = util.axes()
@@ -231,98 +240,99 @@
         // temp: takes root shape and adjusts children so nothing blows up
         // TODO transfer depth stuff to MatMul init
         const fix_shape = params => {
-          const f = (p, i, j, k, d) => {
+          const f = (p, i, j, k, node_depth) => {
             if (j === undefined) {
-              j = p.depth
+              j = p.j
             }
             p.count = 1
-            p.depth = d
-            p.max_depth = d + 1
+            p.node_depth = node_depth
+            p.max_depth = node_depth + 1
             if (p.left_mm) {
-              f(p.left_mm, i, undefined, j, d + 1)
+              f(p.left_mm, i, undefined, j, node_depth + 1)
               p.max_depth = p.left_mm.max_depth
               p.count += p.left_mm.count
             }
             if (p.right_mm) {
-              f(p.right_mm, j, undefined, k, d + 1)
+              f(p.right_mm, j, undefined, k, node_depth + 1)
               p.max_depth = Math.max(p.right_mm.max_depth, p.max_depth)
               p.count += p.right_mm.count
             }
-            p.height = p.max_depth - p.depth
-            p.height = i
-            p.depth = j
-            p.width = k
+            p.node_height = p.max_depth - p.node_depth
+            p.i = i
+            p.j = j
+            p.k = k
           }
-          f(params, params.height, params.depth, params.width, 0)
+          f(params, params.i, params.j, params.k, 0)
           return params
         }
 
         // L @ R
-        obj = new vis.MatMul(fix_shape(getParams()))
+        // obj = new viz.MatMul(fix_shape(getParams()))
+        obj = new viz.MatMul(params, getContext())
 
         // 2 levels
 
         // (LL @ LR) @ R
         // const l = { ...getParams(), 'left name': "LL", 'right name': "LR", name: "L" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
+        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l }))
 
         // L @ (RL @ RR)
         // spacious: RL/RR not oriented properly, flip RR along horizontal axis (face front, RSU)
         // @@@ repro 1: just RR @@@
         // const r = { ...getParams(), 'left name': "RL", 'right name': "RR", name: "R" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), right_mm: r }))
+        // obj = new viz.MatMul(fix_shape({ ...getParams(), right_mm: r }))
 
         // (LL @ LR) @ (RL @ RR)
         // spacious: repro 1
         // const l = { ...getParams(), 'left name': "LL", 'right name': "LR", name: "L" }
         // const r = { ...getParams(), 'left name': "RL", 'right name': "RR", name: "R" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
+        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
 
         // 3 levels
 
         // ((LLL @ LLR) @ LR) @ R
         // const ll = { ...getParams(), 'left name': "LLL", 'right name': "LLR", name: "LL" }
         // const l = { ...getParams(), left_mm: ll, 'right name': "LR", name: "L" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
+        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l }))
 
         // (LL @ (LRL @ LRR)) @ R
         // spacious: here orientation is CORRECT. test any orientation fix against this
         // const lr = { ...getParams(), 'left name': "LRL", 'right name': "LRR", name: "LR" }
         // const l = { ...getParams(), right_mm: lr, 'left name': "LL", name: "L" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
+        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l }))
 
         // ((LLL @ LLR) @ (LRL @ LRR)) @ R
         // const ll = { ...getParams(), 'left name': "LLL", 'right name': "LLR", name: "LL" }
         // const lr = { ...getParams(), 'left name': "LRL", 'right name': "LRR", name: "LR" }
         // const l = { ...getParams(), left_mm: ll, right_mm: lr, name: "L" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
+        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l }))
 
         // L @ ((RLL @ RLR) @ RR)
         // spacious: repro 1, RR face
         // const rl = { ...getParams(), 'left name': "RLL", 'right name': "RLR", name: "RL" }
         // const r = { ...getParams(), left_mm: rl, 'right name': "RR", name: "R" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), right_mm: r }))
+        // obj = new viz.MatMul(fix_shape({ ...getParams(), right_mm: r }))
 
         // L @ (RL @ (RRL @ RRR))
         // spacious: orientation problem on result face, left face
         // @@@ repro 2: RR cube @@@
         // const rr = { ...getParams(), 'left name': "RRL", 'right name': "RRR", name: "RR" }
         // const r = { ...getParams(), right_mm: rr, 'left name': "RL", name: "R" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), right_mm: r }))
+        // obj = new viz.MatMul(fix_shape({ ...getParams(), right_mm: r }))
 
         // L @ ((RLL @ RLR) @ (RRL @ RRR))
         // spacious: repro 2, RR cube
         // const rl = { ...getParams(), 'left name': "RLL", 'right name': "RLR", name: "RL" }
         // const rr = { ...getParams(), 'left name': "RRL", 'right name': "RRR", name: "RR" }
         // const r = { ...getParams(), left_mm: rl, right_mm: rr, name: "R" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), right_mm: r }))
+        // obj = new viz.MatMul(fix_shape({ ...getParams(), right_mm: r }))
 
         // ((LLL @ LLR) @ LR) @ (RL @ RR)
         // spacious: repro 1
         // const ll = { ...getParams(), 'left name': "LLL", 'right name': "LLR", name: "LL" }
         // const l = { ...getParams(), left_mm: ll, 'right name': "LR", name: "L" }
         // const r = { ...getParams(), 'left name': "RL", 'right name': "RR", name: "R" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
+        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
 
         // ((LLL @ LLR) @ LR) @ ((RLL @ RLR) @ RR)
         // spacious: repro 1
@@ -330,7 +340,7 @@
         // const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", name: "L" }
         // const rl = { ...getParams(), 'left name': "RLL", 'right name': "RLR", name: "RL" }
         // const r = { ...getParams(), left_mm: rl, 'right name': "RR", name: "R" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
+        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
 
         // ((LLL @ LLR) @ LR) @ (RL @ (RRL @ RRR))
         // spacious: repro 2
@@ -338,7 +348,7 @@
         // const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", name: "L" }
         // const rr = { ...getParams(), 'left name': "RRL", 'right name': "RRR", name: "RR" }
         // const r = { ...getParams(), right_mm: rr, 'left name': "RL", 'right name': "RR", name: "R" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
+        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
 
         // ((LLL @ LLR) @ (LRL @ LRR)) @ (RL @ RR)
         // spacious: repro 1
@@ -346,7 +356,7 @@
         // const lr = { ...getParams(), 'left name': "LRL", 'right name': "LRR", name: "LR" }
         // const l = { ...getParams(), left_mm: ll, right_mm: lr, name: "L" }
         // const r = { ...getParams(), 'left name': "RL", 'right name': "RR", name: "R" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
+        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
 
         // ((LLL @ LLR) @ (LRL @ LRR)) @ ((RLL @ RLR) @ RR)
         // spacious: repro 1
@@ -355,7 +365,7 @@
         // const l = { ...getParams(), left_mm: ll, right_mm: lr, name: "L" }
         // const rl = { ...getParams(), 'left name': "RLL", 'right name': "RLR", name: "RL" }
         // const r = { ...getParams(), left_mm: rl, 'right name': "RR", name: "R" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
+        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
 
         // ((LLL @ LLR) @ (LRL @ LRR)) @ (RL @ (RRL @ RRR))
         // spacious: repro 2
@@ -364,7 +374,7 @@
         // const l = { ...getParams(), left_mm: ll, right_mm: lr, name: "L" }
         // const rr = { ...getParams(), 'left name': "RRL", 'right name': "RRR", name: "RR" }
         // const r = { ...getParams(), 'left name': "RL", right_mm: rr, name: "R" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
+        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
 
         // ((LLL @ LLR) @ (LRL @ LRR)) @ ((RLL @ RLR) @ (RRL @ RRR))
         // spacious: repro 2
@@ -374,7 +384,7 @@
         // const rl = { ...getParams(), 'left name': "RLL", 'right name': "RLR", name: "RL" }
         // const rr = { ...getParams(), 'left name': "RRL", 'right name': "RRR", name: "RR" }
         // const r = { ...getParams(), left_mm: rl, right_mm: rr, name: "R" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
+        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
 
         // 4+ levels but not exhaustive - focusing on r, need to get to repro 3
 
@@ -384,14 +394,14 @@
         // const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", name: "LLL" }
         // const ll = { ...getParams(), left_mm: lll, 'left name': "LLL", 'right name': "LLR", name: "LL" }
         // const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", name: "L" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
+        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l }))
 
         // ((((LLLLL @ LLLLR) @ LLLR) @ LLR) @ LR) @ R
         // const llll = { ...getParams(), 'left name': "LLLLL", 'right name': "LLLLR", name: "LLLL" }
         // const lll = { ...getParams(), left_mm: llll, 'right name': "LLLR", name: "LLL" }
         // const ll = { ...getParams(), left_mm: lll, 'left name': "LLL", 'right name': "LLR", name: "LL" }
         // const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", name: "L" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l }))
+        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l }))
 
         // L @ (RL @ (RRL @ (RRRL @ RRRR)))
         // note here (and elsewhere) that flipping leaf inputs around is only trivial when 
@@ -401,7 +411,7 @@
         // const rrr = { ...getParams(), 'left name': "RRRL", 'right name': "RRRR", name: "RRR" }
         // const rr = { ...getParams(), right_mm: rrr, 'left name': "RRL", 'right name': "RRR", name: "RR" }
         // const r = { ...getParams(), right_mm: rr, 'left name': "RL", 'right name': "RR", name: "R" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), right_mm: r }))
+        // obj = new viz.MatMul(fix_shape({ ...getParams(), right_mm: r }))
 
         // (((LLLL @ LLLR) @ LLR) @ LR) @ (RL @ (RRL @ (RRRL @ RRRR)))
         // pair of long paths... non-alternating layout is still an option
@@ -414,7 +424,7 @@
         // const rrr = { ...getParams(), 'left name': "RRRL", 'right name': "RRRR", name: "RRR" }
         // const rr = { ...getParams(), right_mm: rrr, 'left name': "RRL", 'right name': "RRR", name: "RR" }
         // const r = { ...getParams(), right_mm: rr, 'left name': "RL", 'right name': "RR", name: "R" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
+        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
 
         // ---
 
@@ -426,7 +436,7 @@
         // const rr = { ...getParams(), left_mm: rrl, right_mm: rrr, name: "RR" }
         // const rl = { ...getParams(), 'left name': "RLL", 'right name': "RLR", name: "RL" }
         // const r = { ...getParams(), right_mm: rr, left_mm: rl, name: "R" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
+        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
 
         // ---
 
@@ -435,7 +445,7 @@
         // const rrr = { ...getParams(), 'left name': "RRRL", 'right name': "RRRR", name: "RRR" }
         // const rr = { ...getParams(), right_mm: rrr, 'left name': "RRL", 'right name': "RRR", name: "RR" }
         // const r = { ...getParams(), left_mm: rl, right_mm: rr, 'left name': "RL", 'right name': "RR", name: "R" }
-        // obj = new vis.MatMul({ ...getParams(), right_mm: r })
+        // obj = new viz.MatMul({ ...getParams(), right_mm: r })
 
         // ((LLL @ LLR) @ LR) @ (RL @ (RRL @ (RRRL @ RRRR))
         // ...collision
@@ -444,7 +454,7 @@
         // const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", name: "L" }
         // const rr = { ...getParams(), 'left name': "RRL", 'right name': "RRR", name: "RR" }
         // const r = { ...getParams(), right_mm: rr, 'left name': "RL", 'right name': "RR", name: "R" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
+        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
 
         // (((LLLL @ LLLR) @ LLR) @ LR) @ (RL @ (RRL @ (RRRL @ RRRR)))
         // const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", name: "LLL" }
@@ -453,7 +463,7 @@
         // const rrr = { ...getParams(), 'left name': "RRRL", 'right name': "RRRR", name: "RRR" }
         // const rr = { ...getParams(), right_mm: rrr, 'left name': "RRL", 'right name': "RRR", name: "RR" }
         // const r = { ...getParams(), right_mm: rr, 'left name': "RL", 'right name': "RR", name: "R" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
+        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
 
         // (((LLLL @ LLLR) @ LLR) @ (LRL @ LRR)) @ (RL @ (RRL @ (RRRL @ RRRR)))
         // const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", name: "LLL" }
@@ -464,7 +474,7 @@
         // const rrr = { ...getParams(), 'left name': "RRRL", 'right name': "RRRR", name: "RRR" }
         // const rr = { ...getParams(), right_mm: rrr, 'left name': "RRL", 'right name': "RRR", name: "RR" }
         // const r = { ...getParams(), left_mm: rl, right_mm: rr, 'left name': "RL", 'right name': "RR", name: "R" }
-        // obj = new vis.MatMul({ ...getParams(), left_mm: l, right_mm: r })
+        // obj = new viz.MatMul({ ...getParams(), left_mm: l, right_mm: r })
 
         // (((LLLL @ LLLR) @ (LLRL @ LLRR)) @ ((LRLL @ LRLR) @ (LRRL @ LRRR))) @ 
         //  (((RLLL @ RLLR) @ (RLRL @ RLRR)) @ ((RRLL @ RRLR) @ (RRRL @ RRRR)))
@@ -485,7 +495,7 @@
         // const rrr = { ...getParams(), 'left name': "RRRL", 'right name': "RRRR", name: "RRR" }
         // const rr = { ...getParams(), left_mm: rrl, right_mm: rrr, name: "RR" }
         // const r = { ...getParams(), left_mm: rl, right_mm: rr, 'left name': "RL", 'right name': "RR", name: "R" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
+        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
 
         // ((LLL @ (LLRL @ LLRR)) @ LR) @ (RL @ ((RRLL @ RRLR) @ RRR))
         // minimal collision - same as above but all other subtrees pruned
@@ -496,7 +506,7 @@
         // const rrl = { ...getParams(), 'left name': "RRLL", 'right name': "RRLR", name: "RRL" }
         // const rr = { ...getParams(), left_mm: rrl, 'right name': "RRR", name: "RR" }
         // const r = { ...getParams(), 'left name': "RL", right_mm: rr, name: "R" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
+        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
 
         // (((LLLL @ LLLR) @ (LLRL @ LLRR)) @ ((LRLL @ (LRLRL @ LRLRR)) @ (LRRL @ LRRR))) @ 
         //  (((RLLL @ RLLR) @ ((RLRLR @ RLRLL) @ RLRR)) @ ((RRLL @ RRLR) @ (RRRL @ RRRR)))
@@ -521,7 +531,7 @@
         // const rrr = { ...getParams(), 'left name': "RRRL", 'right name': "RRRR", name: "RRR" }
         // const rr = { ...getParams(), left_mm: rrl, right_mm: rrr, name: "RR" }
         // const r = { ...getParams(), left_mm: rl, right_mm: rr, 'left name': "RL", 'right name': "RR", name: "R" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
+        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
 
         // 5 levels saturated
         // const llll = { ...getParams(), 'left name': "LLLLL", 'right name': "LLLLR", name: "LLLL" }
@@ -554,7 +564,7 @@
         // const rrr = { ...getParams(), left_mm: rrrl, right_mm: rrrr, name: "RRR" }
         // const rr = { ...getParams(), left_mm: rrl, right_mm: rrr, name: "RR" }
         // const r = { ...getParams(), left_mm: rl, right_mm: rr, name: "R" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
+        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
 
         // ---
 
@@ -563,33 +573,33 @@
         // spacious: repro 1 in.t
         // note: could actually get away with all-right-at-bottom here... good example of where collision
         // detection would help UX, like to gray out layout options that collide
-        // const q = { ...getParams(), height: 64, depth: 128, width: 32, 'left name': "in", 'right name': "wQ", name: "Q" }
-        // const kt = { ...getParams(), height: 32, depth: 128, width: 64, 'left name': "wK.t", 'right name': "in.t", name: "width.t" }
-        // const attn = { ...getParams(), height: 64, depth: 32, width: 64, left_mm: q, right_mm: kt, 'left name': "Q", 'right name': "Kt", name: "attn" }
-        // const v = { ...getParams(), height: 64, depth: 128, width: 32, 'left name': "in", 'right name': "wV", name: "V" }
-        // const out = { ...getParams(), height: 64, depth: 64, width: 32, left_mm: attn, right_mm: v, 'left name': "attn", 'right name': "V", name: "out" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), height: 64, depth: 32, width: 128, left_mm: out, 'right name': 'wO', name: 'out2' }))
+        // const q = { ...getParams(), i: 64, j: 128, k: 32, 'left name': "in", 'right name': "wQ", name: "Q" }
+        // const kt = { ...getParams(), i: 32, j: 128, k: 64, 'left name': "wK.t", 'right name': "in.t", name: "k.t" }
+        // const attn = { ...getParams(), i: 64, j: 32, k: 64, left_mm: q, right_mm: kt, 'left name': "Q", 'right name': "Kt", name: "attn" }
+        // const v = { ...getParams(), i: 64, j: 128, k: 32, 'left name': "in", 'right name': "wV", name: "V" }
+        // const out = { ...getParams(), i: 64, j: 64, k: 32, left_mm: attn, right_mm: v, 'left name': "attn", 'right name': "V", name: "out" }
+        // obj = new viz.MatMul(fix_shape({ ...getParams(), i: 64, j: 32, k: 128, left_mm: out, 'right name': 'wO', name: 'out2' }))
 
-        // const attn = { ...getParams(), height: 64, depth: 32, width: 64, 'left name': "Q", 'right name': "width.t", name: "attn" }
-        // obj = new vis.MatMul(fix_shape({
-        //   ...getParams(), height: 64, depth: 64, width: 32, left_mm: attn, 'right name': 'V', name: 'out',
+        // const attn = { ...getParams(), i: 64, j: 32, k: 64, 'left name': "Q", 'right name': "k.t", name: "attn" }
+        // obj = new viz.MatMul(fix_shape({
+        //   ...getParams(), i: 64, j: 64, k: 32, left_mm: attn, 'right name': 'V', name: 'out',
         // }))
 
-        // const attn = { ...getParams(), height: 64, depth: 32, width: 64, 'left name': "Q", 'right name': "width.t", name: "attn" }
-        // obj = new vis.MatMul(fix_shape({
-        //   ...getParams(), height: 64, depth: 64, width: 32, left_mm: attn, 'right name': 'V', name: 'out',
+        // const attn = { ...getParams(), i: 64, j: 32, k: 64, 'left name': "Q", 'right name': "k.t", name: "attn" }
+        // obj = new viz.MatMul(fix_shape({
+        //   ...getParams(), i: 64, j: 64, k: 32, left_mm: attn, 'right name': 'V', name: 'out',
         //   alg: 'vvprod',
         // }))
 
         // mha reassociated (worse)
         // ((in @ wQ) @ (wK.t @ in.t)) @ ((in @ wV) @ wO)
         // spacious: orientation prob at wO 
-        // const q = { ...getParams(), height: 64, depth: 128, width: 32, 'left name': "in", 'right name': "wQ", name: "Q" }
-        // const kt = { ...getParams(), height: 32, depth: 128, width: 64, 'left name': "wK.t", 'right name': "in.t", name: "width.t" }
-        // const attn = { ...getParams(), height: 64, depth: 32, width: 64, left_mm: q, right_mm: kt, 'left name': "Q", 'right name': "Kt", name: "attn" }
-        // const v = { ...getParams(), height: 64, depth: 128, width: 32, 'left name': "in", 'right name': "wV", name: "V" }
-        // const out = { ...getParams(), height: 64, depth: 32, width: 128, left_mm: v, 'right name': "wO", name: "out" }
-        // obj = new vis.MatMul(fix_shape({ ...getParams(), height: 64, depth: 64, width: 128, left_mm: attn, right_mm: out, name: 'out2' }))
+        // const q = { ...getParams(), i: 64, j: 128, k: 32, 'left name': "in", 'right name': "wQ", name: "Q" }
+        // const kt = { ...getParams(), i: 32, j: 128, k: 64, 'left name': "wK.t", 'right name': "in.t", name: "k.t" }
+        // const attn = { ...getParams(), i: 64, j: 32, k: 64, left_mm: q, right_mm: kt, 'left name': "Q", 'right name': "Kt", name: "attn" }
+        // const v = { ...getParams(), i: 64, j: 128, k: 32, 'left name': "in", 'right name': "wV", name: "V" }
+        // const out = { ...getParams(), i: 64, j: 32, k: 128, left_mm: v, 'right name': "wO", name: "out" }
+        // obj = new viz.MatMul(fix_shape({ ...getParams(), i: 64, j: 64, k: 128, left_mm: attn, right_mm: out, name: 'out2' }))
 
         obj.group.rotation.x = Math.PI
         obj.center()
@@ -640,21 +650,11 @@
         postLabelUpdate()
       })
 
-      orbit.addEventListener('change', function () {
-        if (camera.position.x != params.xcam ||
-          camera.position.y != params.ycam ||
-          camera.position.z != params.zcam) {
-          setParams({
-            xcam: camera.position.x,
-            ycam: camera.position.y,
-            zcam: camera.position.z
-          })
-        }
-      }, false)
+      orbit.addEventListener('change', () => setParams({ cam: camera.position }), false)
 
       // let arcball = new ArcballControls(camera, renderer.domElement, scene);
       // arcball.addEventListener('change', function () {
-      //   setParams({ xcam: camera.position.x, ycam: camera.position.y, zcam: camera.position.z })
+      //   setParams({ x: camera.position.x, y: camera.position.y, z: camera.position.z }, params.cam)
       // }, false)
 
       window.addEventListener('resize', function () {
@@ -701,109 +701,159 @@
 
     function initGui(getObj, initObj, initAxes) {
 
-      function set(n, v, f = initObj) {
-        setParams({ [n]: v })
-        if (getObj().params[n] != v) {
+      function set(n, v, f = initObj, param_path = p => p, obj_path = o => o) {
+        setParams({ [n]: v }, param_path(params))
+        if (obj_path(getObj()).params[n] != v) {
           f(v)
         }
       }
 
-      function addNumParam(gui, name, min, max, f = initObj) {
-        gui.add(params, name, min, max).onChange(x => set(name, x, f))
+      function addNumParam(gui, k, min, max, f = initObj, param_path = p => p, obj_path = o => o) {
+        gui.add(param_path(params), k, min, max).onChange(x => set(k, x, f, param_path, obj_path))
       }
 
-      function addIntParam(gui, name, min, max, f = initObj) {
-        gui.add(params, name, min, max).onChange(x => set(name, Math.floor(x), f))
+      function addIntParam(gui, k, min, max, f = initObj, param_path = p => p, obj_path = o => o) {
+        gui.add(param_path(params), k, min, max).onChange(x => set(k, Math.floor(x), f, param_path, obj_path))
       }
 
-      function addChoiceParam(gui, name, choices, f = initObj) {
-        gui.add(params, name, choices).onChange(x => set(name, x, f))
+      function addChoiceParam(gui, k, choices, f = initObj, param_path = p => p, obj_path = o => o) {
+        gui.add(param_path(params), k, choices).onChange(x => set(k, x, f, param_path, obj_path))
       }
 
-      function addParam(gui, name, f = initObj) {
-        gui.add(params, name).onChange(x => set(name, x, f))
+      function addParam(gui, k, f = initObj, param_path = p => p, obj_path = o => o) {
+        gui.add(param_path(params), k).onChange(x => set(k, x, f, param_path, obj_path))
       }
 
       const gui = new GUI();
 
-      const gui_shape = gui.addFolder('shape')
-      addIntParam(gui_shape, 'height', 1, 128)
-      addIntParam(gui_shape, 'width', 1, 128)
-      addIntParam(gui_shape, 'depth', 1, 128)
-
-      const gui_data = gui.addFolder('data')
+      // ---
 
       function findController(gui, property) {
         return gui.controllers.find(c => c.property == property)
       }
 
-      function syncLeftInitDependents(g, init) {
-        findController(g, 'left min').show(vis.useRange(init))
-        findController(g, 'left max').show(vis.useRange(init))
+      function syncArgParams(g, path) {
+        const p = path(params)
+        // mat
+        findController(g, 'init').show(!p.matmul)
+        findController(g, 'min').show(!p.matmul && viz.useRange(p.init))
+        findController(g, 'max').show(!p.matmul && viz.useRange(p.init))
+        findController(g, 'dropout').show(!p.matmul)
+        // matmul
+
       }
 
-      const gui_left = gui_data.addFolder('left')
-      addChoiceParam(gui_left, 'left init', vis.INITS, v => { syncLeftInitDependents(gui_left, v); initObj() })
-      addNumParam(gui_left, 'left min', -1.0, 1.0)
-      addNumParam(gui_left, 'left max', 0.0, 1.0)
-      addNumParam(gui_left, 'left dropout', 0.0, 1.0)
-      syncLeftInitDependents(gui_left, params['left init'])
-      // addParam(gui_left, 'left name', _ => getObj().setLegends(getParams()))
-
-      function syncRightInitDependents(g, init) {
-        findController(g, 'right min').show(vis.useRange(init))
-        findController(g, 'right max').show(vis.useRange(init))
+      function addArgParams(g, path) {
+        addParam(g, 'name', x => path(getObj()).setName(x), path, path)
+        addParam(g, 'matmul', v => {
+          syncArgParams(g, path, v)
+          initObj()
+        }, path)
+        addChoiceParam(g, 'init', viz.INITS, v => {
+          syncArgParams(g, path, v)
+          initObj()
+        }, path)
+        addNumParam(g, 'min', -1.0, 1.0, initObj, path, path)
+        addNumParam(g, 'max', 0.0, 1.0, initObj, path, path)
+        addNumParam(g, 'dropout', 0.0, 1.0, initObj, path, path)
+        // TODO matmul
       }
 
-      const gui_right = gui_data.addFolder('right')
-      addChoiceParam(gui_right, 'right init', vis.INITS, v => { syncRightInitDependents(gui_right, v); initObj() })
-      addNumParam(gui_right, 'right min', -1.0, 1.0)
-      addNumParam(gui_right, 'right max', 0.0, 1.0)
-      addNumParam(gui_right, 'right dropout', 0.0, 1.0)
-      syncRightInitDependents(gui_right, params['right init'])
-      // addParam(gui_right, 'right name', _ => getObj().setLegends(getParams()))
+      // 1. add left, right need addArgParams and recursion into here
+      // 2. handlers need reference to expr node
+      function addExprParams(g, path) {
+        addParam(g, 'name', x => path(getObj()).setName(x), path)
+        addIntParam(g, 'i', 1, 128, initObj, path)
+        addIntParam(g, 'j', 1, 128, initObj, path)
+        addIntParam(g, 'k', 1, 128, initObj, path)
+        addChoiceParam(g, 'epilog', viz.EPILOGS, initObj, path)
 
-      const gui_result = gui_data.addFolder('result')
-      addChoiceParam(gui_result, 'epilog', vis.EPILOGS)
+        const gui_left = g.addFolder('left')
+        addArgParams(gui_left, x => path(x).left)
+
+        const gui_right = gui.addFolder('right')
+        addArgParams(gui_right, x => path(x).right)
+      }
+
+      addExprParams(gui, x => x)
+
+
+
+      // ---
+
+      // const gui_data = gui.addFolder('data')
+
+
+      // function syncLeftInitDependents(g, init) {
+      //   findController(g, 'left min').show(viz.useRange(init))
+      //   findController(g, 'left max').show(viz.useRange(init))
+      // }
+
+      // const gui_left = gui_data.addFolder('left')
+      // addChoiceParam(gui_left, 'left init', viz.INITS, v => { syncLeftInitDependents(gui_left, v); initObj() })
+      // addNumParam(gui_left, 'left min', -1.0, 1.0)
+      // addNumParam(gui_left, 'left max', 0.0, 1.0)
+      // addNumParam(gui_left, 'left dropout', 0.0, 1.0)
+      // syncLeftInitDependents(gui_left, params['left init'])
+      // // addParam(gui_left, 'left name', _ => getObj().setLegends(getParams()))
+
+      // function syncRightInitDependents(g, init) {
+      //   findController(g, 'right min').show(viz.useRange(init))
+      //   findController(g, 'right max').show(viz.useRange(init))
+      // }
+
+      // const gui_right = gui_data.addFolder('right')
+      // addChoiceParam(gui_right, 'right init', viz.INITS, v => { syncRightInitDependents(gui_right, v); initObj() })
+      // addNumParam(gui_right, 'right min', -1.0, 1.0)
+      // addNumParam(gui_right, 'right max', 0.0, 1.0)
+      // addNumParam(gui_right, 'right dropout', 0.0, 1.0)
+      // syncRightInitDependents(gui_right, params['right init'])
+      // // addParam(gui_right, 'right name', _ => getObj().setLegends(getParams()))
+
+
+      // const gui_result = gui_data.addFolder('result')
+      // addChoiceParam(gui_result, 'epilog', viz.EPILOGS)
       // addParam(gui_result, 'name', _ => getObj().setLegends(getParams()))
 
+      // ---
+
       const gui_anim = gui.addFolder('animation')
-      addChoiceParam(gui_anim, 'alg', vis.ANIM_ALGS)
-      addIntParam(gui_anim, 'speed', 1, 100, _ => { })
+      addChoiceParam(gui_anim, 'alg', viz.ANIM_ALGS, initObj, p => p.anim)
+      addIntParam(gui_anim, 'speed', 1, 100, _ => { }, p => p.anim)
       gui_anim.add({ pause: false }, 'pause').onChange(x => anim_pause = x)
       gui_anim.add({ step: animStep }, 'step')
-      addParam(gui_anim, 'fuse')
-      addParam(gui_anim, 'hide inputs', x => getObj().hideInputs(x))
-      addIntParam(gui_anim, 'i blocks', 1, 16)
-      addIntParam(gui_anim, 'j blocks', 1, 16)
-      addIntParam(gui_anim, 'k blocks', 1, 16)
+      addParam(gui_anim, 'fuse', initObj, p => p.anim)
+      addParam(gui_anim, 'hide inputs', x => getObj().hideInputs(x), p => p.anim)
+      addIntParam(gui_anim, 'i blocks', 1, 16, initObj, p => p.anim)
+      addIntParam(gui_anim, 'j blocks', 1, 16, initObj, p => p.anim)
+      addIntParam(gui_anim, 'k blocks', 1, 16, initObj, p => p.anim)
+
+      const gui_deco = gui.addFolder('deco')
+      addParam(gui_deco, 'legends', x => getObj().setLegends(x), p => p.deco)
+      addIntParam(gui_deco, 'spotlight', 0, 10, x => getObj().updateLabels(params), p => p.deco)
+      addNumParam(gui_deco, 'row guides', 0.0, 1.0, x => getObj().setRowGuides(x), p => p.deco)
+      addNumParam(gui_deco, 'flow guides', 0.0, 1.0, x => getObj().setFlowGuide(x), p => p.deco)
+      addParam(gui_deco, 'interior spotlight', x => getObj().updateLabels(params), p => p.deco)
+      addParam(gui_deco, 'axes', x => initAxes(getObj().params.axes = x), p => p.deco)
 
       const gui_layout = gui.addFolder('layout')
-      addChoiceParam(gui_layout, 'polarity', vis.POLARITIES)
-      addChoiceParam(gui_layout, 'left placement', vis.LEFT_PLACEMENTS)
-      addChoiceParam(gui_layout, 'right placement', vis.RIGHT_PLACEMENTS)
-      addChoiceParam(gui_layout, 'result placement', vis.RESULT_PLACEMENTS)
-      addIntParam(gui_layout, 'gap', 1, 32)
-      addIntParam(gui_layout, 'scatter', 0, 128)
-      addIntParam(gui_layout, 'molecule', 1, 8)
-      addNumParam(gui_layout, 'blast', -2.0, 2.0)
+      addChoiceParam(gui_layout, 'polarity', viz.POLARITIES, initObj, p => p.layout)
+      addChoiceParam(gui_layout, 'left placement', viz.LEFT_PLACEMENTS, initObj, p => p.layout)
+      addChoiceParam(gui_layout, 'right placement', viz.RIGHT_PLACEMENTS, initObj, p => p.layout)
+      addChoiceParam(gui_layout, 'result placement', viz.RESULT_PLACEMENTS, initObj, p => p.layout)
+      addIntParam(gui_layout, 'gap', 1, 32, initObj, p => p.layout)
+      addIntParam(gui_layout, 'scatter', 0, 128, initObj, p => p.layout)
+      addIntParam(gui_layout, 'molecule', 1, 8, initObj, p => p.layout)
+      addNumParam(gui_layout, 'blast', -2.0, 2.0, initObj, p => p.layout)
 
-      const gui_vis = gui.addFolder('vis')
-      addParam(gui_vis, 'legends', x => getObj().setLegends(x))
-      addIntParam(gui_vis, 'spotlight', 0, 10, x => getObj().updateLabels(getParams()))
-      addNumParam(gui_vis, 'row guides', 0.0, 1.0, x => getObj().setRowGuides(x))
-      addNumParam(gui_vis, 'flow guides', 0.0, 1.0, x => getObj().setFlowGuide(x))
-      addParam(gui_vis, 'interior spotlight', x => getObj().updateLabels(getParams()))
-      addParam(gui_vis, 'axes', x => initAxes(getObj().params.axes = x))
-
-      const gui_colors = gui.addFolder('colors and sizes')
-      addChoiceParam(gui_colors, 'sensitivity', vis.SENSITIVITIES)
-      addNumParam(gui_colors, 'min size', 0.0, 1.0)
-      addNumParam(gui_colors, 'min light', 0.0, 1.0)
-      addNumParam(gui_colors, 'max light', 0.0, 1.0)
-      addNumParam(gui_colors, 'zero hue', 0.0, 1.0)
-      addNumParam(gui_colors, 'hue gap', 0.0, 1.0)
-      addNumParam(gui_colors, 'hue spread', 0.0, 1.0)
+      const gui_viz = gui.addFolder('colors and sizes')
+      addChoiceParam(gui_viz, 'sensitivity', viz.SENSITIVITIES, initObj, p => p.viz)
+      addNumParam(gui_viz, 'min size', 0.0, 1.0, initObj, p => p.viz)
+      addNumParam(gui_viz, 'min light', 0.0, 1.0, initObj, p => p.viz)
+      addNumParam(gui_viz, 'max light', 0.0, 1.0, initObj, p => p.viz)
+      addNumParam(gui_viz, 'zero hue', 0.0, 1.0, initObj, p => p.viz)
+      addNumParam(gui_viz, 'hue gap', 0.0, 1.0, initObj, p => p.viz)
+      addNumParam(gui_viz, 'hue spread', 0.0, 1.0, initObj, p => p.viz)
     }
 
   </script>
