@@ -44,9 +44,13 @@ export function updateFromSearchParams(obj, searchParams, strict = false) {
   }
 
   const flattened = flatten(obj)
+  const unqual = k => k.slice(k.lastIndexOf('.') + 1)
+  const add_unqual = (acc, [k, v]) => ({ ...acc, [unqual(k)]: v })
+  const types = Object.entries(flattened).reduce(add_unqual, {})
+
   for (const [k, v] of searchParams.entries()) {
-    if (k in flattened) {
-      const t = typeof flattened[k]
+    if (unqual(k) in types) {
+      const t = typeof types[unqual(k)]
       const x = castToType(v, t)
       if (x !== undefined) {
         flattened[k] = x
@@ -215,18 +219,18 @@ export function syncProp(obj, k, v) {
 // {a: {b: 0, c: {d: 1}}} => {a$b: 0, a$c$d: 1}
 // NOTE only handles our nested params - nothing null 
 // or undefined, no arrays, no empty subobjects, etc
-export function flatten(obj, sep = '.') {
+export function flatten(obj) {
   const f = (obj, pre) => Object.entries(obj).reduce((acc, [k, v]) => ({
     ...acc,
-    ...(typeof v === 'object' ? f(obj[k], pre + k + sep) : { [pre + k]: v })
+    ...(typeof v === 'object' ? f(obj[k], pre + k + '.') : { [pre + k]: v })
   }), {})
   return f(obj, '')
 }
 
 // {a$b: 0, a$c$d: 1} => {a: {b: 0, c: {d: 1}}}
-export function unflatten(obj, sep = '.') {
+export function unflatten(obj) {
   const add = (obj, [k, v]) => {
-    const i = k.indexOf(sep)
+    const i = k.indexOf('.')
     if (i >= 0) {
       const [base, suf] = [k.slice(0, i), k.slice(i + 1)]
       obj[base] = add(obj[base] || {}, [suf, v])

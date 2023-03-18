@@ -832,8 +832,8 @@ export class MatMul {
     }
 
     const spotlight = this.params.deco.spotlight
-    this.left.updateLabels(spotlight)
-    this.right.updateLabels(spotlight)
+    this.left.updateLabels(this.left.params.matmul ? params : spotlight)
+    this.right.updateLabels(this.right.params.matmul ? params : spotlight)
     this.result.updateLabels(spotlight)
 
     const interior_spotlight = this.params.deco['interior spotlight'] ? spotlight : 0
