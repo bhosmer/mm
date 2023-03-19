@@ -32,7 +32,6 @@
     import { FontLoader } from 'https://threejs.org/examples/jsm/loaders/FontLoader.js'
     import { GUI } from 'https://threejs.org/examples/jsm/libs/lil-gui.module.min.js'
     import { OrbitControls } from 'https://threejs.org/examples/jsm/controls/OrbitControls.js'
-    import { ArcballControls } from 'https://threejs.org/examples/jsm/controls/ArcballControls.js'
     import { EffectComposer } from 'https://threejs.org/examples/jsm/postprocessing/EffectComposer.js'
     import { RenderPass } from 'https://threejs.org/examples/jsm/postprocessing/RenderPass.js'
 
@@ -621,11 +620,6 @@
       })
 
       orbit.addEventListener('change', () => setParams({ cam: camera.position }), false)
-
-      // let arcball = new ArcballControls(camera, renderer.domElement, scene);
-      // arcball.addEventListener('change', function () {
-      //   setParams({ x: camera.position.x, y: camera.position.y, z: camera.position.z }, params.cam)
-      // }, false)
 
       window.addEventListener('resize', function () {
         camera.aspect = window.innerWidth / window.innerHeight
