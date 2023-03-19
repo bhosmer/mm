@@ -706,7 +706,8 @@
         return gui.controllers.find(c => c.property == property)
       }
 
-      function syncArgParams(g, path, parent) {
+      // @@@ TODO @@@
+      function syncChildParams(g, path, ancestors) {
         while (g.controllers.length > 0) {
           g.controllers[0].destroy()
         }
@@ -745,12 +746,50 @@
         }
       }
 
-      function addMatParams(g, path, parent) {
+      function addMatParams(g, path, ancestors, update_sib_j) {
         addParam(g, 'matmul', v => {
-          syncArgParams(g, path, parent)
+          syncChildParams(g, path, ancestors)
           initObj()
         }, path, path)
         addParam(g, 'name', x => path(getObj()).setName(x), path, path)
+
+        const [m, mm] = [path(params), ancestors[0](params)]
+        const is_left = m === mm.left
+
+        const fix_mm_i = i => {
+          const f = anc => {
+            setParams({ 'i': i }, anc[0](params))
+            anc.length > 1 && mm === anc[1](params).left && f(anc.slice(1))
+          }
+          f(ancestors)
+        }
+
+        const fix_mm_j = j => {
+          if (ancestors[0](params).j != j) {
+            setParams({ 'j': j }, ancestors[0](params))
+            update_sib_j(j)
+          }
+        }
+
+        const fix_mm_k = k => {
+          const f = anc => {
+            setParams({ 'k': k }, anc[0](params))
+            anc.length > 1 && mm === anc[1](params).right && f(anc.slice(1))
+          }
+          f(ancestors)
+        }
+
+        const shape = is_left ? { height: mm.i, width: mm.j } : { height: mm.j, width: mm.k }
+
+        g.add(shape, 'height', 1, 128).onChange(x => {
+          (is_left ? fix_mm_i : fix_mm_j)(shape.height = Math.floor(x))
+          initObj()
+        })
+        g.add(shape, 'width', 1, 128).onChange(x => {
+          (is_left ? fix_mm_j : fix_mm_k)(shape.width = Math.floor(x))
+          initObj()
+        })
+
         addChoiceParam(g, 'init', viz.INITS, v => {
           findController(g, 'min').show(viz.useRange(v))
           findController(g, 'max').show(viz.useRange(v))
@@ -761,52 +800,47 @@
         addNumParam(g, 'dropout', 0.0, 1.0, initObj, path, path)
       }
 
-      function addMatmulParams(g, path = x => x, parent = undefined) {
-        const is_root = parent === undefined
-
-        const fix_i = (p, i) => {
-          p.i = i
-          p.left.matmul && fix_i(p.left, p.i)
-        }
-
-        const fix_j = (p, j) => {
-          p.j = j
-          p.left.matmul && fix_k(p.left, p.j)
-          p.right.matmul && fix_i(p.right, p.j)
-        }
-
-        const fix_k = (p, k) => {
-          p.k = k
-          p.right.matmul && fix_k(p.right, p.k)
-        }
-
-        if (is_root) {
-          addParam(g, 'name', x => path(getObj()).setName(x), path, path)
-          addIntParam(g, 'i', 1, 128, i => { fix_i(params, i); initObj() }, path, path)
-          addIntParam(g, 'j', 1, 128, j => { fix_j(params, j); initObj() }, path, path)
-          addIntParam(g, 'k', 1, 128, k => { fix_k(params, k); initObj() }, path, path)
-        } else {
+      function addMatmulParams(g, path = x => x, ancestors = []) {
+        const is_root = ancestors.length == 0
+        if (!is_root) {
           addParam(g, 'matmul', v => {
-            syncArgParams(g, path, parent)
+            syncChildParams(g, path, ancestors)
             initObj()
           }, path, path)
-          addParam(g, 'name', x => path(getObj()).setName(x), path, path)
-          addIntParam(g, 'j', 1, 128, initObj, path, path)
         }
-
+        addParam(g, 'name', x => path(getObj()).setName(x), path, path)
         addChoiceParam(g, 'epilog', viz.EPILOGS, initObj, path, path)
 
-        const addChildParams = name => {
-          const ismm = path(params)[name].matmul
-          const title = (is_root ? '' : `${g._title} / `) + name
-          const gui_child = g.addFolder(title)
-          const f = ismm ? addMatmulParams : addMatParams
-          f(gui_child, p => path(p)[name], path)
-          return gui_child
+        const title = name => (is_root ? '' : `${g._title} / `) + name
+
+        const gui_left = g.addFolder(title('left'))
+        const gui_right = g.addFolder(title('right'))
+
+        const update_left_width = w => {
+          const left = path(params).left
+          if (left.matmul) {
+            left.k = w
+            fix_shape(left)
+          } else {
+            findController(gui_left, 'width').setValue(w)
+          }
         }
 
-        addChildParams('left').open(is_root)
-        addChildParams('right').open(is_root)
+        const update_right_height = h => {
+          const right = path(params).right
+          if (right.matmul) {
+            right.i = h
+            fix_shape(right)
+          } else {
+            findController(gui_right, 'height').setValue(h)
+          }
+        }
+
+        const add_left = path(params).left.matmul ? addMatmulParams : addMatParams
+        add_left(gui_left, x => path(x).left, [path].concat(ancestors), update_right_height)
+
+        const add_right = path(params).right.matmul ? addMatmulParams : addMatParams
+        add_right(gui_right, x => path(x).right, [path].concat(ancestors), update_left_width)
       }
 
       // ---
