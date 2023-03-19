@@ -40,11 +40,10 @@
 
     const params = {
       name: 'X @ Y',
-      // shape
       i: init_dims.i,
       j: init_dims.j,
       k: init_dims.k,
-
+      epilog: 'none',
       left: {
         name: 'X',
         matmul: false,
@@ -53,7 +52,6 @@
         max: 1,
         dropout: 0,
       },
-
       right: {
         name: 'Y',
         matmul: false,
@@ -62,34 +60,6 @@
         max: 1,
         dropout: 0,
       },
-
-      epilog: 'none',
-
-      // ---
-
-      // shape
-      // I: init_dims.i,
-      // J: init_dims.j,
-      // K: init_dims.k,
-      // data
-      // left arg
-      // 'left init': 'row major',
-      // 'left min': -1,
-      // 'left max': 1,
-      // 'left dropout': 0,
-      // 'left name': 'X',
-      // right arg
-      // 'right init': 'col major',
-      // 'right min': -1,
-      // 'right max': 1,
-      // 'right dropout': 0,
-      // 'right name': 'Y',
-      // result
-      // epilog: 'none',
-      // 'result name': 'XY',
-
-      // ---
-
       anim: {
         alg: 'none',
         fuse: true,
@@ -709,57 +679,47 @@
       }
 
       function addNumParam(gui, k, min, max, f = initObj, param_path = p => p, obj_path = o => o) {
-        return gui.add(param_path(params), k, min, max).onChange(x => set(k, x, f, param_path, obj_path))
+        return gui.add(param_path(params), k, min, max).onChange(
+          x => set(k, x, f, param_path, obj_path)
+        )
       }
 
       function addIntParam(gui, k, min, max, f = initObj, param_path = p => p, obj_path = o => o) {
-        return gui.add(param_path(params), k, min, max).onChange(x => set(k, Math.floor(x), f, param_path, obj_path))
+        return gui.add(param_path(params), k, min, max).onChange(
+          x => set(k, Math.floor(x), f, param_path, obj_path)
+        )
       }
 
       function addChoiceParam(gui, k, choices, f = initObj, param_path = p => p, obj_path = o => o) {
-        return gui.add(param_path(params), k, choices).onChange(x => set(k, x, f, param_path, obj_path))
+        return gui.add(param_path(params), k, choices).onChange(
+          x => set(k, x, f, param_path, obj_path)
+        )
       }
 
       function addParam(gui, k, f = initObj, param_path = p => p, obj_path = o => o) {
-        return gui.add(param_path(params), k).onChange(x => set(k, x, f, param_path, obj_path))
+        return gui.add(param_path(params), k).onChange(
+          x => set(k, x, f, param_path, obj_path)
+        )
       }
-
-      const gui = new GUI();
-
-      // ---
 
       function findController(gui, property) {
         return gui.controllers.find(c => c.property == property)
       }
 
-      // function clearMatParams(g) {
-      //   findController(g, 'init')?.destroy()
-      //   findController(g, 'min')?.destroy()
-      //   findController(g, 'max')?.destroy()
-      //   findController(g, 'dropout')?.destroy()
-      // }
-
-      // function clearExprParams(g) {
-      //   findController(g, 'left')?.destroy()
-      //   findController(g, 'right')?.destroy()
-      // }
-
-
       function syncArgParams(g, path, parent) {
-        console.log(`HEY syncArgParams path ${path(params).name} parent ${parent(params).name}`)
         while (g.controllers.length > 0) {
           g.controllers[0].destroy()
         }
         if (path(params).matmul) {
           util.updateProps(path(params), {
             i: parent(params).i,
-            j: path(params).j || 32,
+            j: path(params).j || parent(params).i || 32,
             k: parent(params).j,
             epilog: path(params).epilog || parent(params).epilog,
             left: {
               name: `${path(params).name}L`,
               matmul: false,
-              init: 'row major',
+              init: 'rows',
               min: -1,
               max: 1,
               dropout: 0,
@@ -767,7 +727,7 @@
             right: {
               name: `${path(params).name}R`,
               matmul: false,
-              init: 'col major',
+              init: 'cols',
               min: -1,
               max: 1,
               dropout: 0,
@@ -776,7 +736,7 @@
           return addMatmulParams(g, path, parent)
         } else {
           util.updateProps(path(params), {
-            init: path(params) == parent(params).left ? 'row major' : 'col major',
+            init: path(params) == parent(params).left ? 'rows' : 'cols',
             min: -1,
             max: 1,
             dropout: 0,
@@ -804,11 +764,27 @@
       function addMatmulParams(g, path = x => x, parent = undefined) {
         const is_root = parent === undefined
 
+        const fix_i = (p, i) => {
+          p.i = i
+          p.left.matmul && fix_i(p.left, p.i)
+        }
+
+        const fix_j = (p, j) => {
+          p.j = j
+          p.left.matmul && fix_k(p.left, p.j)
+          p.right.matmul && fix_i(p.right, p.j)
+        }
+
+        const fix_k = (p, k) => {
+          p.k = k
+          p.right.matmul && fix_k(p.right, p.k)
+        }
+
         if (is_root) {
           addParam(g, 'name', x => path(getObj()).setName(x), path, path)
-          addIntParam(g, 'i', 1, 128, initObj, path, path)
-          addIntParam(g, 'j', 1, 128, initObj, path, path)
-          addIntParam(g, 'k', 1, 128, initObj, path, path)
+          addIntParam(g, 'i', 1, 128, i => { fix_i(params, i); initObj() }, path, path)
+          addIntParam(g, 'j', 1, 128, j => { fix_j(params, j); initObj() }, path, path)
+          addIntParam(g, 'k', 1, 128, k => { fix_k(params, k); initObj() }, path, path)
         } else {
           addParam(g, 'matmul', v => {
             syncArgParams(g, path, parent)
@@ -833,47 +809,11 @@
         addChildParams('right').open(is_root)
       }
 
+      // ---
+
+      const gui = new GUI();
+
       addMatmulParams(gui)
-
-
-
-      // ---
-
-      // const gui_data = gui.addFolder('data')
-
-
-      // function syncLeftInitDependents(g, init) {
-      //   findController(g, 'left min').show(viz.useRange(init))
-      //   findController(g, 'left max').show(viz.useRange(init))
-      // }
-
-      // const gui_left = gui_data.addFolder('left')
-      // addChoiceParam(gui_left, 'left init', viz.INITS, v => { syncLeftInitDependents(gui_left, v); initObj() })
-      // addNumParam(gui_left, 'left min', -1.0, 1.0)
-      // addNumParam(gui_left, 'left max', 0.0, 1.0)
-      // addNumParam(gui_left, 'left dropout', 0.0, 1.0)
-      // syncLeftInitDependents(gui_left, params['left init'])
-      // // addParam(gui_left, 'left name', _ => getObj().setLegends(getParams()))
-
-      // function syncRightInitDependents(g, init) {
-      //   findController(g, 'right min').show(viz.useRange(init))
-      //   findController(g, 'right max').show(viz.useRange(init))
-      // }
-
-      // const gui_right = gui_data.addFolder('right')
-      // addChoiceParam(gui_right, 'right init', viz.INITS, v => { syncRightInitDependents(gui_right, v); initObj() })
-      // addNumParam(gui_right, 'right min', -1.0, 1.0)
-      // addNumParam(gui_right, 'right max', 0.0, 1.0)
-      // addNumParam(gui_right, 'right dropout', 0.0, 1.0)
-      // syncRightInitDependents(gui_right, params['right init'])
-      // // addParam(gui_right, 'right name', _ => getObj().setLegends(getParams()))
-
-
-      // const gui_result = gui_data.addFolder('result')
-      // addChoiceParam(gui_result, 'epilog', viz.EPILOGS)
-      // addParam(gui_result, 'name', _ => getObj().setLegends(getParams()))
-
-      // ---
 
       const gui_anim = gui.addFolder('animation')
       addChoiceParam(gui_anim, 'alg', viz.ANIM_ALGS, initObj, p => p.anim)

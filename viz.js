@@ -58,7 +58,6 @@ export const INIT_FUNCS = {
   'row major': (i, j, h, w) => h * w > 1 ? (i * w + j) / (h * w - 1) : 0,
   'col major': (i, j, h, w) => h * w > 1 ? (j * h + i) / (h * w) : 0,
   'pt linear': (i, j, h, w) => (2 * Math.random() - 1) / Math.sqrt(w),
-  'pt linear+': (i, j, h, w) => Math.max((2 * Math.random() - 1) / Math.sqrt(w)),
   uniform: () => Math.random(),
   gaussian: () => gaussianRandom(0.5, 0.5),
   tril: (i, j) => j <= i ? 1 : 0,
