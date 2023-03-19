@@ -128,7 +128,7 @@
 
     let getText
     const loader = new FontLoader();
-    loader.load('examples/fonts/droid/droid_sans_regular.typeface.json', function (font) {
+    loader.load('droid_sans_regular.typeface.json', function (font) {
 
       getText = function (msg, color = 0x006699, size = 1) {
         const shapes = font.generateShapes(msg, size);

@@ -5,7 +5,7 @@ import * as util from './util.js'
 // shader
 //
 
-const TEXTURE = new THREE.TextureLoader().load('../examples/textures/sprites/ball.png')
+const TEXTURE = new THREE.TextureLoader().load('ball.png')
 
 const MATERIAL = new THREE.ShaderMaterial({
   uniforms: {
