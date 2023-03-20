@@ -38,13 +38,13 @@
     const init_dims = { i: 32, j: 32, k: 32 }
 
     const params = {
-      name: 'X @ Y',
+      name: 'L @ R',
       i: init_dims.i,
       j: init_dims.j,
       k: init_dims.k,
       epilog: 'none',
       left: {
-        name: 'X',
+        name: 'L',
         matmul: false,
         init: 'rows',
         min: -1,
@@ -52,7 +52,7 @@
         dropout: 0,
       },
       right: {
-        name: 'Y',
+        name: 'R',
         matmul: false,
         init: 'cols',
         min: -1,
@@ -700,18 +700,25 @@
         return gui.controllers.find(c => c.property == property)
       }
 
-      // @@@ TODO @@@
-      function syncChildParams(g, path, ancestors) {
-        while (g.controllers.length > 0) {
-          g.controllers[0].destroy()
+      function clearFolder(gui) {
+        while (gui.folders.length > 0) {
+          gui.folders[0].destroy()
         }
+        while (gui.controllers.length > 0) {
+          gui.controllers[0].destroy()
+        }
+      }
+
+      function syncChildParams(g, path, ancestors) {
+        clearFolder(g)
+        const parent = ancestors[0]
         if (path(params).matmul) {
           util.updateProps(path(params), {
             i: parent(params).i,
             j: path(params).j || parent(params).i || 32,
             k: parent(params).j,
             epilog: path(params).epilog || parent(params).epilog,
-            left: {
+            left: path(params).left || {
               name: `${path(params).name}L`,
               matmul: false,
               init: 'rows',
@@ -719,7 +726,7 @@
               max: 1,
               dropout: 0,
             },
-            right: {
+            right: path(params).right || {
               name: `${path(params).name}R`,
               matmul: false,
               init: 'cols',
@@ -728,7 +735,7 @@
               dropout: 0,
             },
           })
-          return addMatmulParams(g, path, parent)
+          return addMatmulParams(g, path, ancestors)
         } else {
           util.updateProps(path(params), {
             init: path(params) == parent(params).left ? 'rows' : 'cols',
@@ -736,19 +743,17 @@
             max: 1,
             dropout: 0,
           })
-          return addMatParams(g, path, parent)
+          return addMatParams(g, path, ancestors)
         }
       }
 
+      // addMatParams
       function addMatParams(g, path, ancestors, update_sib_j) {
         addParam(g, 'matmul', v => {
           syncChildParams(g, path, ancestors)
           initObj()
         }, path, path)
         addParam(g, 'name', x => path(getObj()).setName(x), path, path)
-
-        const [m, mm] = [path(params), ancestors[0](params)]
-        const is_left = m === mm.left
 
         const fix_mm_i = i => {
           const f = anc => {
@@ -757,14 +762,12 @@
           }
           f(ancestors)
         }
-
         const fix_mm_j = j => {
           if (ancestors[0](params).j != j) {
             setParams({ 'j': j }, ancestors[0](params))
             update_sib_j(j)
           }
         }
-
         const fix_mm_k = k => {
           const f = anc => {
             setParams({ 'k': k }, anc[0](params))
@@ -773,6 +776,8 @@
           f(ancestors)
         }
 
+        const [m, mm] = [path(params), ancestors[0](params)]
+        const is_left = m === mm.left
         const shape = is_left ? { height: mm.i, width: mm.j } : { height: mm.j, width: mm.k }
 
         g.add(shape, 'height', 1, 128).onChange(x => {
@@ -794,6 +799,7 @@
         addNumParam(g, 'dropout', 0.0, 1.0, initObj, path, path)
       }
 
+      // addMatmulParams
       function addMatmulParams(g, path = x => x, ancestors = []) {
         const is_root = ancestors.length == 0
         if (!is_root) {
