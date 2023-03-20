@@ -464,15 +464,15 @@ export class Mat {
     this.setLegends()
   }
 
-  setLegends(enabled) {
-    enabled = util.syncProp(this.params.deco, 'legends', enabled)
+  setLegends(size = undefined) {
+    size = util.syncProp(this.params.deco, 'legends', size)
     if (this.name_text) {
       this.inner_group.remove(this.name_text)
       util.disposeAndClear(this.name_text)
     }
-    if (enabled && this.params.name) {
+    if (size > 0 && this.params.name) {
       const color = 0xCCCCFF
-      const size = Math.cbrt(Math.max(5, this.H) * Math.max(this.W, 5)) / 3
+      size = Math.cbrt(Math.max(5, this.H) * Math.max(this.W, 5)) * size / 20
       const facing = this.isFacing()
       const rsu = this.isRightSideUp()
       let suf = this.params.tag ? ` (${this.params.tag}` : ''
@@ -487,7 +487,7 @@ export class Mat {
       this.name_text.geometry.translate(
         util.center(this.W - 1, xdir * w),
         ydir * h + util.center(this.H - 1, h),
-        -zdir * h / 2
+        -zdir // * h / 2
       )
       this.inner_group.add(this.name_text)
     }

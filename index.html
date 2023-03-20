@@ -79,7 +79,7 @@
         blast: 0,
       },
       deco: {
-        legends: true,
+        legends: 6,
         spotlight: 1,
         'row guides': 0.5,
         'flow guides': 0.0,
@@ -855,7 +855,7 @@
       addIntParam(gui_anim, 'k blocks', 1, 16, initObj, p => p.anim)
 
       const gui_deco = gui.addFolder('deco')
-      addParam(gui_deco, 'legends', x => getObj().setLegends(x), p => p.deco)
+      addNumParam(gui_deco, 'legends', 1, 10, x => getObj().setLegends(x), p => p.deco)
       addIntParam(gui_deco, 'spotlight', 0, 10, x => getObj().updateLabels(params), p => p.deco)
       addNumParam(gui_deco, 'row guides', 0.0, 1.0, x => getObj().setRowGuides(x), p => p.deco)
       addNumParam(gui_deco, 'flow guides', 0.0, 1.0, x => getObj().setFlowGuide(x), p => p.deco)
