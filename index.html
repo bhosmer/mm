@@ -38,14 +38,15 @@
     const init_dims = { i: 32, j: 32, k: 32 }
 
     const params = {
+      // TODO
+      // expr: {
       name: 'L @ R',
-      i: init_dims.i,
-      j: init_dims.j,
-      k: init_dims.k,
       epilog: 'none',
       left: {
         name: 'L',
         matmul: false,
+        h: init_dims.i,
+        w: init_dims.j,
         init: 'rows',
         min: -1,
         max: 1,
@@ -54,11 +55,15 @@
       right: {
         name: 'R',
         matmul: false,
+        h: init_dims.j,
+        w: init_dims.k,
         init: 'cols',
         min: -1,
         max: 1,
         dropout: 0,
       },
+      // TODO
+      // },
       anim: {
         alg: 'none',
         fuse: true,
@@ -101,6 +106,9 @@
         y: init_dims.j * 2,
         z: init_dims.k * 2,
       }
+      // gui: {
+      //    TODO folder state
+      // }
     }
 
     // update URL with param changes
@@ -710,98 +718,95 @@
       }
 
       function syncChildParams(g, path, ancestors) {
+        const height = p => p.matmul ? height(p.left) : p.h
+        const width = p => p.matmul ? width(p.right) : p.w
+        const p = path(params)
+        const pp = ancestors[0](params)
+        const is_left = p === pp.left
         clearFolder(g)
-        const parent = ancestors[0]
-        if (path(params).matmul) {
-          util.updateProps(path(params), {
-            i: parent(params).i,
-            j: path(params).j || parent(params).i || 32,
-            k: parent(params).j,
-            epilog: path(params).epilog || parent(params).epilog,
-            left: path(params).left || {
-              name: `${path(params).name}L`,
+        if (p.matmul) {
+          const depth = is_left ? width(pp.right) : height(pp.left)
+          util.updateProps(p, {
+            epilog: 'none',
+            left: {
+              name: `${p.name}L`,
               matmul: false,
+              h: p.h,
+              w: depth,
               init: 'rows',
               min: -1,
               max: 1,
               dropout: 0,
             },
-            right: path(params).right || {
-              name: `${path(params).name}R`,
+            right: {
+              name: `${p.name}R`,
               matmul: false,
+              h: depth,
+              w: p.w,
               init: 'cols',
               min: -1,
               max: 1,
               dropout: 0,
             },
+            // TODO layout
           })
+          util.deleteProps(p, ['h', 'w', 'init', 'min', 'max', 'dropout'])
           return addMatmulParams(g, path, ancestors)
         } else {
-          util.updateProps(path(params), {
-            init: path(params) == parent(params).left ? 'rows' : 'cols',
+          util.updateProps(p, {
+            h: height(p.left),
+            w: width(p.right),
+            init: p === pp.left ? 'rows' : 'cols',
             min: -1,
             max: 1,
             dropout: 0,
           })
+          util.deleteProps(p, ['left', 'right', 'epilog'])
           return addMatParams(g, path, ancestors)
         }
       }
 
       // addMatParams
-      function addMatParams(g, path, ancestors, update_sib_j) {
+      function addMatParams(g, path, ancestors) {
+        const p = path(params)
         addParam(g, 'matmul', v => {
           syncChildParams(g, path, ancestors)
           initObj()
         }, path, path)
         addParam(g, 'name', x => path(getObj()).setName(x), path, path)
 
-        const fix_mm_i = i => {
-          const f = anc => {
-            setParams({ 'i': i }, anc[0](params))
-            anc.length > 1 && mm === anc[1](params).left && f(anc.slice(1))
-          }
-          f(ancestors)
-        }
-        const fix_mm_j = j => {
-          if (ancestors[0](params).j != j) {
-            setParams({ 'j': j }, ancestors[0](params))
-            update_sib_j(j)
-          }
-        }
-        const fix_mm_k = k => {
-          const f = anc => {
-            setParams({ 'k': k }, anc[0](params))
-            anc.length > 1 && mm === anc[1](params).right && f(anc.slice(1))
-          }
-          f(ancestors)
+        const seth = (p, h) => p.matmul ? seth(p.left, h) : (p.h = h)
+        const setw = (p, w) => p.matmul ? setw(p.right, w) : (p.w = w)
+        const fix_shape = (h, w, p, anc) => {
+          const pp = anc[0](params)
+          p === pp.left ? seth(pp.right, w) : setw(pp.left, h)
+          anc.length > 1 && fix_shape(pp.left.h, pp.right.w, pp, anc.slice(1))
         }
 
-        const [m, mm] = [path(params), ancestors[0](params)]
-        const is_left = m === mm.left
-        const shape = is_left ? { height: mm.i, width: mm.j } : { height: mm.j, width: mm.k }
-
-        g.add(shape, 'height', 1, 128).onChange(x => {
-          (is_left ? fix_mm_i : fix_mm_j)(shape.height = Math.floor(x))
+        addIntParam(g, 'h', 1, 128, x => {
+          fix_shape(p.h, p.w, p, ancestors)
           initObj()
-        })
-        g.add(shape, 'width', 1, 128).onChange(x => {
-          (is_left ? fix_mm_j : fix_mm_k)(shape.width = Math.floor(x))
+        }, path, path)
+        addIntParam(g, 'w', 1, 128, x => {
+          fix_shape(p.h, p.w, p, ancestors)
           initObj()
-        })
-
+        }, path, path)
         addChoiceParam(g, 'init', viz.INITS, v => {
           findController(g, 'min').show(viz.useRange(v))
           findController(g, 'max').show(viz.useRange(v))
+          findController(g, 'dropout').show(viz.useDropout(v))
           initObj()
         }, path)
-        addNumParam(g, 'min', -1.0, 1.0, initObj, path, path)
-        addNumParam(g, 'max', 0.0, 1.0, initObj, path, path)
-        addNumParam(g, 'dropout', 0.0, 1.0, initObj, path, path)
+        addNumParam(g, 'min', -1.0, 1.0, initObj, path, path).show(viz.useRange(p.init))
+        addNumParam(g, 'max', 0.0, 1.0, initObj, path, path).show(viz.useRange(p.init))
+        addNumParam(g, 'dropout', 0.0, 1.0, initObj, path, path).show(viz.useDropout(p.init))
       }
 
       // addMatmulParams
       function addMatmulParams(g, path = x => x, ancestors = []) {
+        const p = path(params)
         const is_root = ancestors.length == 0
+
         if (!is_root) {
           addParam(g, 'matmul', v => {
             syncChildParams(g, path, ancestors)
@@ -812,35 +817,14 @@
         addChoiceParam(g, 'epilog', viz.EPILOGS, initObj, path, path)
 
         const title = name => (is_root ? '' : `${g._title} / `) + name
-
         const gui_left = g.addFolder(title('left'))
         const gui_right = g.addFolder(title('right'))
 
-        const update_left_width = w => {
-          const left = path(params).left
-          if (left.matmul) {
-            left.k = w
-            fix_shape(left)
-          } else {
-            findController(gui_left, 'width').setValue(w)
-          }
-        }
+        const add_left = p.left.matmul ? addMatmulParams : addMatParams
+        add_left(gui_left, x => path(x).left, [path].concat(ancestors))
 
-        const update_right_height = h => {
-          const right = path(params).right
-          if (right.matmul) {
-            right.i = h
-            fix_shape(right)
-          } else {
-            findController(gui_right, 'height').setValue(h)
-          }
-        }
-
-        const add_left = path(params).left.matmul ? addMatmulParams : addMatParams
-        add_left(gui_left, x => path(x).left, [path].concat(ancestors), update_right_height)
-
-        const add_right = path(params).right.matmul ? addMatmulParams : addMatParams
-        add_right(gui_right, x => path(x).right, [path].concat(ancestors), update_left_width)
+        const add_right = p.right.matmul ? addMatmulParams : addMatParams
+        add_right(gui_right, x => path(x).right, [path].concat(ancestors))
       }
 
       // ---

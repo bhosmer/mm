@@ -208,6 +208,10 @@ export function updateProps(obj, donor, f = (_, v) => v) {
   Object.entries(donor).map(([k, v]) => obj[k] = f(k, v))
 }
 
+export function deleteProps(obj, props) {
+  Object.keys(obj).forEach(k => props.includes(k) && delete obj[k])
+}
+
 export function syncProp(obj, k, v) {
   if (v === undefined) {
     return obj[k]
@@ -216,7 +220,7 @@ export function syncProp(obj, k, v) {
   return v
 }
 
-// {a: {b: 0, c: {d: 1}}} => {a$b: 0, a$c$d: 1}
+// {a: {b: 0, c: {d: 1}}} => {a.b: 0, a.c.d: 1}
 // NOTE only handles our nested params - nothing null 
 // or undefined, no arrays, no empty subobjects, etc
 export function flatten(obj) {
@@ -227,7 +231,7 @@ export function flatten(obj) {
   return f(obj, '')
 }
 
-// {a$b: 0, a$c$d: 1} => {a: {b: 0, c: {d: 1}}}
+// {a$b: 0, a.c.d: 1} => {a: {b: 0, c: {d: 1}}}
 export function unflatten(obj) {
   const add = (obj, [k, v]) => {
     const i = k.indexOf('.')
@@ -245,22 +249,6 @@ export function unflatten(obj) {
 // deepish - copies nested objects but not arrays
 export function copyTree(obj) {
   return unflatten({ ...flatten(obj) })
-}
-
-// {my_prop_name: x} => {'my prop name': x}
-export function spaces(obj) {
-  return Object.entries(obj).reduce(
-    (acc, [k, v]) => ({ ...acc, [k.replaceAll('_', ' ')]: v }),
-    {}
-  )
-}
-
-// {'my prop name': x} => {my_prop_name: x}
-export function unders(obj) {
-  return Object.entries(obj).reduce(
-    (acc, [k, v]) => ({ ...acc, [k.replaceAll(' ', '_')]: v }),
-    {}
-  )
 }
 
 //

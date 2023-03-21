@@ -60,8 +60,8 @@ export const INIT_FUNCS = {
   'pt linear': (i, j, h, w) => (2 * Math.random() - 1) / Math.sqrt(w),
   uniform: () => Math.random(),
   gaussian: () => gaussianRandom(0.5, 0.5),
-  tril: (i, j) => j <= i ? 1 : 0,
-  triu: (i, j) => j >= i ? 1 : 0,
+  'tril mask': (i, j) => j <= i ? 1 : 0,
+  'triu mask': (i, j) => j >= i ? 1 : 0,
   eye: (i, j) => i == j ? 1 : 0,
   diff: (i, j) => i == j ? 1 : i == j + 1 ? -1 : 0,
 }
@@ -69,10 +69,10 @@ export const INIT_FUNCS = {
 export const INITS = Object.keys(INIT_FUNCS)
 
 const USE_RANGE = ['rows', 'cols', 'row major', 'col major', 'uniform', 'gaussian']
+const USE_DROPOUT = USE_RANGE.concat(['pt linear'])
 
-export function useRange(name) {
-  return USE_RANGE.indexOf(name) >= 0
-}
+export const useRange = name => USE_RANGE.indexOf(name) >= 0
+export const useDropout = name => USE_DROPOUT.indexOf(name) >= 0
 
 function getInitFunc(name, min = 0, max = 1, dropout = 0) {
   const f = INIT_FUNCS[name]
@@ -581,9 +581,16 @@ export class MatMul {
     this.group = new THREE.Group()
     this.group.name = `${this.params.name}.group`
 
-    this.H = params.i
-    this.D = params.j
-    this.W = params.k
+    const height = p => p.matmul ? height(p.left) : p.h
+    const width = p => p.matmul ? width(p.right) : p.w
+
+    this.H = height(params.left)
+    this.D = width(params.left)
+    this.W = width(params.right)
+
+    if (this.D != height(params.right)) {
+      console.log(`HEY left width ${this.D} != right height ${height(params.right)}`)
+    }
 
     this.initLeft()
     this.initRight()

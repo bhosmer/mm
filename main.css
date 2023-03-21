@@ -26,3 +26,8 @@ canvas {
   pointer-events: none;
   z-index: 1;
 }
+
+.lil-gui {
+  --background-color: #1f1f1f;
+  --folder-indent: 16px;
+}
