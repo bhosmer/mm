@@ -28,6 +28,8 @@ canvas {
 }
 
 .lil-gui {
+  --padding: 8px;
+  --spacing: 2px;
   --background-color: #1f1f1f;
   --folder-indent: 16px;
 }
