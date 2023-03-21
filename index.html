@@ -92,7 +92,7 @@
         axes: false,
       },
       viz: {
-        sensitivity: 'global',
+        sensitivity: 'local',
         'min size': 0.15,
         'min light': 0.25,
         'max light': 0.6,
@@ -854,7 +854,7 @@
       addParam(gui_deco, 'interior spotlight', x => getObj().updateLabels(params), p => p.deco)
       addParam(gui_deco, 'axes', x => initAxes(getObj().params.axes = x), p => p.deco)
 
-      const gui_layout = gui.addFolder('layout')
+      const gui_layout = gui.addFolder('layout').close()
       addChoiceParam(gui_layout, 'polarity', viz.POLARITIES, initObj, p => p.layout)
       addChoiceParam(gui_layout, 'left placement', viz.LEFT_PLACEMENTS, initObj, p => p.layout)
       addChoiceParam(gui_layout, 'right placement', viz.RIGHT_PLACEMENTS, initObj, p => p.layout)
@@ -864,7 +864,7 @@
       addIntParam(gui_layout, 'molecule', 1, 8, initObj, p => p.layout)
       addNumParam(gui_layout, 'blast', -2.0, 2.0, initObj, p => p.layout)
 
-      const gui_viz = gui.addFolder('colors and sizes')
+      const gui_viz = gui.addFolder('colors and sizes').close()
       addChoiceParam(gui_viz, 'sensitivity', viz.SENSITIVITIES, initObj, p => p.viz)
       addNumParam(gui_viz, 'min size', 0.0, 1.0, initObj, p => p.viz)
       addNumParam(gui_viz, 'min light', 0.0, 1.0, initObj, p => p.viz)
