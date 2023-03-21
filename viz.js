@@ -919,7 +919,7 @@ export class MatMul {
     let left_done = true, right_done = true
 
     this.alg_join = () => {
-      const alg = this.params.alg
+      const alg = this.params.anim.alg
 
       const lalg = this.params.left.matmul && !left_done ?
         (this.left.getIndex() == this.getIndex() ? this.left.alg_join() : 'mixed') :
@@ -1007,6 +1007,7 @@ export class MatMul {
 
   getAnimMatParams() {
     const params = util.copyTree(this.prepChildParams())
+    delete params.name
     params.layout.sensitivity = 'local'
     params.stretch_absmax = true
     return params

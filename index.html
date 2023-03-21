@@ -47,7 +47,7 @@
         matmul: false,
         h: init_dims.i,
         w: init_dims.j,
-        init: 'rows',
+        init: 'row major',
         min: -1,
         max: 1,
         dropout: 0,
@@ -57,7 +57,7 @@
         matmul: false,
         h: init_dims.j,
         w: init_dims.k,
-        init: 'cols',
+        init: 'col major',
         min: -1,
         max: 1,
         dropout: 0,
@@ -66,7 +66,7 @@
       // },
       anim: {
         alg: 'none',
-        fuse: true,
+        fuse: false,
         speed: 25,
         'hide inputs': false,
         'i blocks': 1,
@@ -656,7 +656,9 @@
       let last = 0
       function animate() {
         const t = performance.now()
-        if (params.alg != 'none' && (anim_step || !anim_pause) && (t - last) > (1000 / params.speed)) {
+        if (params.anim.alg != 'none' &&
+          (anim_step || !anim_pause) &&
+          (t - last) > (1000 / params.anim.speed)) {
           obj.bump()
           last = t
           anim_step = false
@@ -733,7 +735,7 @@
               matmul: false,
               h: p.h,
               w: depth,
-              init: 'rows',
+              init: 'row major',
               min: -1,
               max: 1,
               dropout: 0,
@@ -743,7 +745,7 @@
               matmul: false,
               h: depth,
               w: p.w,
-              init: 'cols',
+              init: 'col major',
               min: -1,
               max: 1,
               dropout: 0,
@@ -756,7 +758,7 @@
           util.updateProps(p, {
             h: height(p.left),
             w: width(p.right),
-            init: p === pp.left ? 'rows' : 'cols',
+            init: p === pp.left ? 'row major' : 'col major',
             min: -1,
             max: 1,
             dropout: 0,
