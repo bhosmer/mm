@@ -608,13 +608,13 @@ export class MatMul {
   prepChildParams(base = this.params) {
     return {
       ...base,
-      getGlobalAbsmax: this.getGlobalAbsmax.bind(this),
+      ...(base.anim ? {} : { anim: this.params.anim }),
+      ...(base.layout ? {} : { layout: this.params.layout }),
       ...(base != this.params ? {
-        anim: this.params.anim,
         deco: this.params.deco,
-        layout: this.params.layout,
         viz: this.params.viz,
       } : {}),
+      getGlobalAbsmax: this.getGlobalAbsmax.bind(this),
     }
   }
 
