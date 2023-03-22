@@ -126,7 +126,6 @@
       for (const k in obj) {
         p[k] = obj[k]
       }
-      document.getElementById('info').innerHTML = expr(params)
       // throttle address bar update
       if (!address_bar_update_pending) {
         address_bar_update_pending = true
@@ -683,7 +682,12 @@
     // Gui
     //
 
-    function initGui(getObj, initObj, initAxes) {
+    function initGui(getObj, _initObj, initAxes) {
+
+      const initObj = () => {
+        document.getElementById('info').innerHTML = expr(params)
+        _initObj()
+      }
 
       function set(n, v, f = initObj, param_path = p => p, obj_path = o => o) {
         setParams({ [n]: v }, param_path(params))
