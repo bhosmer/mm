@@ -74,14 +74,14 @@
         'k blocks': 1,
       },
       layout: {
-        // polarity: 'negative/positive',
-        // 'left placement': 'left/right',
-        // 'right placement': 'top/bottom',
-        // 'result placement': 'front/back',
-        polarity: 'negative',
-        'left placement': 'left',
-        'right placement': 'top',
-        'result placement': 'front',
+        polarity: 'negative/positive',
+        'left placement': 'left/right',
+        'right placement': 'top/bottom',
+        'result placement': 'front/back',
+        // polarity: 'negative',
+        // 'left placement': 'left',
+        // 'right placement': 'top',
+        // 'result placement': 'front',
         gap: 1,
         scatter: 0,
         molecule: 3,
@@ -130,7 +130,9 @@
       if (!address_bar_update_pending) {
         address_bar_update_pending = true
         setTimeout(function () {
-          const search_params = new URLSearchParams(util.flatten(params))
+          // const search_params = new URLSearchParams(util.flatten(params))
+          // encodeURIComponent(JSON.stringify(obj))
+          const search_params = new URLSearchParams({ p: JSON.stringify(params) })
           const url = `${window.location.pathname}?${search_params}`
           window.history.replaceState({}, '', url)
           address_bar_update_pending = false
@@ -194,7 +196,9 @@
       const scene = new THREE.Scene()
 
       // load params from url
-      util.updateFromSearchParams(params, new URL(window.location).searchParams)
+      // util.updateFromSearchParams(params, new URL(window.location).searchParams)
+      const search_params = new URL(window.location).searchParams.get('p')
+      search_params && util.updateProps(params, JSON.parse(search_params))
       document.getElementById('info').innerHTML = expr(params)
 
       // set camera position

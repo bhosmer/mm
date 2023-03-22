@@ -43,17 +43,13 @@ export function updateFromSearchParams(obj, searchParams, strict = false) {
     }
   }
 
-  const flattened = flatten(obj)
-  const unqual = k => k.slice(k.lastIndexOf('.') + 1)
-  const add_unqual = (acc, [k, v]) => ({ ...acc, [unqual(k)]: v })
-  const types = Object.entries(flattened).reduce(add_unqual, {})
-
-  for (const [k, v] of searchParams.entries()) {
-    if (unqual(k) in types) {
-      const t = typeof types[unqual(k)]
+  const params_obj = JSON.parse(searchParams.get('p'))
+  for (const [k, v] of Object(params_obj).entries()) {
+    if (k in obj) {
+      const t = typeof obj[k]
       const x = castToType(v, t)
       if (x !== undefined) {
-        flattened[k] = x
+        obj[k] = x
       } else {
         err(`don't know how to cast param '${k}' to type ${t}`)
       }
@@ -61,8 +57,6 @@ export function updateFromSearchParams(obj, searchParams, strict = false) {
       err(`unknown param '${k}'`)
     }
   }
-
-  updateProps(obj, unflatten(flattened))
 }
 
 // we only know a limited set of value types for simplicity
@@ -224,10 +218,13 @@ export function syncProp(obj, k, v) {
 // NOTE only handles our nested params - nothing null 
 // or undefined, no arrays, no empty subobjects, etc
 export function flatten(obj) {
-  const f = (obj, pre) => Object.entries(obj).reduce((acc, [k, v]) => ({
-    ...acc,
-    ...(typeof v === 'object' ? f(obj[k], pre + k + '.') : { [pre + k]: v })
-  }), {})
+  const f = (obj, pre) => Object.entries(obj).reduce(
+    (acc, [k, v]) => ({
+      ...acc,
+      ...(typeof v === 'object' ? f(obj[k], pre + k + '.') : { [pre + k]: v })
+    }),
+    {}
+  )
   return f(obj, '')
 }
 
@@ -246,9 +243,9 @@ export function unflatten(obj) {
   return Object.entries(obj).reduce(add, {})
 }
 
-// deepish - copies nested objects but not arrays
-export function copyTree(obj) {
-  return unflatten({ ...flatten(obj) })
+export function copyJSON(obj) {
+  return JSON.parse(JSON.stringify(obj))
+  // return unflatten({ ...flatten(obj) })
 }
 
 //
