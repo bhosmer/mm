@@ -813,9 +813,9 @@ export class MatMul {
     // this.right.params.layout['right placement'] = next(this.params.layout['right placement'])
     // this.right.params.layout['result placement'] = next(this.params.layout['result placement'])
 
-    this.left.params.name += ` ${first(this.params.layout.polarity)}, ${first(this.params.layout['left placement'])}`
-    this.right.params.name += ` ${first(this.params.layout.polarity)}, ${first(this.params.layout['right placement'])}`
-    this.result.params.name += ` ${first(this.params.layout['result placement'])}`
+    // this.left.params.name += ` ${first(this.params.layout.polarity)}, ${first(this.params.layout['left placement'])}`
+    // this.right.params.name += ` ${first(this.params.layout.polarity)}, ${first(this.params.layout['right placement'])}`
+    // this.result.params.name += ` ${first(this.params.layout['result placement'])}`
 
     this.initLeftVis()
     this.initRightVis()
