@@ -581,7 +581,14 @@ export const ANIM_ALGS = [
 export class MatMul {
 
   constructor(params, context, init_viz = true) {
-    this.params = util.copyTree(params)
+    const ensureCounts = p => {
+      p.count = 1 +
+        (p.left.matmul ? ensureCounts(p.left).count : 0) +
+        (p.right.matmul ? ensureCounts(p.right).count : 0)
+      return p
+    }
+
+    this.params = ensureCounts(util.copyTree(params))
     this.context = context
 
     this.group = new THREE.Group()
@@ -758,37 +765,55 @@ export class MatMul {
             x == 'front' ? 'back' : x == 'back' ? 'front' : undefined
     )
 
-    if (this.left.params.matmul) {
-      this.left.params.layout.polarity = negate(this.params.layout.polarity)
+    // if (this.left.params.matmul) {
+    //   console.log(`HEY L`)
+    //   this.left.params.layout.polarity = negate(this.params.layout.polarity)
 
-      // correct for .L+
-      if (this.params.layout.polarity == 'negative' || is_left) {
-        this.left.params.layout['left placement'] = this.params.layout['left placement']
-        this.left.params.layout['right placement'] = negate(this.params.layout['right placement'])
-        this.left.params.layout['result placement'] = negate(this.params.layout['result placement'])
-      } else {
-        this.left.params.layout['left placement'] = negate(this.params.layout['left placement'])
-        this.left.params.layout['right placement'] = negate(this.params.layout['right placement'])
-        this.left.params.layout['result placement'] = this.params.layout['result placement']
-      }
+    //   // correct for .L+
+    //   if (this.params.layout.polarity == 'negative' || is_left) {
+    //     console.log(`HEY L 1a - ${this.params.layout.polarity == 'negative'} is_left ${is_left}`)
+    //     this.left.params.layout['left placement'] = this.params.layout['left placement']
+    //     this.left.params.layout['right placement'] = negate(this.params.layout['right placement'])
+    //     this.left.params.layout['result placement'] = negate(this.params.layout['result placement'])
+    //   } else {
+    //     console.log(`HEY L 1b pol ${this.params.layout.polarity} is_left ${is_left}`)
+    //     this.left.params.layout['left placement'] = negate(this.params.layout['left placement'])
+    //     this.left.params.layout['right placement'] = negate(this.params.layout['right placement'])
+    //     this.left.params.layout['result placement'] = this.params.layout['result placement']
+    //   }
+    // }
+
+    // if (this.right.params.matmul) {
+    //   console.log(`HEY R`)
+    //   this.right.params.layout.polarity = negate(this.params.layout.polarity)
+
+    //   // correct for .R+
+    //   if (this.params.layout.polarity == 'negative') {
+    //     console.log(`HEY R 1a - ${this.params.layout.polarity == 'negative'}`)
+    //     this.right.params.layout['left placement'] = negate(this.params.layout['left placement'])
+    //     this.right.params.layout['right placement'] = this.params.layout['right placement']
+    //     this.right.params.layout['result placement'] = negate(this.params.layout['result placement'])
+    //   } else { // +
+    //     if (is_left) {
+    //       console.log(`HEY R 1b pol ${this.params.layout.polarity} is_left ${is_left}`)
+    //       this.right.params.layout['left placement'] = negate(this.params.layout['left placement'])
+    //       this.right.params.layout['right placement'] = negate(this.params.layout['right placement'])
+    //       this.right.params.layout['result placement'] = this.params.layout['result placement']
+    //     }
+    //   }
+    // }
+
+    const layout_desc = p => {
+      const pol = { 'positive': '+', 'negative': '-', 'positive/negative': '+/-', 'negative/positive': '-/+' }[p.layout.polarity]
+      const lfp = { 'left': 'L', 'right': 'R', 'left/right': 'L/R', 'right/left': 'R/L' }[p.layout['left placement']]
+      const rtp = { 'top': 'T', 'bottom': 'B', 'top/bottom': 'T/B', 'bottom/top': 'B/T' }[p.layout['right placement']]
+      const rsp = { 'front': 'F', 'back': 'B', 'front/back': 'F/B', 'back/front': 'B/F' }[p.layout['result placement']]
+      return `${pol} ${lfp} ${rtp} ${rsp}`
     }
 
-    if (this.right.params.matmul) {
-      this.right.params.layout.polarity = negate(this.params.layout.polarity)
-
-      // correct for .R+
-      if (this.params.layout.polarity == 'negative') {
-        this.right.params.layout['left placement'] = negate(this.params.layout['left placement'])
-        this.right.params.layout['right placement'] = this.params.layout['right placement']
-        this.right.params.layout['result placement'] = negate(this.params.layout['result placement'])
-      } else { // +
-        if (is_left) {
-          this.right.params.layout['left placement'] = negate(this.params.layout['left placement'])
-          this.right.params.layout['right placement'] = negate(this.params.layout['right placement'])
-          this.right.params.layout['result placement'] = this.params.layout['result placement']
-        }
-      }
-    }
+    this.left.params.name += ` ${first(this.params.layout.polarity)}, ${first(this.params.layout['left placement'])}`
+    this.right.params.name += ` ${first(this.params.layout.polarity)}, ${first(this.params.layout['right placement'])}`
+    this.result.params.name += ` ${first(this.params.layout['result placement'])} (${layout_desc(this.params)})`
 
     // ---
 
@@ -809,19 +834,17 @@ export class MatMul {
 
     // ---
 
-    // this.left.params.layout.polarity = next(this.params.layout.polarity)
-    // this.left.params.layout['left placement'] = next(this.params.layout['left placement'])
-    // this.left.params.layout['right placement'] = next(this.params.layout['right placement'])
-    // this.left.params.layout['result placement'] = next(this.params.layout['result placement'])
+    this.left.params.layout.polarity = next(this.params.layout.polarity)
+    this.left.params.layout['left placement'] = next(this.params.layout['left placement'])
+    this.left.params.layout['right placement'] = next(this.params.layout['right placement'])
+    this.left.params.layout['result placement'] = next(this.params.layout['result placement'])
 
-    // this.right.params.layout.polarity = next(this.params.layout.polarity)
-    // this.right.params.layout['left placement'] = next(this.params.layout['left placement'])
-    // this.right.params.layout['right placement'] = next(this.params.layout['right placement'])
-    // this.right.params.layout['result placement'] = next(this.params.layout['result placement'])
+    this.right.params.layout.polarity = next(this.params.layout.polarity)
+    this.right.params.layout['left placement'] = next(this.params.layout['left placement'])
+    this.right.params.layout['right placement'] = next(this.params.layout['right placement'])
+    this.right.params.layout['result placement'] = next(this.params.layout['result placement'])
 
-    this.left.params.name += ` ${first(this.params.layout.polarity)}, ${first(this.params.layout['left placement'])}`
-    this.right.params.name += ` ${first(this.params.layout.polarity)}, ${first(this.params.layout['right placement'])}`
-    this.result.params.name += ` ${first(this.params.layout['result placement'])}`
+    // ---
 
     this.initLeftVis()
     this.initRightVis()

@@ -102,7 +102,7 @@
         'max light': 0.6,
         'zero hue': 0.77,
         'hue gap': 0.2,
-        'hue spread': 0.05,
+        'hue spread': 0.04,
       },
       cam: {
         // set from orbit control
@@ -784,42 +784,44 @@
 
       // addMatParams
       function addMatParams(g, path, ancestors) {
-        const p = path(params)
-        addParam(g, 'matmul', v => {
-          syncChildParams(g, path, ancestors)
-          initObj()
-        }, path, path)
-        addParam(g, 'name', x => path(getObj()).setName(x), path, path)
-
         const height = p => p.matmul ? height(p.left) : p.h
         const width = p => p.matmul ? width(p.right) : p.w
+
         const seth = (p, h) => p.matmul ? seth(p.left, h) : (p.h = h)
-        const setw = (p, w) => {
-          if (w === undefined) {
-            console.log(`HEY`)
-          }
-          p.matmul ? setw(p.right, w) : (p.w = w)
-        }
+        const setw = (p, w) => p.matmul ? setw(p.right, w) : (p.w = w)
+
         const fix_shape = (h, w, p, anc) => {
           const pp = anc[0](params)
           p === pp.left ? seth(pp.right, w) : setw(pp.left, h)
           anc.length > 1 && fix_shape(height(pp.left), width(pp.right), pp, anc.slice(1))
         }
 
+        const p = path(params)
+
+        addParam(g, 'matmul', v => {
+          syncChildParams(g, path, ancestors)
+          initObj()
+        }, path, path)
+
+        addParam(g, 'name', x => path(getObj()).setName(x), path, path)
+
         addIntParam(g, 'h', 1, 128, x => {
           fix_shape(p.h, p.w, p, ancestors)
           initObj()
         }, path, path)
+
         addIntParam(g, 'w', 1, 128, x => {
           fix_shape(p.h, p.w, p, ancestors)
           initObj()
         }, path, path)
+
         addChoiceParam(g, 'init', viz.INITS, v => {
           findController(g, 'min').show(viz.useRange(v))
           findController(g, 'max').show(viz.useRange(v))
           findController(g, 'dropout').show(viz.useDropout(v))
           initObj()
         }, path)
+
         addNumParam(g, 'min', -1.0, 1.0, initObj, path, path).show(viz.useRange(p.init))
         addNumParam(g, 'max', 0.0, 1.0, initObj, path, path).show(viz.useRange(p.init))
         addNumParam(g, 'dropout', 0.0, 1.0, initObj, path, path).show(viz.useDropout(p.init))
@@ -836,6 +838,7 @@
             initObj()
           }, path, path)
         }
+
         addParam(g, 'name', x => path(getObj()).setName(x), path, path)
         addChoiceParam(g, 'epilog', viz.EPILOGS, initObj, path, path)
 
