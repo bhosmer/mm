@@ -328,7 +328,7 @@ export class Mat {
       throw Error(`HEY sizeFromData(${x})`)
     }
 
-    const local_sens = this.params.deco.sensitivity == 'local'
+    const local_sens = this.params.viz.sensitivity == 'local'
     const absx = Math.abs(x)
     const absmax = local_sens ? this.absmax : this.getGlobalAbsmax()
 
@@ -352,7 +352,8 @@ export class Mat {
       throw Error(`HEY colorFromData(${x})`)
     }
 
-    const local_sens = this.params.deco.sensitivity == 'local'
+    const viz = this.params.viz
+    const local_sens = viz.sensitivity == 'local'
     const absx = Math.abs(x)
     const absmax = local_sens ? this.absmax : this.getGlobalAbsmax()
 
@@ -360,7 +361,6 @@ export class Mat {
       return COLOR_TEMP.setHSL(1.0, 1.0, 1.0)
     }
 
-    const viz = this.params.viz
     const hue_vol = absmax == 0 ? 0 : x / absmax
     const gap = viz['hue gap'] * Math.sign(x)
     const hue = (viz['zero hue'] + gap + (Math.cbrt(hue_vol) * viz['hue spread'])) % 1
@@ -740,6 +740,8 @@ export class MatMul {
       return sep == -1 ? x : x.slice(sep + 1) + '/' + x.slice(0, sep)
     }
 
+    // ---
+
     this.left.params.anim.alg = next(this.params.anim.alg)
     this.right.params.anim.alg = next(this.params.anim.alg)
 
@@ -749,7 +751,6 @@ export class MatMul {
     this.left.params.is_left = true
     this.right.params.is_left = false
 
-    // const is_pos = this.params.layout.polarity == 'positive'
     const negate = x => (
       x == 'negative' ? 'positive' : x == 'positive' ? 'negative' :
         x == 'left' ? 'right' : x == 'right' ? 'left' :
@@ -757,30 +758,35 @@ export class MatMul {
             x == 'front' ? 'back' : x == 'back' ? 'front' : undefined
     )
 
-    this.left.params.layout.polarity = negate(this.params.layout.polarity)
-    this.right.params.layout.polarity = negate(this.params.layout.polarity)
+    if (this.left.params.matmul) {
+      this.left.params.layout.polarity = negate(this.params.layout.polarity)
 
-    // correct for .L+
-    if (this.params.layout.polarity == 'negative' || is_left) {
-      this.left.params.layout['left placement'] = this.params.layout['left placement']
-      this.left.params.layout['right placement'] = negate(this.params.layout['right placement'])
-      this.left.params.layout['result placement'] = negate(this.params.layout['result placement'])
-    } else {
-      this.left.params.layout['left placement'] = negate(this.params.layout['left placement'])
-      this.left.params.layout['right placement'] = negate(this.params.layout['right placement'])
-      this.left.params.layout['result placement'] = this.params.layout['result placement']
+      // correct for .L+
+      if (this.params.layout.polarity == 'negative' || is_left) {
+        this.left.params.layout['left placement'] = this.params.layout['left placement']
+        this.left.params.layout['right placement'] = negate(this.params.layout['right placement'])
+        this.left.params.layout['result placement'] = negate(this.params.layout['result placement'])
+      } else {
+        this.left.params.layout['left placement'] = negate(this.params.layout['left placement'])
+        this.left.params.layout['right placement'] = negate(this.params.layout['right placement'])
+        this.left.params.layout['result placement'] = this.params.layout['result placement']
+      }
     }
 
-    // correct for .R+
-    if (this.params.layout.polarity == 'negative') {
-      this.right.params.layout['left placement'] = negate(this.params.layout['left placement'])
-      this.right.params.layout['right placement'] = this.params.layout['right placement']
-      this.right.params.layout['result placement'] = negate(this.params.layout['result placement'])
-    } else { // +
-      if (is_left) {
+    if (this.right.params.matmul) {
+      this.right.params.layout.polarity = negate(this.params.layout.polarity)
+
+      // correct for .R+
+      if (this.params.layout.polarity == 'negative') {
         this.right.params.layout['left placement'] = negate(this.params.layout['left placement'])
-        this.right.params.layout['right placement'] = negate(this.params.layout['right placement'])
-        this.right.params.layout['result placement'] = this.params.layout['result placement']
+        this.right.params.layout['right placement'] = this.params.layout['right placement']
+        this.right.params.layout['result placement'] = negate(this.params.layout['result placement'])
+      } else { // +
+        if (is_left) {
+          this.right.params.layout['left placement'] = negate(this.params.layout['left placement'])
+          this.right.params.layout['right placement'] = negate(this.params.layout['right placement'])
+          this.right.params.layout['result placement'] = this.params.layout['result placement']
+        }
       }
     }
 
@@ -813,9 +819,9 @@ export class MatMul {
     // this.right.params.layout['right placement'] = next(this.params.layout['right placement'])
     // this.right.params.layout['result placement'] = next(this.params.layout['result placement'])
 
-    // this.left.params.name += ` ${first(this.params.layout.polarity)}, ${first(this.params.layout['left placement'])}`
-    // this.right.params.name += ` ${first(this.params.layout.polarity)}, ${first(this.params.layout['right placement'])}`
-    // this.result.params.name += ` ${first(this.params.layout['result placement'])}`
+    this.left.params.name += ` ${first(this.params.layout.polarity)}, ${first(this.params.layout['left placement'])}`
+    this.right.params.name += ` ${first(this.params.layout.polarity)}, ${first(this.params.layout['right placement'])}`
+    this.result.params.name += ` ${first(this.params.layout['result placement'])}`
 
     this.initLeftVis()
     this.initRightVis()
@@ -1095,7 +1101,7 @@ export class MatMul {
   getAnimMatParams() {
     const params = util.copyTree(this.prepChildParams())
     delete params.name
-    params.deco.sensitivity = 'local'
+    params.viz.sensitivity = 'local'
     params.stretch_absmax = true
     return params
   }

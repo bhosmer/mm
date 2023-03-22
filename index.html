@@ -88,7 +88,6 @@
         blast: 0,
       },
       deco: {
-        sensitivity: 'local',
         legends: 6,
         'row guides': 0.5,
         'flow guides': 0.0,
@@ -97,12 +96,13 @@
         axes: false,
       },
       viz: {
-        'min size': 0.15,
+        sensitivity: 'global',
+        'min size': 0.25,
         'min light': 0.25,
         'max light': 0.6,
         'zero hue': 0.77,
         'hue gap': 0.2,
-        'hue spread': 0.01,
+        'hue spread': 0.05,
       },
       cam: {
         // set from orbit control
@@ -868,7 +868,6 @@
       addIntParam(gui_anim, 'k blocks', 1, 16, initObj, p => p.anim)
 
       const gui_deco = gui.addFolder('deco')
-      addChoiceParam(gui_deco, 'sensitivity', viz.SENSITIVITIES, initObj, p => p.deco)
       addNumParam(gui_deco, 'legends', 0, 10, x => getObj().setLegends(x), p => p.deco)
       addIntParam(gui_deco, 'spotlight', 0, 10, x => getObj().updateLabels(params), p => p.deco)
       addNumParam(gui_deco, 'row guides', 0.0, 1.0, x => getObj().setRowGuides(x), p => p.deco)
@@ -887,6 +886,7 @@
       addNumParam(gui_layout, 'blast', -2.0, 2.0, initObj, p => p.layout)
 
       const gui_viz = gui.addFolder('colors and sizes')
+      addChoiceParam(gui_viz, 'sensitivity', viz.SENSITIVITIES, initObj, p => p.viz)
       addNumParam(gui_viz, 'min size', 0.0, 1.0, initObj, p => p.viz)
       addNumParam(gui_viz, 'min light', 0.0, 1.0, initObj, p => p.viz)
       addNumParam(gui_viz, 'max light', 0.0, 1.0, initObj, p => p.viz)
