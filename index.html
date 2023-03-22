@@ -74,16 +74,21 @@
         'k blocks': 1,
       },
       layout: {
-        polarity: 'negative/positive',
+        // polarity: 'negative/positive',
+        // 'left placement': 'left/right',
+        // 'right placement': 'top/bottom',
+        // 'result placement': 'front/back',
+        polarity: 'negative',
         'left placement': 'left',
-        'right placement': 'top/bottom',
-        'result placement': 'front/back',
+        'right placement': 'top',
+        'result placement': 'front',
         gap: 1,
         scatter: 0,
         molecule: 3,
         blast: 0,
       },
       deco: {
+        sensitivity: 'local',
         legends: 6,
         'row guides': 0.5,
         'flow guides': 0.0,
@@ -92,7 +97,6 @@
         axes: false,
       },
       viz: {
-        sensitivity: 'local',
         'min size': 0.15,
         'min light': 0.25,
         'max light': 0.6,
@@ -111,6 +115,10 @@
       // }
     }
 
+    const expr = p => p.left && p.right ?
+      `${expr(p.left)} @ ${p.right.matmul ? '(' + expr(p.right) + ')' : p.right.name}` :
+      p.name
+
     // update URL with param changes
 
     let address_bar_update_pending = false
@@ -118,6 +126,7 @@
       for (const k in obj) {
         p[k] = obj[k]
       }
+      document.getElementById('info').innerHTML = expr(params)
       // throttle address bar update
       if (!address_bar_update_pending) {
         address_bar_update_pending = true
@@ -187,6 +196,7 @@
 
       // load params from url
       util.updateFromSearchParams(params, new URL(window.location).searchParams)
+      document.getElementById('info').innerHTML = expr(params)
 
       // set camera position
       camera.position.set(params.cam.x, params.cam.y, params.cam.z)
@@ -777,12 +787,19 @@
         }, path, path)
         addParam(g, 'name', x => path(getObj()).setName(x), path, path)
 
+        const height = p => p.matmul ? height(p.left) : p.h
+        const width = p => p.matmul ? width(p.right) : p.w
         const seth = (p, h) => p.matmul ? seth(p.left, h) : (p.h = h)
-        const setw = (p, w) => p.matmul ? setw(p.right, w) : (p.w = w)
+        const setw = (p, w) => {
+          if (w === undefined) {
+            console.log(`HEY`)
+          }
+          p.matmul ? setw(p.right, w) : (p.w = w)
+        }
         const fix_shape = (h, w, p, anc) => {
           const pp = anc[0](params)
           p === pp.left ? seth(pp.right, w) : setw(pp.left, h)
-          anc.length > 1 && fix_shape(pp.left.h, pp.right.w, pp, anc.slice(1))
+          anc.length > 1 && fix_shape(height(pp.left), width(pp.right), pp, anc.slice(1))
         }
 
         addIntParam(g, 'h', 1, 128, x => {
@@ -831,7 +848,7 @@
 
       // ---
 
-      const gui = new GUI();
+      const gui = new GUI()
 
       addMatmulParams(gui)
 
@@ -847,6 +864,7 @@
       addIntParam(gui_anim, 'k blocks', 1, 16, initObj, p => p.anim)
 
       const gui_deco = gui.addFolder('deco')
+      addChoiceParam(gui_deco, 'sensitivity', viz.SENSITIVITIES, initObj, p => p.deco)
       addNumParam(gui_deco, 'legends', 0, 10, x => getObj().setLegends(x), p => p.deco)
       addIntParam(gui_deco, 'spotlight', 0, 10, x => getObj().updateLabels(params), p => p.deco)
       addNumParam(gui_deco, 'row guides', 0.0, 1.0, x => getObj().setRowGuides(x), p => p.deco)
@@ -854,7 +872,7 @@
       addParam(gui_deco, 'interior spotlight', x => getObj().updateLabels(params), p => p.deco)
       addParam(gui_deco, 'axes', x => initAxes(getObj().params.axes = x), p => p.deco)
 
-      const gui_layout = gui.addFolder('layout').close()
+      const gui_layout = gui.addFolder('layout')
       addChoiceParam(gui_layout, 'polarity', viz.POLARITIES, initObj, p => p.layout)
       addChoiceParam(gui_layout, 'left placement', viz.LEFT_PLACEMENTS, initObj, p => p.layout)
       addChoiceParam(gui_layout, 'right placement', viz.RIGHT_PLACEMENTS, initObj, p => p.layout)
@@ -864,8 +882,7 @@
       addIntParam(gui_layout, 'molecule', 1, 8, initObj, p => p.layout)
       addNumParam(gui_layout, 'blast', -2.0, 2.0, initObj, p => p.layout)
 
-      const gui_viz = gui.addFolder('colors and sizes').close()
-      addChoiceParam(gui_viz, 'sensitivity', viz.SENSITIVITIES, initObj, p => p.viz)
+      const gui_viz = gui.addFolder('colors and sizes')
       addNumParam(gui_viz, 'min size', 0.0, 1.0, initObj, p => p.viz)
       addNumParam(gui_viz, 'min light', 0.0, 1.0, initObj, p => p.viz)
       addNumParam(gui_viz, 'max light', 0.0, 1.0, initObj, p => p.viz)

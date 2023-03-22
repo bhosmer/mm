@@ -328,7 +328,7 @@ export class Mat {
       throw Error(`HEY sizeFromData(${x})`)
     }
 
-    const local_sens = this.params.viz.sensitivity == 'local'
+    const local_sens = this.params.deco.sensitivity == 'local'
     const absx = Math.abs(x)
     const absmax = local_sens ? this.absmax : this.getGlobalAbsmax()
 
@@ -352,8 +352,7 @@ export class Mat {
       throw Error(`HEY colorFromData(${x})`)
     }
 
-    const viz = this.params.viz
-    const local_sens = viz.sensitivity == 'local'
+    const local_sens = this.params.deco.sensitivity == 'local'
     const absx = Math.abs(x)
     const absmax = local_sens ? this.absmax : this.getGlobalAbsmax()
 
@@ -361,6 +360,7 @@ export class Mat {
       return COLOR_TEMP.setHSL(1.0, 1.0, 1.0)
     }
 
+    const viz = this.params.viz
     const hue_vol = absmax == 0 ? 0 : x / absmax
     const gap = viz['hue gap'] * Math.sign(x)
     const hue = (viz['zero hue'] + gap + (Math.cbrt(hue_vol) * viz['hue spread'])) % 1
@@ -569,7 +569,13 @@ export const LEFT_PLACEMENTS = ['left', 'right', 'left/right', 'right/left']
 export const RIGHT_PLACEMENTS = ['top', 'bottom', 'top/bottom', 'bottom/top']
 export const RESULT_PLACEMENTS = ['front', 'back', 'front/back', 'back/front']
 export const SENSITIVITIES = ['local', 'global']
-export const ANIM_ALGS = ['none', 'dotprod (row major)', 'dotprod (col major)', 'axpy', 'vmprod', 'mvprod', 'vvprod']
+export const ANIM_ALGS = [
+  'none',
+  'dotprod (row major)', 'dotprod (col major)', 'axpy',
+  'vmprod', 'mvprod', 'vvprod',
+  'vmprod/vvprod', 'vvprod/vmprod',
+  'mvprod/vvprod', 'vvprod/mvprod'
+]
 
 
 export class MatMul {
@@ -608,11 +614,11 @@ export class MatMul {
   prepChildParams(base = this.params) {
     return {
       ...base,
-      ...(base.anim ? {} : { anim: this.params.anim }),
-      ...(base.layout ? {} : { layout: this.params.layout }),
       ...(base != this.params ? {
-        deco: this.params.deco,
-        viz: this.params.viz,
+        anim: { ...this.params.anim, ...base.anim || {} },
+        deco: { ...this.params.deco, ...base.deco || {} },
+        layout: { ...this.params.layout, ...base.layout || {} },
+        viz: { ...this.params.viz, ...base.viz || {} },
       } : {}),
       getGlobalAbsmax: this.getGlobalAbsmax.bind(this),
     }
@@ -724,20 +730,92 @@ export class MatMul {
     this.flow_guide_group = undefined
     this.anim_mats = []
 
+    function first(x) {
+      const sep = x.indexOf('/')
+      return sep == -1 ? x : x.slice(0, sep)
+    }
+
     function next(x) {
       const sep = x.indexOf('/')
       return sep == -1 ? x : x.slice(sep + 1) + '/' + x.slice(0, sep)
     }
 
-    this.left.params.layout.polarity = next(this.params.layout.polarity)
-    this.left.params.layout['left placement'] = next(this.params.layout['left placement'])
-    this.left.params.layout['right placement'] = next(this.params.layout['right placement'])
-    this.left.params.layout['result placement'] = next(this.params.layout['result placement'])
+    this.left.params.anim.alg = next(this.params.anim.alg)
+    this.right.params.anim.alg = next(this.params.anim.alg)
 
-    this.right.params.layout.polarity = next(this.params.layout.polarity)
-    this.right.params.layout['left placement'] = next(this.params.layout['left placement'])
-    this.right.params.layout['right placement'] = next(this.params.layout['right placement'])
-    this.right.params.layout['result placement'] = next(this.params.layout['result placement'])
+    // ---
+
+    const is_left = this.params.is_left === undefined || this.params.is_left
+    this.left.params.is_left = true
+    this.right.params.is_left = false
+
+    // const is_pos = this.params.layout.polarity == 'positive'
+    const negate = x => (
+      x == 'negative' ? 'positive' : x == 'positive' ? 'negative' :
+        x == 'left' ? 'right' : x == 'right' ? 'left' :
+          x == 'top' ? 'bottom' : x == 'bottom' ? 'top' :
+            x == 'front' ? 'back' : x == 'back' ? 'front' : undefined
+    )
+
+    this.left.params.layout.polarity = negate(this.params.layout.polarity)
+    this.right.params.layout.polarity = negate(this.params.layout.polarity)
+
+    // correct for .L+
+    if (this.params.layout.polarity == 'negative' || is_left) {
+      this.left.params.layout['left placement'] = this.params.layout['left placement']
+      this.left.params.layout['right placement'] = negate(this.params.layout['right placement'])
+      this.left.params.layout['result placement'] = negate(this.params.layout['result placement'])
+    } else {
+      this.left.params.layout['left placement'] = negate(this.params.layout['left placement'])
+      this.left.params.layout['right placement'] = negate(this.params.layout['right placement'])
+      this.left.params.layout['result placement'] = this.params.layout['result placement']
+    }
+
+    // correct for .R+
+    if (this.params.layout.polarity == 'negative') {
+      this.right.params.layout['left placement'] = negate(this.params.layout['left placement'])
+      this.right.params.layout['right placement'] = this.params.layout['right placement']
+      this.right.params.layout['result placement'] = negate(this.params.layout['result placement'])
+    } else { // +
+      if (is_left) {
+        this.right.params.layout['left placement'] = negate(this.params.layout['left placement'])
+        this.right.params.layout['right placement'] = negate(this.params.layout['right placement'])
+        this.right.params.layout['result placement'] = this.params.layout['result placement']
+      }
+    }
+
+    // ---
+
+    // result of a right of a left is back in current example
+    // result of a right of a right is front
+
+    // this.left.params.layout.polarity = next(this.params.layout.polarity)
+    // this.left.params.layout['left placement'] = 'left/right'
+    // this.left.params.layout['right placement'] = next(this.params.layout['right placement'])
+    // if we're a right, this should be our result placement otherwise alt
+    // this.left.params.layout['result placement'] = next(this.params.layout['result placement'])
+
+    // this.right.params.layout.polarity = next(this.params.layout.polarity)
+    // this.right.params.layout['left placement'] = next(this.params.layout['left placement'])
+    // this.right.params.layout['right placement'] = 'top/bottom'
+    // if we're a left, this should be our result placement otherwise alt
+    // this.right.params.layout['result placement'] = next(this.params.layout['result placement'])
+
+    // ---
+
+    // this.left.params.layout.polarity = next(this.params.layout.polarity)
+    // this.left.params.layout['left placement'] = next(this.params.layout['left placement'])
+    // this.left.params.layout['right placement'] = next(this.params.layout['right placement'])
+    // this.left.params.layout['result placement'] = next(this.params.layout['result placement'])
+
+    // this.right.params.layout.polarity = next(this.params.layout.polarity)
+    // this.right.params.layout['left placement'] = next(this.params.layout['left placement'])
+    // this.right.params.layout['right placement'] = next(this.params.layout['right placement'])
+    // this.right.params.layout['result placement'] = next(this.params.layout['result placement'])
+
+    this.left.params.name += ` ${first(this.params.layout.polarity)}, ${first(this.params.layout['left placement'])}`
+    this.right.params.name += ` ${first(this.params.layout.polarity)}, ${first(this.params.layout['right placement'])}`
+    this.result.params.name += ` ${first(this.params.layout['result placement'])}`
 
     this.initLeftVis()
     this.initRightVis()
@@ -918,8 +996,13 @@ export class MatMul {
 
     let left_done = true, right_done = true
 
+    function first(x) {
+      const sep = x.indexOf('/')
+      return sep == -1 ? x : x.slice(0, sep)
+    }
+
     this.alg_join = () => {
-      const alg = this.params.anim.alg
+      const alg = first(this.params.anim.alg)
 
       const lalg = this.params.left.matmul && !left_done ?
         (this.left.getIndex() == this.getIndex() ? this.left.alg_join() : 'mixed') :
@@ -929,14 +1012,18 @@ export class MatMul {
         (this.right.getIndex() == this.getIndex() ? this.right.alg_join() : 'mixed') :
         'none'
 
+      const nj = () => this.getBlockInfo().j.n
+      const nlk = () => this.left.getBlockInfo().k.n
+      const nri = () => this.right.getBlockInfo().i.n
+
       return (lalg == 'none' && ralg == 'none') ? alg :
         (ralg == 'none') ?
           (lalg == 'vmprod' && alg == 'vmprod' ? 'vmprod' :
-            lalg == 'mvprod' && alg == 'vvprod' ? 'vvprod' :
+            lalg == 'mvprod' && alg == 'vvprod' && nlk() == nj() ? 'vvprod' :
               'mixed') :
           (lalg == 'none') ?
             (ralg == 'mvprod' && alg == 'mvprod' ? 'mvprod' :
-              ralg == 'vmprod' && alg == 'vvprod' ? 'vvprod' :
+              ralg == 'vmprod' && alg == 'vvprod' && nri() == nj() ? 'vvprod' :
                 'mixed') :
             'mixed'
     }
@@ -944,7 +1031,7 @@ export class MatMul {
     const can_fuse = () => this.alg_join() != 'mixed'
 
     const start = () => {
-      const result_bump = bumps[this.params.anim.alg]()
+      const result_bump = bumps[first(this.params.anim.alg)]()
 
       this.bump = () => {
         const go = left_done && right_done || this.params.anim.fuse && can_fuse()
@@ -1008,7 +1095,7 @@ export class MatMul {
   getAnimMatParams() {
     const params = util.copyTree(this.prepChildParams())
     delete params.name
-    params.layout.sensitivity = 'local'
+    params.deco.sensitivity = 'local'
     params.stretch_absmax = true
     return params
   }
