@@ -266,7 +266,7 @@ function emptyPoints(h, w) {
 export class Mat {
 
   constructor(data, params, context, init_viz) {
-    this.params = util.copyJSON(params)
+    this.params = util.copyTree(params)
     this.context = context
 
     this.data = data
@@ -588,7 +588,7 @@ export class MatMul {
       return p
     }
 
-    this.params = ensureCounts(util.copyJSON(params))
+    this.params = ensureCounts(util.copyTree(params))
     this.context = context
 
     this.group = new THREE.Group()
@@ -730,7 +730,7 @@ export class MatMul {
 
   initViz(params = undefined) {
     if (params) {
-      this.params = util.copyJSON(params)
+      this.params = util.copyTree(params)
     }
 
     util.disposeAndClear(this.group)
@@ -1122,7 +1122,7 @@ export class MatMul {
   }
 
   getAnimMatParams() {
-    const params = util.copyJSON(this.prepChildParams())
+    const params = util.copyTree(this.prepChildParams())
     delete params.name
     params.viz.sensitivity = 'local'
     params.stretch_absmax = true
