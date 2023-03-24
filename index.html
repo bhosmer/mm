@@ -230,7 +230,7 @@
           return p
         }
 
-        obj = new viz.MatMul(ensureCounts(params), getContext())
+        obj = new viz.MatMul(ensureCounts(util.copyTree(params)), getContext())
 
         obj.group.rotation.x = Math.PI
         obj.center()

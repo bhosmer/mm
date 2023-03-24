@@ -266,7 +266,7 @@ function emptyPoints(h, w) {
 export class Mat {
 
   constructor(data, params, context, init_viz) {
-    this.params = util.copyTree(params)
+    this.params = params
     this.context = context
 
     this.data = data
@@ -465,19 +465,27 @@ export class Mat {
   }
 
   setLegends(size = undefined) {
+    const facing = this.isFacing()
+    const rsu = this.isRightSideUp()
+    const name = this.params.name
+    if ((size === undefined || size == this.params.deco.legends) &&
+      this.legendState &&
+      this.legendState.facing == facing &&
+      this.legendState.rsu == rsu &&
+      this.legendState.name == name) {
+      return
+    }
     size = util.syncProp(this.params.deco, 'legends', size)
+    this.legendState = { facing, rsu, name }
     if (this.name_text) {
       this.inner_group.remove(this.name_text)
       util.disposeAndClear(this.name_text)
     }
-    if (size > 0 && this.params.name) {
+    if (size > 0 && name) {
       const color = 0xCCCCFF
       size = Math.cbrt(Math.max(5, this.H) * Math.max(this.W, 5)) * size / 20
-      const facing = this.isFacing()
-      const rsu = this.isRightSideUp()
-      let suf = this.params.tag ? ` (${this.params.tag}` : ''
-      this.name_text = this.context.getText(this.params.name + suf, color, size)
-      this.name_text.name = `${this.params.name}.name`
+      this.name_text = this.context.getText(name, color, size)
+      this.name_text.name = `${name}.name`
       const { h, w } = util.bbhw(this.name_text.geometry)
       this.name_text.geometry.rotateZ(rsu ? Math.PI : 0)
       this.name_text.geometry.rotateY(facing ? Math.PI : 0)
@@ -581,7 +589,7 @@ export const ANIM_ALGS = [
 export class MatMul {
 
   constructor(params, context, init_viz = true) {
-    this.params = util.copyTree(params)
+    this.params = params
     this.context = context
 
     this.group = new THREE.Group()
@@ -723,7 +731,7 @@ export class MatMul {
 
   initViz(params = undefined) {
     if (params) {
-      this.params = util.copyTree(params)
+      this.params = params
     }
 
     util.disposeAndClear(this.group)
