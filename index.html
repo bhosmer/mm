@@ -130,7 +130,7 @@
       if (!address_bar_update_pending) {
         address_bar_update_pending = true
         setTimeout(function () {
-          const search_params = new URLSearchParams(util.flatten(params))
+          const search_params = util.makeSearchParams(params)
           const url = `${window.location.pathname}?${search_params}`
           window.history.replaceState({}, '', url)
           address_bar_update_pending = false

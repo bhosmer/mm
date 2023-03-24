@@ -33,6 +33,11 @@ const MMGUIDE_MATERIAL = new THREE.RawShaderMaterial({
 // reading/writing params
 //
 
+export function makeSearchParams(params) {
+  return new URLSearchParams(compress(flatten(params)))
+}
+
+
 export function updateFromSearchParams(obj, searchParams, strict = false) {
 
   function err(msg) {
@@ -43,26 +48,29 @@ export function updateFromSearchParams(obj, searchParams, strict = false) {
     }
   }
 
-  const flattened = flatten(obj)
+  const flat_obj = flatten(obj)
   const unqual = k => k.slice(k.lastIndexOf('.') + 1)
   const add_unqual = (acc, [k, v]) => ({ ...acc, [unqual(k)]: v })
-  const types = Object.entries(flattened).reduce(add_unqual, {})
+  const types = Object.entries(flat_obj).reduce(add_unqual, {})
 
-  for (const [k, v] of searchParams.entries()) {
+  const comp_update = {}
+  searchParams.forEach((v, k) => comp_update[k] = v)
+  const update = uncompress(comp_update)
+  Object.entries(update).forEach(([k, v]) => {
     if (unqual(k) in types) {
       const t = typeof types[unqual(k)]
       const x = castToType(v, t)
       if (x !== undefined) {
-        flattened[k] = x
+        flat_obj[k] = x
       } else {
         err(`don't know how to cast param '${k}' to type ${t}`)
       }
     } else {
       err(`unknown param '${k}'`)
     }
-  }
+  })
 
-  updateProps(obj, unflatten(flattened))
+  updateProps(obj, unflatten(flat_obj))
 }
 
 // we only know a limited set of value types for simplicity
@@ -220,7 +228,6 @@ export function syncProp(obj, k, v) {
   return v
 }
 
-// {a: {b: 0, c: {d: 1}}} => {a.b: 0, a.c.d: 1}
 // NOTE only handles our nested params - nothing null 
 // or undefined, no arrays, no empty subobjects, etc
 export function flatten(obj) {
@@ -231,8 +238,7 @@ export function flatten(obj) {
   return f(obj, '')
 }
 
-// {a$b: 0, a.c.d: 1} => {a: {b: 0, c: {d: 1}}}
-export function unflatten(obj) {
+export function unflatten(flat) {
   const add = (obj, [k, v]) => {
     const i = k.indexOf('.')
     if (i >= 0) {
@@ -243,10 +249,35 @@ export function unflatten(obj) {
     }
     return obj
   }
-  return Object.entries(obj).reduce(add, {})
+  return Object.entries(flat).reduce(add, {})
 }
 
-// deepish - copies nested objects but not arrays
+export function compress(obj) {
+  const names = {}
+  const getname = p =>
+    p == '' ? '' : names[p] || (names[p] = `${Object.keys(names).length}`)
+  const getpath = p => {
+    const i = p.lastIndexOf('.')
+    return i == -1 ? getname(p) : `${getname(p.slice(0, i))}.${getname(p.slice(i + 1))}`
+  }
+  const comp = {}
+  Object.entries(obj).forEach(([k, v]) => comp[getpath(k)] = v)
+  Object.entries(names).forEach(([k, v]) => comp[k] = v)
+  return comp
+}
+
+export function uncompress(comp) {
+  const [names, props] = [[], []]
+  Object.entries(comp).forEach(([k, v]) => +k == k ? (props[k] = v) : (names[v] = k))
+  const getpath = n => {
+    const i = n.indexOf('.')
+    return i == -1 ? names[n] : `${names[n.slice(0, i)] + '.' + names[n.slice(i + 1)]}`
+  }
+  const obj = {}
+  Object.entries(props).forEach(([k, v]) => obj[getpath(k)] = v)
+  return obj
+}
+
 export function copyTree(obj) {
   return unflatten({ ...flatten(obj) })
 }
