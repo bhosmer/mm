@@ -134,7 +134,7 @@
           const url = `${window.location.pathname}?${search_params}`
           window.history.replaceState({}, '', url)
           address_bar_update_pending = false
-        }, 250);
+        }, 1000)
       }
     }
 
@@ -223,378 +223,23 @@
           obj.disposeAll()
         }
 
-        // temp: takes root shape and adjusts children so nothing blows up
-        // TODO transfer depth stuff to MatMul init
-        const fix_shape = params => {
-          const f = (p, i, j, k, node_depth) => {
-            if (j === undefined) {
-              j = p.j
-            }
-            p.count = 1
-            p.node_depth = node_depth
-            p.max_depth = node_depth + 1
-            if (p.left_mm) {
-              f(p.left_mm, i, undefined, j, node_depth + 1)
-              p.max_depth = p.left_mm.max_depth
-              p.count += p.left_mm.count
-            }
-            if (p.right_mm) {
-              f(p.right_mm, j, undefined, k, node_depth + 1)
-              p.max_depth = Math.max(p.right_mm.max_depth, p.max_depth)
-              p.count += p.right_mm.count
-            }
-            p.node_height = p.max_depth - p.node_depth
-            p.i = i
-            p.j = j
-            p.k = k
-          }
-          f(params, params.i, params.j, params.k, 0)
-          return params
+        const ensureCounts = p => {
+          p.count = 1 +
+            (p.left.matmul ? ensureCounts(p.left).count : 0) +
+            (p.right.matmul ? ensureCounts(p.right).count : 0)
+          return p
         }
 
-        // L @ R
-        // obj = new viz.MatMul(fix_shape(getParams()))
-        obj = new viz.MatMul(params, getContext())
-
-        // 2 levels
-
-        // (LL @ LR) @ R
-        // const l = { ...getParams(), 'left name': "LL", 'right name': "LR", name: "L" }
-        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l }))
-
-        // L @ (RL @ RR)
-        // spacious: RL/RR not oriented properly, flip RR along horizontal axis (face front, RSU)
-        // @@@ repro 1: just RR @@@
-        // const r = { ...getParams(), 'left name': "RL", 'right name': "RR", name: "R" }
-        // obj = new viz.MatMul(fix_shape({ ...getParams(), right_mm: r }))
-
-        // (LL @ LR) @ (RL @ RR)
-        // spacious: repro 1
-        // const l = { ...getParams(), 'left name': "LL", 'right name': "LR", name: "L" }
-        // const r = { ...getParams(), 'left name': "RL", 'right name': "RR", name: "R" }
-        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
-
-        // 3 levels
-
-        // ((LLL @ LLR) @ LR) @ R
-        // const ll = { ...getParams(), 'left name': "LLL", 'right name': "LLR", name: "LL" }
-        // const l = { ...getParams(), left_mm: ll, 'right name': "LR", name: "L" }
-        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l }))
-
-        // (LL @ (LRL @ LRR)) @ R
-        // spacious: here orientation is CORRECT. test any orientation fix against this
-        // const lr = { ...getParams(), 'left name': "LRL", 'right name': "LRR", name: "LR" }
-        // const l = { ...getParams(), right_mm: lr, 'left name': "LL", name: "L" }
-        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l }))
-
-        // ((LLL @ LLR) @ (LRL @ LRR)) @ R
-        // const ll = { ...getParams(), 'left name': "LLL", 'right name': "LLR", name: "LL" }
-        // const lr = { ...getParams(), 'left name': "LRL", 'right name': "LRR", name: "LR" }
-        // const l = { ...getParams(), left_mm: ll, right_mm: lr, name: "L" }
-        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l }))
-
-        // L @ ((RLL @ RLR) @ RR)
-        // spacious: repro 1, RR face
-        // const rl = { ...getParams(), 'left name': "RLL", 'right name': "RLR", name: "RL" }
-        // const r = { ...getParams(), left_mm: rl, 'right name': "RR", name: "R" }
-        // obj = new viz.MatMul(fix_shape({ ...getParams(), right_mm: r }))
-
-        // L @ (RL @ (RRL @ RRR))
-        // spacious: orientation problem on result face, left face
-        // @@@ repro 2: RR cube @@@
-        // const rr = { ...getParams(), 'left name': "RRL", 'right name': "RRR", name: "RR" }
-        // const r = { ...getParams(), right_mm: rr, 'left name': "RL", name: "R" }
-        // obj = new viz.MatMul(fix_shape({ ...getParams(), right_mm: r }))
-
-        // L @ ((RLL @ RLR) @ (RRL @ RRR))
-        // spacious: repro 2, RR cube
-        // const rl = { ...getParams(), 'left name': "RLL", 'right name': "RLR", name: "RL" }
-        // const rr = { ...getParams(), 'left name': "RRL", 'right name': "RRR", name: "RR" }
-        // const r = { ...getParams(), left_mm: rl, right_mm: rr, name: "R" }
-        // obj = new viz.MatMul(fix_shape({ ...getParams(), right_mm: r }))
-
-        // ((LLL @ LLR) @ LR) @ (RL @ RR)
-        // spacious: repro 1
-        // const ll = { ...getParams(), 'left name': "LLL", 'right name': "LLR", name: "LL" }
-        // const l = { ...getParams(), left_mm: ll, 'right name': "LR", name: "L" }
-        // const r = { ...getParams(), 'left name': "RL", 'right name': "RR", name: "R" }
-        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
-
-        // ((LLL @ LLR) @ LR) @ ((RLL @ RLR) @ RR)
-        // spacious: repro 1
-        // const ll = { ...getParams(), 'left name': "LLL", 'right name': "LLR", name: "LL" }
-        // const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", name: "L" }
-        // const rl = { ...getParams(), 'left name': "RLL", 'right name': "RLR", name: "RL" }
-        // const r = { ...getParams(), left_mm: rl, 'right name': "RR", name: "R" }
-        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
-
-        // ((LLL @ LLR) @ LR) @ (RL @ (RRL @ RRR))
-        // spacious: repro 2
-        // const ll = { ...getParams(), 'left name': "LLL", 'right name': "LLR", name: "LL" }
-        // const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", name: "L" }
-        // const rr = { ...getParams(), 'left name': "RRL", 'right name': "RRR", name: "RR" }
-        // const r = { ...getParams(), right_mm: rr, 'left name': "RL", 'right name': "RR", name: "R" }
-        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
-
-        // ((LLL @ LLR) @ (LRL @ LRR)) @ (RL @ RR)
-        // spacious: repro 1
-        // const ll = { ...getParams(), 'left name': "LLL", 'right name': "LLR", name: "LL" }
-        // const lr = { ...getParams(), 'left name': "LRL", 'right name': "LRR", name: "LR" }
-        // const l = { ...getParams(), left_mm: ll, right_mm: lr, name: "L" }
-        // const r = { ...getParams(), 'left name': "RL", 'right name': "RR", name: "R" }
-        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
-
-        // ((LLL @ LLR) @ (LRL @ LRR)) @ ((RLL @ RLR) @ RR)
-        // spacious: repro 1
-        // const ll = { ...getParams(), 'left name': "LLL", 'right name': "LLR", name: "LL" }
-        // const lr = { ...getParams(), 'left name': "LRL", 'right name': "LRR", name: "LR" }
-        // const l = { ...getParams(), left_mm: ll, right_mm: lr, name: "L" }
-        // const rl = { ...getParams(), 'left name': "RLL", 'right name': "RLR", name: "RL" }
-        // const r = { ...getParams(), left_mm: rl, 'right name': "RR", name: "R" }
-        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
-
-        // ((LLL @ LLR) @ (LRL @ LRR)) @ (RL @ (RRL @ RRR))
-        // spacious: repro 2
-        // const ll = { ...getParams(), 'left name': "LLL", 'right name': "LLR", name: "LL" }
-        // const lr = { ...getParams(), 'left name': "LRL", 'right name': "LRR", name: "LR" }
-        // const l = { ...getParams(), left_mm: ll, right_mm: lr, name: "L" }
-        // const rr = { ...getParams(), 'left name': "RRL", 'right name': "RRR", name: "RR" }
-        // const r = { ...getParams(), 'left name': "RL", right_mm: rr, name: "R" }
-        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
-
-        // ((LLL @ LLR) @ (LRL @ LRR)) @ ((RLL @ RLR) @ (RRL @ RRR))
-        // spacious: repro 2
-        // const ll = { ...getParams(), 'left name': "LLL", 'right name': "LLR", name: "LL" }
-        // const lr = { ...getParams(), 'left name': "LRL", 'right name': "LRR", name: "LR" }
-        // const l = { ...getParams(), left_mm: ll, right_mm: lr, name: "L" }
-        // const rl = { ...getParams(), 'left name': "RLL", 'right name': "RLR", name: "RL" }
-        // const rr = { ...getParams(), 'left name': "RRL", 'right name': "RRR", name: "RR" }
-        // const r = { ...getParams(), left_mm: rl, right_mm: rr, name: "R" }
-        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
-
-        // 4+ levels but not exhaustive - focusing on r, need to get to repro 3
-
-        // long paths at extremes
-
-        // (((LLLL @ LLLR) @ LLR) @ LR) @ R
-        // const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", name: "LLL" }
-        // const ll = { ...getParams(), left_mm: lll, 'left name': "LLL", 'right name': "LLR", name: "LL" }
-        // const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", name: "L" }
-        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l }))
-
-        // ((((LLLLL @ LLLLR) @ LLLR) @ LLR) @ LR) @ R
-        // const llll = { ...getParams(), 'left name': "LLLLL", 'right name': "LLLLR", name: "LLLL" }
-        // const lll = { ...getParams(), left_mm: llll, 'right name': "LLLR", name: "LLL" }
-        // const ll = { ...getParams(), left_mm: lll, 'left name': "LLL", 'right name': "LLR", name: "LL" }
-        // const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", name: "L" }
-        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l }))
-
-        // L @ (RL @ (RRL @ (RRRL @ RRRR)))
-        // note here (and elsewhere) that flipping leaf inputs around is only trivial when 
-        // BOTH inputs are leaves. otherwise will require reorientating the other, non-leaf
-        // input, which will cascade down one side of its subtree
-        // spacious: repro 3
-        // const rrr = { ...getParams(), 'left name': "RRRL", 'right name': "RRRR", name: "RRR" }
-        // const rr = { ...getParams(), right_mm: rrr, 'left name': "RRL", 'right name': "RRR", name: "RR" }
-        // const r = { ...getParams(), right_mm: rr, 'left name': "RL", 'right name': "RR", name: "R" }
-        // obj = new viz.MatMul(fix_shape({ ...getParams(), right_mm: r }))
-
-        // (((LLLL @ LLLR) @ LLR) @ LR) @ (RL @ (RRL @ (RRRL @ RRRR)))
-        // pair of long paths... non-alternating layout is still an option
-        // (nice alternating layout is about to collide)
-        // spacious: @@@ repro 3, RRRL should be on other side @@@
-        // @@@ depth issue?
-        // const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", name: "LLL" }
-        // const ll = { ...getParams(), left_mm: lll, 'left name': "LLL", 'right name': "LLR", name: "LL" }
-        // const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", name: "L" }
-        // const rrr = { ...getParams(), 'left name': "RRRL", 'right name': "RRRR", name: "RRR" }
-        // const rr = { ...getParams(), right_mm: rrr, 'left name': "RRL", 'right name': "RRR", name: "RR" }
-        // const r = { ...getParams(), right_mm: rr, 'left name': "RL", 'right name': "RR", name: "R" }
-        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
-
-        // ---
-
-        // (LL @ LR) @ ((RLL @ RLR) @ ((RRLL @ RRLR) @ ((RRRLL @ RRRLR) @ RRRR)))
-        // const l = { ...getParams(), 'left name': "LL", 'right name': "LR", name: "L" }
-        // const rrrl = { ...getParams(), 'left name': "RRRLL", 'right name': "RRRLR", name: "RRRL" }
-        // const rrr = { ...getParams(), left_mm: rrrl, 'right name': "RRRR", name: "RRR" }
-        // const rrl = { ...getParams(), 'left name': "RRLL", 'right name': "RRLR", name: "RRL" }
-        // const rr = { ...getParams(), left_mm: rrl, right_mm: rrr, name: "RR" }
-        // const rl = { ...getParams(), 'left name': "RLL", 'right name': "RLR", name: "RL" }
-        // const r = { ...getParams(), right_mm: rr, left_mm: rl, name: "R" }
-        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
-
-        // ---
-
-        // L @ ((RLL @ RLR) @ (RRL @ (RRRL @ RRRR)))
-        // const rl = { ...getParams(), 'left name': "RLL", 'right name': "RLR", name: "RL" }
-        // const rrr = { ...getParams(), 'left name': "RRRL", 'right name': "RRRR", name: "RRR" }
-        // const rr = { ...getParams(), right_mm: rrr, 'left name': "RRL", 'right name': "RRR", name: "RR" }
-        // const r = { ...getParams(), left_mm: rl, right_mm: rr, 'left name': "RL", 'right name': "RR", name: "R" }
-        // obj = new viz.MatMul({ ...getParams(), right_mm: r })
-
-        // ((LLL @ LLR) @ LR) @ (RL @ (RRL @ (RRRL @ RRRR))
-        // ...collision
-        // const llr = { ...getParams(), 'left name': "LLRL", 'right name': "LLRR", name: "LLR" }
-        // const ll = { ...getParams(), right_mm: llr, 'left name': "LLL", 'right name': "LLR", name: "LL" }
-        // const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", name: "L" }
-        // const rr = { ...getParams(), 'left name': "RRL", 'right name': "RRR", name: "RR" }
-        // const r = { ...getParams(), right_mm: rr, 'left name': "RL", 'right name': "RR", name: "R" }
-        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
-
-        // (((LLLL @ LLLR) @ LLR) @ LR) @ (RL @ (RRL @ (RRRL @ RRRR)))
-        // const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", name: "LLL" }
-        // const ll = { ...getParams(), left_mm: lll, 'left name': "LLL", 'right name': "LLR", name: "LL" }
-        // const l = { ...getParams(), left_mm: ll, 'left name': "LL", 'right name': "LR", name: "L" }
-        // const rrr = { ...getParams(), 'left name': "RRRL", 'right name': "RRRR", name: "RRR" }
-        // const rr = { ...getParams(), right_mm: rrr, 'left name': "RRL", 'right name': "RRR", name: "RR" }
-        // const r = { ...getParams(), right_mm: rr, 'left name': "RL", 'right name': "RR", name: "R" }
-        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
-
-        // (((LLLL @ LLLR) @ LLR) @ (LRL @ LRR)) @ (RL @ (RRL @ (RRRL @ RRRR)))
-        // const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", name: "LLL" }
-        // const ll = { ...getParams(), left_mm: lll, 'left name': "LLL", 'right name': "LLR", name: "LL" }
-        // const lr = { ...getParams(), 'left name': "LRL", 'right name': "LRR", name: "LR" }
-        // const l = { ...getParams(), left_mm: ll, right_mm: lr, 'left name': "LL", 'right name': "LR", name: "L" }
-        // const rl = { ...getParams(), 'left name': "RLL", 'right name': "RLR", name: "RL" }
-        // const rrr = { ...getParams(), 'left name': "RRRL", 'right name': "RRRR", name: "RRR" }
-        // const rr = { ...getParams(), right_mm: rrr, 'left name': "RRL", 'right name': "RRR", name: "RR" }
-        // const r = { ...getParams(), left_mm: rl, right_mm: rr, 'left name': "RL", 'right name': "RR", name: "R" }
-        // obj = new viz.MatMul({ ...getParams(), left_mm: l, right_mm: r })
-
-        // (((LLLL @ LLLR) @ (LLRL @ LLRR)) @ ((LRLL @ LRLR) @ (LRRL @ LRRR))) @ 
-        //  (((RLLL @ RLLR) @ (RLRL @ RLRR)) @ ((RRLL @ RRLR) @ (RRRL @ RRRR)))
-        // first symmetrical tree with collision (4 levels)
-        // RRL and its arguments, LLR and its arguments share a cube
-        // spacious: repro 3, maybe more
-        // const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", name: "LLL" }
-        // const llr = { ...getParams(), 'left name': "LLRL", 'right name': "LLRR", name: "LLR" }
-        // const ll = { ...getParams(), left_mm: lll, right_mm: llr, name: "LL" }
-        // const lrl = { ...getParams(), 'left name': "LRLL", 'right name': "LRLR", name: "LRL" }
-        // const lrr = { ...getParams(), 'left name': "LRRL", 'right name': "LRRR", name: "LRR" }
-        // const lr = { ...getParams(), left_mm: lrl, right_mm: lrr, name: "LR" }
-        // const l = { ...getParams(), left_mm: ll, right_mm: lr, name: "L" }
-        // const rll = { ...getParams(), 'left name': "RLLL", 'right name': "RLLR", name: "RLL" }
-        // const rlr = { ...getParams(), 'left name': "RLRL", 'right name': "RLRR", name: "RLR" }
-        // const rl = { ...getParams(), left_mm: rll, right_mm: rlr, name: "RL" }
-        // const rrl = { ...getParams(), 'left name': "RRLL", 'right name': "RRLR", name: "RRL" }
-        // const rrr = { ...getParams(), 'left name': "RRRL", 'right name': "RRRR", name: "RRR" }
-        // const rr = { ...getParams(), left_mm: rrl, right_mm: rrr, name: "RR" }
-        // const r = { ...getParams(), left_mm: rl, right_mm: rr, 'left name': "RL", 'right name': "RR", name: "R" }
-        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
-
-        // ((LLL @ (LLRL @ LLRR)) @ LR) @ (RL @ ((RRLL @ RRLR) @ RRR))
-        // minimal collision - same as above but all other subtrees pruned
-        // LLR and its arguments, RRL and its arguments share a cube
-        // const llr = { ...getParams(), 'left name': "LLRL", 'right name': "LLRR", name: "LLR" }
-        // const ll = { ...getParams(), 'left name': "LLL", right_mm: llr, name: "LL" }
-        // const l = { ...getParams(), left_mm: ll, 'right name': "LR", name: "L" }
-        // const rrl = { ...getParams(), 'left name': "RRLL", 'right name': "RRLR", name: "RRL" }
-        // const rr = { ...getParams(), left_mm: rrl, 'right name': "RRR", name: "RR" }
-        // const r = { ...getParams(), 'left name': "RL", right_mm: rr, name: "R" }
-        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
-
-        // (((LLLL @ LLLR) @ (LLRL @ LLRR)) @ ((LRLL @ (LRLRL @ LRLRR)) @ (LRRL @ LRRR))) @ 
-        //  (((RLLL @ RLLR) @ ((RLRLR @ RLRLL) @ RLRR)) @ ((RRLL @ RRLR) @ (RRRL @ RRRR)))
-        // 4 levels - RRL/LLR collision + 5-level paths that reach around in front of root
-        // in nice layout and will collide if anything is added.
-        // also good example of where z always coming towards you breaks down a little in 
-        // nice (although it's still very legible as a ~2d surface)
-        // spacious: repro 3 and maybe more
-        // const lll = { ...getParams(), 'left name': "LLLL", 'right name': "LLLR", name: "LLL" }
-        // const llr = { ...getParams(), 'left name': "LLRL", 'right name': "LLRR", name: "LLR" }
-        // const ll = { ...getParams(), left_mm: lll, right_mm: llr, name: "LL" }
-        // const lrlr = { ...getParams(), 'left name': "LRLRL", 'right name': "LRLRR", name: "LRLR" }
-        // const lrl = { ...getParams(), 'left name': "LRLL", right_mm: lrlr, name: "LRL" }
-        // const lrr = { ...getParams(), 'left name': "LRRL", 'right name': "LRRR", name: "LRR" }
-        // const lr = { ...getParams(), left_mm: lrl, right_mm: lrr, name: "LR" }
-        // const l = { ...getParams(), left_mm: ll, right_mm: lr, name: "L" }
-        // const rll = { ...getParams(), 'left name': "RLLL", 'right name': "RLLR", name: "RLL" }
-        // const rlrl = { ...getParams(), 'left name': "RLRLL", 'right name': "RLRLR", name: "RLRL" }
-        // const rlr = { ...getParams(), left_mm: rlrl, 'right name': "RLRR", name: "RLR" }
-        // const rl = { ...getParams(), left_mm: rll, right_mm: rlr, name: "RL" }
-        // const rrl = { ...getParams(), 'left name': "RRLL", 'right name': "RRLR", name: "RRL" }
-        // const rrr = { ...getParams(), 'left name': "RRRL", 'right name': "RRRR", name: "RRR" }
-        // const rr = { ...getParams(), left_mm: rrl, right_mm: rrr, name: "RR" }
-        // const r = { ...getParams(), left_mm: rl, right_mm: rr, 'left name': "RL", 'right name': "RR", name: "R" }
-        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
-
-        // 5 levels saturated
-        // const llll = { ...getParams(), 'left name': "LLLLL", 'right name': "LLLLR", name: "LLLL" }
-        // const lllr = { ...getParams(), 'left name': "LLLRL", 'right name': "LLLRR", name: "LLLR" }
-        // const lll = { ...getParams(), left_mm: llll, right_mm: lllr, name: "LLL" }
-        // const llrl = { ...getParams(), 'left name': "LLRLL", 'right name': "LLRLR", name: "LLRL" }
-        // const llrr = { ...getParams(), 'left name': "LLRRL", 'right name': "LLRRR", name: "LLRR" }
-        // const llr = { ...getParams(), left_mm: llrl, right_mm: llrr, name: "LLR" }
-        // const ll = { ...getParams(), left_mm: lll, right_mm: llr, name: "LL" }
-        // const lrll = { ...getParams(), 'left name': "LRLLL", 'right name': "LRLLR", name: "LRLL" }
-        // const lrlr = { ...getParams(), 'left name': "LRLRL", 'right name': "LRLRR", name: "LRLR" }
-        // const lrl = { ...getParams(), left_mm: lrll, right_mm: lrlr, name: "LRL" }
-        // const lrrl = { ...getParams(), 'left name': "LRRLL", 'right name': "LRRLR", name: "LRRL" }
-        // const lrrr = { ...getParams(), 'left name': "LRRRL", 'right name': "LRRRR", name: "LRRR" }
-        // const lrr = { ...getParams(), left_mm: lrrl, right_mm: lrrr, name: "LRR" }
-        // const lr = { ...getParams(), left_mm: lrl, right_mm: lrr, name: "LR" }
-        // const l = { ...getParams(), left_mm: ll, right_mm: lr, name: "L" }
-        // const rlll = { ...getParams(), 'left name': "RLLLL", 'right name': "RLLLR", name: "RLLL" }
-        // const rllr = { ...getParams(), 'left name': "RLLRL", 'right name': "RLLRR", name: "RLLR" }
-        // const rll = { ...getParams(), left_mm: rlll, right_mm: rllr, name: "RLL" }
-        // const rlrl = { ...getParams(), 'left name': "RLRLL", 'right name': "RLRLR", name: "RLRL" }
-        // const rlrr = { ...getParams(), 'left name': "RLRRL", 'right name': "RLRRR", name: "RLRR" }
-        // const rlr = { ...getParams(), left_mm: rlrl, right_mm: rlrr, name: "RLR" }
-        // const rl = { ...getParams(), left_mm: rll, right_mm: rlr, name: "RL" }
-        // const rrll = { ...getParams(), 'left name': "RRLLL", 'right name': "RRLLR", name: "RRLL" }
-        // const rrlr = { ...getParams(), 'left name': "RRLRL", 'right name': "RRLRR", name: "RRLR" }
-        // const rrl = { ...getParams(), left_mm: rrll, right_mm: rrlr, name: "RRL" }
-        // const rrrl = { ...getParams(), 'left name': "RRRLL", 'right name': "RRRLR", name: "RRRL" }
-        // const rrrr = { ...getParams(), 'left name': "RRRRL", 'right name': "RRRRR", name: "RRRR" }
-        // const rrr = { ...getParams(), left_mm: rrrl, right_mm: rrrr, name: "RRR" }
-        // const rr = { ...getParams(), left_mm: rrl, right_mm: rrr, name: "RR" }
-        // const r = { ...getParams(), left_mm: rl, right_mm: rr, name: "R" }
-        // obj = new viz.MatMul(fix_shape({ ...getParams(), left_mm: l, right_mm: r }))
-
-        // ---
-
-        // mha
-        // (((in @ wQ) @ (wK.t @ in.t)) @ (in @ wV)) @ wO
-        // spacious: repro 1 in.t
-        // note: could actually get away with all-right-at-bottom here... good example of where collision
-        // detection would help UX, like to gray out layout options that collide
-        // const q = { ...getParams(), i: 64, j: 128, k: 32, 'left name': "in", 'right name': "wQ", name: "Q" }
-        // const kt = { ...getParams(), i: 32, j: 128, k: 64, 'left name': "wK.t", 'right name': "in.t", name: "k.t" }
-        // const attn = { ...getParams(), i: 64, j: 32, k: 64, left_mm: q, right_mm: kt, 'left name': "Q", 'right name': "Kt", name: "attn" }
-        // const v = { ...getParams(), i: 64, j: 128, k: 32, 'left name': "in", 'right name': "wV", name: "V" }
-        // const out = { ...getParams(), i: 64, j: 64, k: 32, left_mm: attn, right_mm: v, 'left name': "attn", 'right name': "V", name: "out" }
-        // obj = new viz.MatMul(fix_shape({ ...getParams(), i: 64, j: 32, k: 128, left_mm: out, 'right name': 'wO', name: 'out2' }))
-
-        // const attn = { ...getParams(), i: 64, j: 32, k: 64, 'left name': "Q", 'right name': "k.t", name: "attn" }
-        // obj = new viz.MatMul(fix_shape({
-        //   ...getParams(), i: 64, j: 64, k: 32, left_mm: attn, 'right name': 'V', name: 'out',
-        // }))
-
-        // const attn = { ...getParams(), i: 64, j: 32, k: 64, 'left name': "Q", 'right name': "k.t", name: "attn" }
-        // obj = new viz.MatMul(fix_shape({
-        //   ...getParams(), i: 64, j: 64, k: 32, left_mm: attn, 'right name': 'V', name: 'out',
-        //   alg: 'vvprod',
-        // }))
-
-        // mha reassociated (worse)
-        // ((in @ wQ) @ (wK.t @ in.t)) @ ((in @ wV) @ wO)
-        // spacious: orientation prob at wO 
-        // const q = { ...getParams(), i: 64, j: 128, k: 32, 'left name': "in", 'right name': "wQ", name: "Q" }
-        // const kt = { ...getParams(), i: 32, j: 128, k: 64, 'left name': "wK.t", 'right name': "in.t", name: "k.t" }
-        // const attn = { ...getParams(), i: 64, j: 32, k: 64, left_mm: q, right_mm: kt, 'left name': "Q", 'right name': "Kt", name: "attn" }
-        // const v = { ...getParams(), i: 64, j: 128, k: 32, 'left name': "in", 'right name': "wV", name: "V" }
-        // const out = { ...getParams(), i: 64, j: 32, k: 128, left_mm: v, 'right name': "wO", name: "out" }
-        // obj = new viz.MatMul(fix_shape({ ...getParams(), i: 64, j: 64, k: 128, left_mm: attn, right_mm: out, name: 'out2' }))
+        obj = new viz.MatMul(ensureCounts(params), getContext())
 
         obj.group.rotation.x = Math.PI
         obj.center()
 
-        scene.add(obj.group)
-
         getObj().setLegends()
         getObj().updateLabels()
         getObj().initAnimation()
+
+        scene.add(obj.group)
       }
 
       // renderer, composer
@@ -612,13 +257,13 @@
       let cam_changing = false
       let label_update_pending = false
 
-      const postLabelUpdate = (t = 5) => {
+      const postLabelUpdate = (t = 250) => {
         if (!label_update_pending) {
           label_update_pending = true
           setTimeout(function () {
             raycaster.setFromCamera(pointer, camera)
             getObj().setLegends()
-            getObj().updateLabels()
+            // getObj().updateLabels()
             label_update_pending = false
           }, t);
         }
@@ -633,7 +278,7 @@
 
       orbit.addEventListener('end', _ => {
         cam_changing = false
-        postLabelUpdate(0)
+        postLabelUpdate()
       })
 
       orbit.addEventListener('change', () => setParams({ cam: camera.position }), false)

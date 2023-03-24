@@ -581,14 +581,7 @@ export const ANIM_ALGS = [
 export class MatMul {
 
   constructor(params, context, init_viz = true) {
-    const ensureCounts = p => {
-      p.count = 1 +
-        (p.left.matmul ? ensureCounts(p.left).count : 0) +
-        (p.right.matmul ? ensureCounts(p.right).count : 0)
-      return p
-    }
-
-    this.params = ensureCounts(util.copyTree(params))
+    this.params = util.copyTree(params)
     this.context = context
 
     this.group = new THREE.Group()
