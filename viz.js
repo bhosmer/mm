@@ -812,9 +812,9 @@ export class MatMul {
       return `${pol} ${lfp} ${rtp} ${rsp}`
     }
 
-    this.left.params.name += ` ${first(this.params.layout.polarity)}, ${first(this.params.layout['left placement'])}`
-    this.right.params.name += ` ${first(this.params.layout.polarity)}, ${first(this.params.layout['right placement'])}`
-    this.result.params.name += ` ${first(this.params.layout['result placement'])} (${layout_desc(this.params)})`
+    // this.left.params.name += ` ${first(this.params.layout.polarity)}, ${first(this.params.layout['left placement'])}`
+    // this.right.params.name += ` ${first(this.params.layout.polarity)}, ${first(this.params.layout['right placement'])}`
+    // this.result.params.name += ` ${first(this.params.layout['result placement'])} (${layout_desc(this.params)})`
 
     // ---
 
