@@ -112,9 +112,16 @@ function softmax_(h, w, data) {
     let denom = 0
     for (let j = 0; j < w; j++, ptr++) {
       denom += Math.exp(data[ptr])
+      if (!isFinite(denom)) {
+        throw Error(`HEY denom at data[${ptr}) = ${data[ptr]} is infinite`)
+      }
     }
     for (let j = 0, ptr = rptr; j < w; j++, ptr++) {
-      data[ptr] = Math.exp(data[ptr]) / denom
+      const x = Math.exp(data[ptr]) / denom
+      if (isNaN(x)) {
+        throw Error(`HEY Math.exp(data[${ptr}) = ${data[ptr]}]) / ${denom} is NaN`)
+      }
+      data[ptr] = x
     }
   }
 }
@@ -619,7 +626,8 @@ export class MatMul {
     util.disposeAndClear(this.group)
   }
 
-  prepChildParams(base = this.params) {
+  prepChildParams(base = undefined) {
+    base ||= util.copyTree(this.params)
     return {
       ...base,
       ...(base != this.params ? {
@@ -679,7 +687,15 @@ export class MatMul {
     }
     let x = 0.0
     for (let j = minj; j < maxj; j++) {
-      x += this.left.getData(i, j) * this.right.getData(j, k)
+      const l = this.left.getData(i, j)
+      if (isNaN(l)) {
+        throw Error(`HEY this.left.getData(${i}, ${j}) is NaN (${this.left.params.name})`)
+      }
+      const r = this.right.getData(j, k)
+      if (isNaN(r)) {
+        throw Error(`HEY this.right.getData(${j}, ${k}) is NaN (${this.right.params.name})`)
+      }
+      x += l * r
     }
     if (isNaN(x)) {
       throw Error(`HEY dotprod_val(${i}, ${k}, ${minj}, ${maxj}) is NaN`)
