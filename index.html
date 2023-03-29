@@ -265,7 +265,7 @@
             getObj().setLegends()
             labels && getObj().updateLabels()
             label_update_pending = false
-          }, 250);
+          }, 100);
         }
       }
 
@@ -443,12 +443,12 @@
 
         const p = path(params)
 
+        addParam(g, 'name', x => path(getObj()).setName(x), path, path)
+
         addParam(g, 'matmul', v => {
           syncChildParams(g, path, ancestors)
           initObj()
         }, path, path)
-
-        addParam(g, 'name', x => path(getObj()).setName(x), path, path)
 
         addIntParam(g, 'h', 1, 128, x => {
           fix_shape(p.h, p.w, p, ancestors)
@@ -477,6 +477,8 @@
         const p = path(params)
         const is_root = ancestors.length == 0
 
+        addParam(g, 'name', x => path(getObj()).setName(x), path, path)
+
         if (!is_root) {
           addParam(g, 'matmul', v => {
             syncChildParams(g, path, ancestors)
@@ -484,7 +486,6 @@
           }, path, path)
         }
 
-        addParam(g, 'name', x => path(getObj()).setName(x), path, path)
         addChoiceParam(g, 'epilog', viz.EPILOGS, initObj, path, path)
 
         const title = name => (is_root ? '' : `${g._title} / `) + name

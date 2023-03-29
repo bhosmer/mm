@@ -52,6 +52,13 @@ function gaussianRandom(mean = 0, stdev = 1) {
   return z * stdev + mean
 }
 
+// https://github.com/facebookresearch/shumai/blob/main/test/gradient.test.ts#L5
+function sampleSphere(args) {
+  const u = sm.randn(args)
+  const d = sm.sum(u.mul(u)).sqrt()
+  return u.div(d)
+}
+
 export const INIT_FUNCS = {
   rows: (i, j, h) => h > 1 ? i / (h - 1) : 0,
   cols: (i, j, h, w) => w > 1 ? j / (w - 1) : 0,
@@ -60,6 +67,7 @@ export const INIT_FUNCS = {
   'pt linear': (i, j, h, w) => (2 * Math.random() - 1) / Math.sqrt(w),
   uniform: () => Math.random(),
   gaussian: () => gaussianRandom(0.5, 0.5),
+  // sphere: (i, j, h, w) => sampleSphere([h, w]),
   'tril mask': (i, j) => j <= i ? 1 : 0,
   'triu mask': (i, j) => j >= i ? 1 : 0,
   eye: (i, j) => i == j ? 1 : 0,
@@ -253,13 +261,16 @@ const ELEM_SIZE = 2000
 const ZERO_COLOR = new THREE.Color(0, 0, 0)
 const COLOR_TEMP = new THREE.Color()
 
-function emptyPoints(h, w) {
+function emptyPoints(h, w, info) {
+  const { i: { size: si }, j: { size: sj } } = info
   const n = h * w
   const points = new Float32Array(n * 3)
   for (let i = 0, ptr = 0; i < h; i++) {
+    const ioff = Math.floor(i / si)
     for (let j = 0; j < w; j++) {
-      points[ptr++] = j
-      points[ptr++] = i
+      const joff = Math.floor(j / sj)
+      points[ptr++] = j + joff
+      points[ptr++] = i + ioff
       points[ptr++] = 0
     }
   }
@@ -281,15 +292,32 @@ export class Mat {
     this.W = data.w
     this.absmax = this.data.absmax()
 
-    this.points = emptyPoints(this.H, this.W)
-    this.points.name = `${this.params.name}.points`
-
     if (init_viz) {
       this.initViz()
     }
   }
 
+  getBlockInfo() {
+    const ni = Math.min(this.params.anim['i blocks'], this.H)
+    const nj = Math.min(this.params.anim['j blocks'], this.W)
+    return {
+      i: { n: ni, size: Math.ceil(this.H / ni), max: this.H },
+      j: { n: nj, size: Math.ceil(this.W / nj), max: this.W },
+    }
+  }
+
+  getDispH() {
+    return this.H + this.getBlockInfo().i.n - 1
+  }
+
+  getDispW() {
+    return this.W + this.getBlockInfo().j.n - 1
+  }
+
   initViz() {
+    this.points = emptyPoints(this.H, this.W, this.getBlockInfo())
+    this.points.name = `${this.params.name}.points`
+
     this.setColorsAndSizes()
 
     this.inner_group = new THREE.Group()
@@ -324,8 +352,8 @@ export class Mat {
   getExtent() {
     const gap = this.params.layout.gap
     return this._extents || (this._extents = {
-      x: this.W + 2 * gap - 1,
-      y: this.H + 2 * gap - 1,
+      x: this.getDispW() + 2 * gap - 1,
+      y: this.getDispH() + 2 * gap - 1,
       z: 0,
     })
   }
@@ -461,7 +489,7 @@ export class Mat {
       util.disposeAndClear(this.row_guide_group)
     }
     if (light > 0.0) {
-      this.row_guide_group = util.rowGuide(this.H, this.W, light)
+      this.row_guide_group = util.rowGuide(this.getDispH(), this.getDispW(), light)
       this.inner_group.add(this.row_guide_group)
     }
   }
@@ -492,7 +520,7 @@ export class Mat {
     }
     if (size > 0 && name) {
       const color = 0xCCCCFF
-      size = Math.cbrt(Math.max(5, this.H) * Math.max(this.W, 5)) * size / 20
+      size = Math.cbrt(Math.max(5, this.getDispH()) * Math.max(this.getDispW(), 5)) * size / 20
       this.name_text = this.context.getText(name, color, size)
       this.name_text.name = `${name}.name`
       const { h, w } = util.bbhw(this.name_text.geometry)
@@ -502,8 +530,8 @@ export class Mat {
       const ydir = rsu ? 1 : 0
       const zdir = facing ? 1 : -1
       this.name_text.geometry.translate(
-        util.center(this.W - 1, xdir * w),
-        ydir * h + util.center(this.H - 1, h),
+        util.center(this.getDispW() - 1, xdir * w),
+        ydir * h + util.center(this.getDispH() - 1, h),
         -zdir // * h / 2
       )
       this.inner_group.add(this.name_text)
@@ -538,6 +566,7 @@ export class Mat {
       } else {
         util.disposeAndClear(this.label_group)
       }
+      const { i: { size: si }, j: { size: sj } } = this.getBlockInfo()
       this.context.raycaster.params.Points.threshold = spotlight
       const intersects = this.context.raycaster.intersectObject(this.points)
       intersects.forEach(x => {
@@ -562,9 +591,11 @@ export class Mat {
               label.geometry.rotateY(facing ? 0 : Math.PI)
               label.geometry.rotateZ(rsu ? 0 : Math.PI)
               const { h, w } = util.bbhw(label.geometry)
+              const disp_i = i + Math.floor(i / si)
+              const disp_j = j + Math.floor(j / sj)
               label.geometry.translate(
-                util.center(j * 2, (rsu ? zdir : -zdir) * w),
-                h + util.center(i * 2, h),
+                util.center(disp_j * 2, (rsu ? zdir : -zdir) * w),
+                h + util.center(disp_i * 2, h),
                 -zdir * 0.25
               )
               this.label_cache[index] = label
@@ -624,6 +655,18 @@ export class MatMul {
     }
   }
 
+  getDispH() {
+    return this.H + this.getBlockInfo().i.n - 1
+  }
+
+  getDispD() {
+    return this.D + this.getBlockInfo().j.n - 1
+  }
+
+  getDispW() {
+    return this.W + this.getBlockInfo().k.n - 1
+  }
+
   disposeAll() {
     util.disposeAndClear(this.group)
   }
@@ -643,7 +686,7 @@ export class MatMul {
   }
 
   initLeft() {
-    const left_params = this.prepChildParams(this.params.left)
+    const left_params = this.prepChildParams(this.params.left, info)
     if (left_params.matmul) {
       this.left = new MatMul(left_params, this.context, false)
     } else {
@@ -659,6 +702,8 @@ export class MatMul {
     if (right_params.matmul) {
       this.right = new MatMul(right_params, this.context, false)
     } else {
+      right_params.anim['i blocks'] = right_params.anim['j blocks']
+      right_params.anim['j blocks'] = right_params.anim['k blocks']
       const { init, min, max, dropout } = right_params
       const f = getInitFunc(init, min, max, dropout)
       const data = Array2D.fromInit(this.D, this.W, f)
@@ -677,7 +722,10 @@ export class MatMul {
     //   // max_depth: this.params.max_depth,
     //   // count: this.params.count
     // }
-    this.result = new Mat(data, this.prepChildParams(), this.context, false)
+    const result_params = this.prepChildParams()
+    result_params.anim['i blocks'] = result_params.anim['i blocks']
+    result_params.anim['j blocks'] = result_params.anim['k blocks']
+    this.result = new Mat(data, result_params, this.context, false)
   }
 
   dotprod_val(i, k, minj = undefined, maxj = undefined) {
@@ -736,9 +784,9 @@ export class MatMul {
   getExtent() {
     const gap = this.params.layout.gap
     return this._extents || (this._extents = {
-      x: this.W + 2 * gap - 1,
-      y: this.H + 2 * gap - 1,
-      z: this.D + 2 * gap - 1,
+      x: this.getDispW() + 2 * gap - 1,
+      y: this.getDispH() + 2 * gap - 1,
+      z: this.getDispD() + 2 * gap - 1,
     })
   }
 
@@ -931,7 +979,9 @@ export class MatMul {
         this.flow_guide_group = undefined
       }
       if (light > 0.0) {
-        this.flow_guide_group = util.flowGuide(this.H, this.D, this.W, this.getPlacementInfo(), light)
+        this.flow_guide_group = util.flowGuide(
+          this.getDispH(), this.getDispD(), this.getDispW(), this.getPlacementInfo(), light
+        )
         this.group.add(this.flow_guide_group)
       }
     }
@@ -1097,6 +1147,8 @@ export class MatMul {
         this.right.hide()
       }
       this.result.hide()
+
+      this.bump()
     }
 
     this.onAnimDone = () => {
@@ -1135,11 +1187,24 @@ export class MatMul {
     loop([], infos, f)
   }
 
-  getAnimMatParams() {
-    const params = util.copyTree(this.prepChildParams())
+  getAnimIntermediateParams() {
+    const params = this.prepChildParams()
     delete params.name
     params.viz.sensitivity = 'local'
     params.stretch_absmax = true
+    params.anim['i blocks'] = 1
+    params.anim['j blocks'] = 1
+    params.anim['k blocks'] = 1
+    return params
+  }
+
+  getAnimResultParams() {
+    const params = this.prepChildParams()
+    delete params.name
+    params.viz.sensitivity = 'local'
+    params.stretch_absmax = true
+    params.anim['i blocks'] = params.anim['i blocks']
+    params.anim['j blocks'] = params.anim['k blocks']
     return params
   }
 
@@ -1152,22 +1217,29 @@ export class MatMul {
   }
 
   getAnimResultMats() {
-    if (this.getBlockInfo().j.n == 1) {
+    const { j: { n: nj, size: sj } } = this.getBlockInfo()
+    if (nj == 1) {
       this.result.params.stretch_absmax = true
       return [this.result]
     }
-    const { gap, polarity } = this.getPlacementInfo()
+    const { gap, polarity, result } = this.getPlacementInfo()
     const { z: extz } = this.getExtent()
     const results = []
-    this.grid('j', ({ start: j, end: je }) => {
+    this.grid('j', ({ start: j, end: je, index: ji }) => {
       const result_init = (i, k) => this.dotprod_val(i, k, j, je)
       const data = Array2D.fromInit(this.H, this.W, result_init)
-      const result = new Mat(data, this.getAnimMatParams(), this.context, true)
-      result.group.position.z = polarity > 0 ? j + gap : extz - je + 1 - gap
-      result.hide()
-      results.push(result)
-      this.group.add(result.group)
-      this.anim_mats.push(result)
+      const mat = new Mat(data, this.getAnimResultParams(), this.context, true)
+      mat.group.position.z = polarity > 0 ?
+        result > 0 ?
+          ji == 0 ? this.result.group.position.z : gap + j + Math.floor((j - 1) / sj) :
+          ji == nj - 1 ? this.result.group.position.z : gap + je + Math.floor(j / sj) :
+        result > 0 ?
+          ji == nj - 1 ? this.result.group.position.z : extz - je - Math.floor(je / sj) + 1 - gap :
+          ji == 0 ? this.result.group.position.z : extz - j - Math.floor((je - 1) / sj) + 1 - gap
+      mat.hide()
+      results.push(mat)
+      this.group.add(mat.group)
+      this.anim_mats.push(mat)
     })
     return results
   }
@@ -1177,13 +1249,17 @@ export class MatMul {
     const results = this.getAnimResultMats()
 
     const vmps = {}
-    this.grid('ijk', ({ start: i }, { start: j, extent: jx }, { start: k, extent: kx }) => {
-      const vmpinit = (ji, ki) => this.ijkmul(i, j + ji, k + ki)
+    this.grid('ijk', (
+      { start: i, index: ii },
+      { start: j, extent: jx, index: ji },
+      { start: k, extent: kx, index: ki }
+    ) => {
+      const vmpinit = (jii, kii) => this.ijkmul(i, j + jii, k + kii)
       const data = Array2D.fromInit(jx, sweep ? 1 : kx, vmpinit)
-      const vmp = new Mat(data, this.getAnimMatParams(), this.context, true)
+      const vmp = new Mat(data, this.getAnimIntermediateParams(), this.context, true)
       vmp.hide()
-      const z = polarity < 0 ? this.getExtent().z - j : j
-      util.updateProps(vmp.group.position, { x: k, y: gap + i, z })
+      const z = polarity < 0 ? this.getExtent().z - j - ji : j + ji
+      util.updateProps(vmp.group.position, { x: k + ki, y: gap + i + ii, z })
       vmp.group.rotation.x = polarity * Math.PI / 2
       vmps[[i, j, k]] = vmp
       this.anim_mats.push(vmp)
@@ -1232,10 +1308,14 @@ export class MatMul {
       }
 
       // update intermediates
-      this.grid('ijk', ({ start: i, extent: ix }, { start: j }, { start: k, extent: kx }) => {
+      this.grid('ijk', (
+        { start: i, extent: ix, index: ii },
+        { start: j },
+        { start: k, extent: kx, index: ki }
+      ) => {
         const vmp = vmps[[i, j, k]]
         if (curi < ix && curk < kx) {
-          util.updateProps(vmp.group.position, { x: k + curk, y: gap + i + curi })
+          util.updateProps(vmp.group.position, { x: k + ki + curk, y: gap + i + ii + curi })
           vmp.reinit((ji, ki) => this.ijkmul(i + curi, j + ji, k + curk + ki))
         }
       })
@@ -1258,7 +1338,7 @@ export class MatMul {
     this.grid('ijk', ({ start: i, extent: ix }, { start: j, extent: jx }, { start: k }) => {
       const mvpinit = (ii, ji) => this.ijkmul(i + ii, j + ji, k)
       const data = Array2D.fromInit(sweep ? 1 : ix, jx, mvpinit)
-      const mvp = new Mat(data, this.getAnimMatParams(), this.context, true)
+      const mvp = new Mat(data, this.getAnimIntermediateParams(), this.context, true)
       mvp.hide()
       const z = polarity < 0 ? this.getExtent().z - j : j
       util.updateProps(mvp.group.position, { x: gap + k, y: i, z })
@@ -1337,7 +1417,7 @@ export class MatMul {
     this.grid('ijk', ({ start: i, extent: ix }, { start: j }, { start: k, extent: kx }) => {
       const vvpinit = (ii, ki) => this.ijkmul(i + ii, j, k + ki)
       const data = Array2D.fromInit(ix, sweep ? 1 : kx, vvpinit)
-      const vvp = new Mat(data, this.getAnimMatParams(), this.context, true)
+      const vvp = new Mat(data, this.getAnimIntermediateParams(), this.context, true)
       vvp.hide()
       const z = polarity > 0 ? gap + j : extz - gap - j
       util.updateProps(vvp.group.position, { x: k, y: i, z })
