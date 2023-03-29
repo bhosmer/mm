@@ -1335,13 +1335,17 @@ export class MatMul {
     const results = this.getAnimResultMats()
 
     const mvps = {}
-    this.grid('ijk', ({ start: i, extent: ix }, { start: j, extent: jx }, { start: k }) => {
-      const mvpinit = (ii, ji) => this.ijkmul(i + ii, j + ji, k)
+    this.grid('ijk', (
+      { start: i, extent: ix, index: ii },
+      { start: j, extent: jx, index: ji },
+      { start: k, index: ki }
+    ) => {
+      const mvpinit = (iii, jii) => this.ijkmul(i + iii, j + jii, k)
       const data = Array2D.fromInit(sweep ? 1 : ix, jx, mvpinit)
       const mvp = new Mat(data, this.getAnimIntermediateParams(), this.context, true)
       mvp.hide()
-      const z = polarity < 0 ? this.getExtent().z - j : j
-      util.updateProps(mvp.group.position, { x: gap + k, y: i, z })
+      const z = polarity < 0 ? this.getExtent().z - j - ji : j + ji
+      util.updateProps(mvp.group.position, { x: gap + k + ji, y: i + ii, z })
       mvp.group.rotation.y = polarity * -Math.PI / 2
       mvps[[i, j, k]] = mvp
       this.anim_mats.push(mvp)
@@ -1390,10 +1394,14 @@ export class MatMul {
       }
 
       // update intermediates
-      this.grid('ijk', ({ start: i, extent: ix }, { start: j }, { start: k, extent: kx }) => {
+      this.grid('ijk', (
+        { start: i, extent: ix, index: ii },
+        { start: j },
+        { start: k, extent: kx, index: ki }
+      ) => {
         const mvp = mvps[[i, j, k]]
         if (curi < ix && curk < kx) {
-          util.updateProps(mvp.group.position, { x: gap + k + curk, y: i + curi })
+          util.updateProps(mvp.group.position, { x: gap + k + ki + curk, y: i + ii + curi })
           mvp.reinit((ii, ji) => this.ijkmul(i + curi + ii, j + ji, k + curk))
         }
       })
@@ -1414,13 +1422,17 @@ export class MatMul {
     const results = this.getAnimResultMats()
 
     const vvps = {}
-    this.grid('ijk', ({ start: i, extent: ix }, { start: j }, { start: k, extent: kx }) => {
-      const vvpinit = (ii, ki) => this.ijkmul(i + ii, j, k + ki)
+    this.grid('ijk', (
+      { start: i, extent: ix, index: ii },
+      { start: j, index: ji },
+      { start: k, extent: kx, index: ki }
+    ) => {
+      const vvpinit = (iii, kii) => this.ijkmul(i + iii, j, k + kii)
       const data = Array2D.fromInit(ix, sweep ? 1 : kx, vvpinit)
       const vvp = new Mat(data, this.getAnimIntermediateParams(), this.context, true)
       vvp.hide()
-      const z = polarity > 0 ? gap + j : extz - gap - j
-      util.updateProps(vvp.group.position, { x: k, y: i, z })
+      const z = polarity > 0 ? gap + j + ji : extz - gap - j - ji
+      util.updateProps(vvp.group.position, { x: k + ki, y: i + ii, z })
       vvps[[i, j, k]] = vvp
       this.anim_mats.push(vvp)
       this.group.add(vvp.group)
@@ -1479,12 +1491,16 @@ export class MatMul {
       }
 
       // update intermediates
-      this.grid('ijk', ({ start: i }, { start: j, extent: jx, end: je }, { start: k, end: ke, extent: kx }) => {
+      this.grid('ijk', (
+        { start: i },
+        { start: j, extent: jx, index: ji },
+        { start: k, extent: kx, index: ki }
+      ) => {
         const vvp = vvps[[i, j, k]]
         if (curj < jx && curk < kx) {
-          const z = polarity > 0 ? gap + j + curj : extz - gap - j - curj
-          util.updateProps(vvp.group.position, { x: k + curk, z })
-          vvp.reinit((ii, ki) => this.ijkmul(i + ii, j + curj, k + curk + ki))
+          const z = polarity > 0 ? gap + j + ji + curj : extz - gap - j - ji - curj
+          vvp.group.position.z = z
+          vvp.reinit((iii, kii) => this.ijkmul(i + iii, j + curj, k + curk + kii))
         }
       })
 
