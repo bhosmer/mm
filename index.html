@@ -66,7 +66,7 @@
       // },
       anim: {
         alg: 'none',
-        fuse: false,
+        fuse: 'none',
         speed: 25,
         'hide inputs': false,
         'i blocks': 1,
@@ -506,11 +506,11 @@
       addMatmulParams(gui)
 
       const gui_anim = gui.addFolder('animation')
-      addChoiceParam(gui_anim, 'alg', viz.ANIM_ALGS, initObj, p => p.anim)
+      addChoiceParam(gui_anim, 'alg', viz.ANIM_ALG, initObj, p => p.anim)
       addIntParam(gui_anim, 'speed', 1, 100, _ => { }, p => p.anim)
       gui_anim.add({ pause: false }, 'pause').onChange(x => anim_pause = x)
       gui_anim.add({ step: animStep }, 'step')
-      addParam(gui_anim, 'fuse', initObj, p => p.anim)
+      addChoiceParam(gui_anim, 'fuse', viz.FUSE_MODE, initObj, p => p.anim)
       addParam(gui_anim, 'hide inputs', x => getObj().hideInputs(x), p => p.anim)
       addIntParam(gui_anim, 'i blocks', 1, 16, initObj, p => p.anim)
       addIntParam(gui_anim, 'j blocks', 1, 16, initObj, p => p.anim)

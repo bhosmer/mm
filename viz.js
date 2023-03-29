@@ -617,14 +617,14 @@ export const LEFT_PLACEMENTS = ['left', 'right', 'left/right', 'right/left']
 export const RIGHT_PLACEMENTS = ['top', 'bottom', 'top/bottom', 'bottom/top']
 export const RESULT_PLACEMENTS = ['front', 'back', 'front/back', 'back/front']
 export const SENSITIVITIES = ['local', 'global']
-export const ANIM_ALGS = [
+export const ANIM_ALG = [
   'none',
   'dotprod (row major)', 'dotprod (col major)', 'axpy',
   'vmprod', 'mvprod', 'vvprod',
   'vmprod/vvprod', 'vvprod/vmprod',
   'mvprod/vvprod', 'vvprod/mvprod'
 ]
-
+export const FUSE_MODE = ['none', 'sync', 'async']
 
 export class MatMul {
 
@@ -1100,13 +1100,18 @@ export class MatMul {
 
     this.alg_join = () => {
       const alg = first(this.params.anim.alg)
+      const fuse = this.params.anim.fuse
 
       const lalg = this.params.left.matmul && !left_done ?
-        (this.left.getIndex() == this.getIndex() ? this.left.alg_join() : 'mixed') :
+        (fuse == 'async' || this.left.getIndex() == this.getIndex() ?
+          this.left.alg_join() :
+          'mixed') :
         'none'
 
       const ralg = this.params.right.matmul && !right_done ?
-        (this.right.getIndex() == this.getIndex() ? this.right.alg_join() : 'mixed') :
+        (fuse == 'async' || this.right.getIndex() == this.getIndex() ?
+          this.right.alg_join() :
+          'mixed') :
         'none'
 
       const nj = () => this.getBlockInfo().j.n
@@ -1131,7 +1136,7 @@ export class MatMul {
       const result_bump = bumps[first(this.params.anim.alg)]()
 
       this.bump = () => {
-        const go = left_done && right_done || this.params.anim.fuse && can_fuse()
+        const go = left_done && right_done || this.params.anim.fuse != 'none' && can_fuse()
         left_done || this.left.bump()
         right_done || this.right.bump()
         go && result_bump()
