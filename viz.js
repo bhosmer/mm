@@ -688,6 +688,8 @@ export class MatMul {
   initLeft() {
     const left_params = this.prepChildParams(this.params.left, info)
     if (left_params.matmul) {
+      left_params.anim['i blocks'] = this.params.anim['i blocks']
+      left_params.anim['k blocks'] = this.params.anim['j blocks']
       this.left = new MatMul(left_params, this.context, false)
     } else {
       const { init, min, max, dropout } = left_params
@@ -700,6 +702,8 @@ export class MatMul {
   initRight() {
     const right_params = this.prepChildParams(this.params.right)
     if (right_params.matmul) {
+      right_params.anim['i blocks'] = this.params.anim['j blocks']
+      right_params.anim['k blocks'] = this.params.anim['k blocks']
       this.right = new MatMul(right_params, this.context, false)
     } else {
       right_params.anim['i blocks'] = right_params.anim['j blocks']
@@ -1148,7 +1152,7 @@ export class MatMul {
       }
       this.result.hide()
 
-      this.bump()
+      !cb && this.bump()
     }
 
     this.onAnimDone = () => {
