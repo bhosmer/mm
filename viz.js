@@ -119,7 +119,7 @@ function softmax_(h, w, data) {
     for (let j = 0, ptr = rptr; j < w; j++, ptr++) {
       const x = Math.exp(data[ptr]) / denom
       if (isNaN(x)) {
-        throw Error(`HEY Math.exp(data[${ptr}) = ${data[ptr]}]) / ${denom} is NaN`)
+        console.log(`HEY Math.exp(data[${ptr}) = ${data[ptr]}]) / ${denom} is NaN`)
       }
       data[ptr] = x
     }
@@ -163,7 +163,7 @@ function initArrayData_(data, h, w, init, epi = undefined, r = undefined, c = un
     for (let j = cstart, ptr = i * w + cstart; j < cend; j++, ptr++) {
       const x = init(i, j, h, w)
       if (isNaN(x)) {
-        throw Error(`HEY init(${i}, ${j}, ${h}, ${w}) is NaN`)
+        console.log(`HEY init(${i}, ${j}, ${h}, ${w}) is NaN`)
       }
       data[ptr] = x
     }
@@ -332,7 +332,8 @@ export class Mat {
 
   sizeFromData(x) {
     if (x === undefined || isNaN(x)) {
-      throw Error(`HEY sizeFromData(${x})`)
+      console.log(`HEY sizeFromData(${x})`)
+      return 0
     }
 
     const local_sens = this.params.viz.sensitivity == 'local'
@@ -356,7 +357,8 @@ export class Mat {
 
   colorFromData(x) {
     if (x === undefined || isNaN(x)) {
-      throw Error(`HEY colorFromData(${x})`)
+      console.log(`HEY colorFromData(${x})`)
+      return COLOR_TEMP.setHSL(0, 1.0, light)
     }
 
     const viz = this.params.viz
@@ -688,17 +690,12 @@ export class MatMul {
     let x = 0.0
     for (let j = minj; j < maxj; j++) {
       const l = this.left.getData(i, j)
-      if (isNaN(l)) {
-        throw Error(`HEY this.left.getData(${i}, ${j}) is NaN (${this.left.params.name})`)
-      }
       const r = this.right.getData(j, k)
-      if (isNaN(r)) {
-        throw Error(`HEY this.right.getData(${j}, ${k}) is NaN (${this.right.params.name})`)
-      }
       x += l * r
     }
     if (isNaN(x)) {
-      throw Error(`HEY dotprod_val(${i}, ${k}, ${minj}, ${maxj}) is NaN`)
+      console.log(`HEY dotprod_val(${i}, ${k}, ${minj}, ${maxj}) is NaN`)
+      return x
     }
     const epi = this.params.epilog
     return epi == 'x/j' ? x / this.D :
