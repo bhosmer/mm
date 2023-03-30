@@ -169,11 +169,7 @@ function initArrayData_(data, h, w, init, epi = undefined, r = undefined, c = un
   const [cstart, cend] = toRange(c, w)
   for (let i = rstart; i < rend; i++) {
     for (let j = cstart, ptr = i * w + cstart; j < cend; j++, ptr++) {
-      const x = init(i, j, h, w)
-      if (isNaN(x)) {
-        console.log(`HEY init(${i}, ${j}, ${h}, ${w}) is NaN`)
-      }
-      data[ptr] = x
+      data[ptr] = init(i, j, h, w)
     }
   }
   const epi_ = epi && getInPlaceEpilog(epi)
@@ -307,11 +303,13 @@ export class Mat {
   }
 
   getDispH() {
-    return this.H + this.getBlockInfo().i.n - 1
+    const { i: { n, size } } = this.getBlockInfo()
+    return this.H + Math.min(n, Math.ceil(this.H / size)) - 1
   }
 
   getDispW() {
-    return this.W + this.getBlockInfo().j.n - 1
+    const { j: { n, size } } = this.getBlockInfo()
+    return this.W + Math.min(n, Math.ceil(this.W / size)) - 1
   }
 
   initViz() {
@@ -618,11 +616,7 @@ export const RIGHT_PLACEMENTS = ['top', 'bottom', 'top/bottom', 'bottom/top']
 export const RESULT_PLACEMENTS = ['front', 'back', 'front/back', 'back/front']
 export const SENSITIVITIES = ['local', 'global']
 export const ANIM_ALG = [
-  'none',
-  'dotprod (row major)', 'dotprod (col major)', 'axpy',
-  'vmprod', 'mvprod', 'vvprod',
-  'vmprod/vvprod', 'vvprod/vmprod',
-  'mvprod/vvprod', 'vvprod/mvprod'
+  'none', 'dotprod (row major)', 'dotprod (col major)', 'axpy', 'vmprod', 'mvprod', 'vvprod',
 ]
 export const FUSE_MODE = ['none', 'sync', 'async']
 
@@ -656,15 +650,18 @@ export class MatMul {
   }
 
   getDispH() {
-    return this.H + this.getBlockInfo().i.n - 1
+    const { i: { n, size } } = this.getBlockInfo()
+    return this.H + Math.min(n, Math.ceil(this.H / size)) - 1
   }
 
   getDispD() {
-    return this.D + this.getBlockInfo().j.n - 1
+    const { j: { n, size } } = this.getBlockInfo()
+    return this.D + Math.min(n, Math.ceil(this.D / size)) - 1
   }
 
   getDispW() {
-    return this.W + this.getBlockInfo().k.n - 1
+    const { k: { n, size } } = this.getBlockInfo()
+    return this.W + Math.min(n, Math.ceil(this.W / size)) - 1
   }
 
   disposeAll() {
@@ -815,8 +812,12 @@ export class MatMul {
 
     // ---
 
-    this.left.params.anim.alg = next(this.params.anim.alg)
-    this.right.params.anim.alg = next(this.params.anim.alg)
+    if (this.left.params.anim.alg == 'none') {
+      this.left.params.anim.alg = this.params.anim.alg
+    }
+    if (this.right.params.anim.alg == 'none') {
+      this.right.params.anim.alg = this.params.anim.alg
+    }
 
     // ---
 
@@ -947,18 +948,20 @@ export class MatMul {
     } else { // negative
       this.right.group.rotation.x = -Math.PI / 2
       this.right.group.position.z = this.getExtent().z
-      this.right.group.position.y = this.params.layout['right placement'].startsWith('top') ?
-        -(this.right.getExtent().z + this.getRightScatter()) :
-        this.getExtent().y + this.getRightScatter()
+      this.right.group.position.y =
+        this.params.layout['right placement'].startsWith('top') ?
+          -(this.right.getExtent().z + this.getRightScatter()) :
+          this.getExtent().y + this.getRightScatter()
     }
     this.group.add(this.right.group)
   }
 
   initResultVis() {
     this.result.initViz()
-    this.result.group.position.z = this.params.layout['result placement'].startsWith('back') ?
-      this.getExtent().z :
-      0
+    this.result.group.position.z =
+      this.params.layout['result placement'].startsWith('back') ?
+        this.getExtent().z :
+        0
     this.group.add(this.result.group)
   }
 
@@ -1091,17 +1094,15 @@ export class MatMul {
       'vvprod': () => this.getVvprodBump(false),
     }
 
+    const nj = this.getBlockInfo().j.n
+    const nlk = () => this.left.getBlockInfo().k.n
+    const nri = () => this.right.getBlockInfo().i.n
+
+    const { alg, fuse } = this.params.anim
+
     let left_done = true, right_done = true
 
-    function first(x) {
-      const sep = x.indexOf('/')
-      return sep == -1 ? x : x.slice(0, sep)
-    }
-
     this.alg_join = () => {
-      const alg = first(this.params.anim.alg)
-      const fuse = this.params.anim.fuse
-
       const lalg = this.params.left.matmul && !left_done ?
         (fuse == 'async' || this.left.getIndex() == this.getIndex() ?
           this.left.alg_join() :
@@ -1114,29 +1115,25 @@ export class MatMul {
           'mixed') :
         'none'
 
-      const nj = () => this.getBlockInfo().j.n
-      const nlk = () => this.left.getBlockInfo().k.n
-      const nri = () => this.right.getBlockInfo().i.n
-
       return (lalg == 'none' && ralg == 'none') ? alg :
         (ralg == 'none') ?
           (lalg == 'vmprod' && alg == 'vmprod' ? 'vmprod' :
-            lalg == 'mvprod' && alg == 'vvprod' && nlk() == nj() ? 'vvprod' :
+            lalg == 'mvprod' && alg == 'vvprod' && nlk() == nj ? 'vvprod' :
               'mixed') :
           (lalg == 'none') ?
             (ralg == 'mvprod' && alg == 'mvprod' ? 'mvprod' :
-              ralg == 'vmprod' && alg == 'vvprod' && nri() == nj() ? 'vvprod' :
+              ralg == 'vmprod' && alg == 'vvprod' && nri() == nj ? 'vvprod' :
                 'mixed') :
             'mixed'
     }
 
-    const can_fuse = () => this.alg_join() != 'mixed'
+    const can_fuse = () => fuse != 'none' && this.alg_join() != 'mixed'
 
     const start = () => {
-      const result_bump = bumps[first(this.params.anim.alg)]()
+      const result_bump = bumps[alg]()
 
       this.bump = () => {
-        const go = left_done && right_done || this.params.anim.fuse != 'none' && can_fuse()
+        const go = left_done && right_done || can_fuse()
         left_done || this.left.bump()
         right_done || this.right.bump()
         go && result_bump()
@@ -1146,6 +1143,7 @@ export class MatMul {
         left_done = false
         this.left.initAnimation(() => left_done = true)
       }
+
       if (this.params.right.matmul) {
         right_done = false
         this.right.initAnimation(() => right_done = true)
@@ -1162,6 +1160,7 @@ export class MatMul {
 
     this.onAnimDone = () => {
       this.clearAnimMats()
+      nj > 1 && this.result.show()
       cb ? cb() : start()
     }
 

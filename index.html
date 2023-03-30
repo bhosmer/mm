@@ -409,6 +409,10 @@
               max: 1,
               dropout: 0,
             },
+            anim: {
+              alg: 'none',
+              'j blocks': 1,
+            },
             // TODO layout
           })
           util.deleteProps(p, ['h', 'w', 'init', 'min', 'max', 'dropout'])
@@ -422,7 +426,7 @@
             max: 1,
             dropout: 0,
           })
-          util.deleteProps(p, ['left', 'right', 'epilog'])
+          util.deleteProps(p, ['left', 'right', 'epilog', 'anim'])
           return addMatParams(g, path, ancestors)
         }
       }
@@ -489,12 +493,38 @@
         addChoiceParam(g, 'epilog', viz.EPILOGS, initObj, path, path)
 
         const title = name => (is_root ? '' : `${g._title} / `) + name
-        const gui_left = g.addFolder(title('left'))
-        const gui_right = g.addFolder(title('right'))
 
+        // ---
+
+        const gui_anim = g.addFolder('animation')
+
+        addChoiceParam(gui_anim, 'alg', viz.ANIM_ALG, initObj, p => path(p).anim, path)
+
+        if (is_root) {
+          addIntParam(gui_anim, 'i blocks', 1, 16, initObj, p => p.anim)
+        }
+
+        addIntParam(gui_anim, 'j blocks', 1, 16, initObj, p => path(p).anim, path)
+
+        if (is_root) {
+          addIntParam(gui_anim, 'k blocks', 1, 16, initObj, p => p.anim)
+        }
+
+        if (is_root) {
+          addIntParam(gui_anim, 'speed', 1, 100, _ => { }, p => p.anim)
+          gui_anim.add({ pause: false }, 'pause').onChange(x => anim_pause = x)
+          gui_anim.add({ step: animStep }, 'step')
+          addChoiceParam(gui_anim, 'fuse', viz.FUSE_MODE, initObj, p => path(p).anim, path)
+          addParam(gui_anim, 'hide inputs', x => getObj().hideInputs(x), p => p.anim)
+        }
+
+        // ---
+
+        const gui_left = g.addFolder(title('left'))
         const add_left = p.left.matmul ? addMatmulParams : addMatParams
         add_left(gui_left, x => path(x).left, [path].concat(ancestors))
 
+        const gui_right = g.addFolder(title('right'))
         const add_right = p.right.matmul ? addMatmulParams : addMatParams
         add_right(gui_right, x => path(x).right, [path].concat(ancestors))
       }
@@ -504,17 +534,6 @@
       const gui = new GUI()
 
       addMatmulParams(gui)
-
-      const gui_anim = gui.addFolder('animation')
-      addChoiceParam(gui_anim, 'alg', viz.ANIM_ALG, initObj, p => p.anim)
-      addIntParam(gui_anim, 'speed', 1, 100, _ => { }, p => p.anim)
-      gui_anim.add({ pause: false }, 'pause').onChange(x => anim_pause = x)
-      gui_anim.add({ step: animStep }, 'step')
-      addChoiceParam(gui_anim, 'fuse', viz.FUSE_MODE, initObj, p => p.anim)
-      addParam(gui_anim, 'hide inputs', x => getObj().hideInputs(x), p => p.anim)
-      addIntParam(gui_anim, 'i blocks', 1, 16, initObj, p => p.anim)
-      addIntParam(gui_anim, 'j blocks', 1, 16, initObj, p => p.anim)
-      addIntParam(gui_anim, 'k blocks', 1, 16, initObj, p => p.anim)
 
       const gui_deco = gui.addFolder('deco')
       addNumParam(gui_deco, 'legends', 0, 10, x => getObj().setLegends(x), p => p.deco)
