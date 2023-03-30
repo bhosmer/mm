@@ -492,16 +492,19 @@
 
         const gui_anim = g.addFolder('animation')
         path(params).anim ||= { alg: 'none', 'j blocks': 1 } // temp?
-        addChoiceParam(gui_anim, 'alg', viz.ANIM_ALG, initObj, p => path(p).anim, path)
-        is_root && addIntParam(gui_anim, 'i blocks', 1, 16, initObj, p => p.anim)
-        addIntParam(gui_anim, 'j blocks', 1, 16, initObj, p => path(p).anim, path)
         if (is_root) {
-          addIntParam(gui_anim, 'k blocks', 1, 16, initObj, p => p.anim)
+          addChoiceParam(gui_anim, 'alg', viz.ANIM_ALG, initObj, p => path(p).anim, path)
           addIntParam(gui_anim, 'speed', 1, 100, _ => { }, p => p.anim)
           gui_anim.add({ pause: false }, 'pause').onChange(x => anim_pause = x)
           gui_anim.add({ step: animStep }, 'step')
           addChoiceParam(gui_anim, 'fuse', viz.FUSE_MODE, initObj, p => path(p).anim, path)
           addParam(gui_anim, 'hide inputs', x => getObj().hideInputs(x), p => p.anim)
+          addIntParam(gui_anim, 'i blocks', 1, 16, initObj, p => p.anim)
+          addIntParam(gui_anim, 'j blocks', 1, 16, initObj, p => path(p).anim, path)
+          addIntParam(gui_anim, 'k blocks', 1, 16, initObj, p => p.anim)
+        } else {
+          addChoiceParam(gui_anim, 'alg', viz.ANIM_ALG, initObj, p => path(p).anim, path)
+          addIntParam(gui_anim, 'j blocks', 1, 16, initObj, p => path(p).anim, path)
         }
 
         const gui_left = g.addFolder(title('left'))
