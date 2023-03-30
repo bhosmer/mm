@@ -257,6 +257,26 @@ class Array2D {
 }
 
 //
+//
+//
+
+function grid(info, dims, f) {
+  const infos = Array.from(dims).map(d => info[d])
+  const loop = (args, infos, f) => infos.length == 0 ?
+    f(...args) :
+    [...Array(infos[0].n).keys()].map(index => {
+      const { size, max } = infos[0]
+      const start = index * size
+      if (start < max) {  // dead final block when size * n - max > size
+        const end = Math.min(start + size, max)
+        const extent = end - start
+        loop([...args, { index, start, end, extent }], infos.slice(1), f)
+      }
+    })
+  loop([], infos, f)
+}
+
+//
 // Mat
 //
 
@@ -307,6 +327,10 @@ export class Mat {
       i: { n: ni, size: Math.ceil(this.H / ni), max: this.H },
       j: { n: nj, size: Math.ceil(this.W / nj), max: this.W },
     }
+  }
+
+  grid(dims, f) {
+    grid(this.getBlockInfo(), dims, f)
   }
 
   getDispH() {
@@ -487,15 +511,26 @@ export class Mat {
     return p.angleTo(c) < Math.PI / 2
   }
 
-  setRowGuides(light) {
+  setRowGuides(light = undefined) {
+    const prev = this.params.deco['row guides']
     light = util.syncProp(this.params.deco, 'row guides', light)
-    if (this.row_guide_group) {
-      this.inner_group.remove(this.row_guide_group)
-      util.disposeAndClear(this.row_guide_group)
+    if (this.row_guide_groups && prev == light) {
+      return
     }
+    if (this.row_guide_groups) {
+      this.row_guide_groups.forEach(g => {
+        this.inner_group.remove(g)
+        util.disposeAndClear(g)
+      })
+    }
+    this.row_guide_groups = []
     if (light > 0.0) {
-      this.row_guide_group = util.rowGuide(this.getDispH(), this.getDispW(), light)
-      this.inner_group.add(this.row_guide_group)
+      this.grid('ij', ({ start: i, end: ie, extent: ix, index: ii }, { start: j, end: je, extent: jx, index: ji }) => {
+        const g = util.rowGuide(ix, jx, light)
+        util.updateProps(g.position, { x: j + ji, y: i + ii })
+        this.inner_group.add(g)
+        this.row_guide_groups.push(g)
+      })
     }
   }
 
@@ -1067,6 +1102,7 @@ export class MatMul {
     this.left.setRowGuides(light)
     this.right.setRowGuides(light)
     this.result.setRowGuides(light)
+    this.anim_mats.forEach(m => m.setRowGuides(light))
   }
 
   setName(name) {
@@ -1181,20 +1217,7 @@ export class MatMul {
   }
 
   grid(dims, f) {
-    const info = this.getBlockInfo()
-    const infos = Array.from(dims).map(d => info[d])
-    const loop = (args, infos, f) => infos.length == 0 ?
-      f(...args) :
-      [...Array(infos[0].n).keys()].map(index => {
-        const { size, max } = infos[0]
-        const start = index * size
-        if (start < max) {  // dead final block when size * n - max > size
-          const end = Math.min(start + size, max)
-          const extent = end - start
-          loop([...args, { index, start, end, extent }], infos.slice(1), f)
-        }
-      })
-    loop([], infos, f)
+    grid(this.getBlockInfo(), dims, f)
   }
 
   getAnimIntermediateParams() {
@@ -1219,7 +1242,7 @@ export class MatMul {
   }
 
   clearAnimMats() {
-    this.anim_mats.map(m => {
+    this.anim_mats.forEach(m => {
       this.group.remove(m.group)
       util.disposeAndClear(m.group)
     })
@@ -1246,6 +1269,7 @@ export class MatMul {
         result > 0 ?
           ji == nj - 1 ? this.result.group.position.z : extz - je - Math.floor(je / sj) + 1 - gap :
           ji == 0 ? this.result.group.position.z : extz - j - Math.floor((je - 1) / sj) + 1 - gap
+      mat.setRowGuides()
       mat.hide()
       results.push(mat)
       this.group.add(mat.group)
