@@ -114,22 +114,29 @@ export const EPILOGS = [
 ]
 
 function softmax_(h, w, data) {
-  let ptr = 0
-  for (let i = 0; i < h; i++) {
-    const rptr = ptr
-    let denom = 0
+
+  const calc_denom = ptr => {
+    let d = 0
     for (let j = 0; j < w; j++, ptr++) {
-      denom += Math.exp(data[ptr])
-      if (!isFinite(denom)) {
-        throw Error(`HEY denom at data[${ptr}) = ${data[ptr]} is infinite`)
+      d += Math.exp(data[ptr])
+      if (!isFinite(d)) {
+        console.log(`HEY denom at data[${ptr}) = ${data[ptr]} becomes infinite`)
+        break
       }
     }
-    for (let j = 0, ptr = rptr; j < w; j++, ptr++) {
+    return d
+  }
+
+  for (let i = 0, ptr = 0; i < h; i++) {
+    const denom = calc_denom(ptr)
+    for (let j = 0; j < w; j++, ptr++) {
       const x = Math.exp(data[ptr]) / denom
       if (isNaN(x)) {
         console.log(`HEY Math.exp(data[${ptr}) = ${data[ptr]}]) / ${denom} is NaN`)
+        data[ptr] = 0
+      } else {
+        data[ptr] = x
       }
-      data[ptr] = x
     }
   }
 }
@@ -358,7 +365,7 @@ export class Mat {
 
   sizeFromData(x) {
     if (x === undefined || isNaN(x)) {
-      console.log(`HEY sizeFromData(${x})`)
+      // console.log(`HEY sizeFromData(${x})`)
       return 0
     }
 
@@ -383,8 +390,8 @@ export class Mat {
 
   colorFromData(x) {
     if (x === undefined || isNaN(x)) {
-      console.log(`HEY colorFromData(${x})`)
-      return COLOR_TEMP.setHSL(0, 1.0, light)
+      // console.log(`HEY colorFromData(${x})`)
+      return COLOR_TEMP.setHSL(0.0, 1.0, 1.0)
     }
 
     const viz = this.params.viz
@@ -744,7 +751,7 @@ export class MatMul {
     }
     if (isNaN(x)) {
       console.log(`HEY dotprod_val(${i}, ${k}, ${minj}, ${maxj}) is NaN`)
-      return x
+      return 0
     }
     const epi = this.params.epilog
     return epi == 'x/j' ? x / this.D :
