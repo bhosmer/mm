@@ -1103,28 +1103,23 @@ export class MatMul {
     let left_done = true, right_done = true
 
     this.alg_join = () => {
-      const lalg = this.params.left.matmul && !left_done ?
+      const lalg = !this.params.left.matmul || left_done ? 'none' :
         (fuse == 'async' || this.left.getIndex() == this.getIndex() ?
           this.left.alg_join() :
-          'mixed') :
-        'none'
+          'mixed')
 
-      const ralg = this.params.right.matmul && !right_done ?
+      const ralg = !this.params.right.matmul || right_done ? 'none' :
         (fuse == 'async' || this.right.getIndex() == this.getIndex() ?
           this.right.alg_join() :
-          'mixed') :
-        'none'
+          'mixed')
 
-      return (lalg == 'none' && ralg == 'none') ? alg :
-        (ralg == 'none') ?
-          (lalg == 'vmprod' && alg == 'vmprod' ? 'vmprod' :
-            lalg == 'mvprod' && alg == 'vvprod' && nlk() == nj ? 'vvprod' :
-              'mixed') :
-          (lalg == 'none') ?
-            (ralg == 'mvprod' && alg == 'mvprod' ? 'mvprod' :
-              ralg == 'vmprod' && alg == 'vvprod' && nri() == nj ? 'vvprod' :
-                'mixed') :
-            'mixed'
+      const or_none = (a, b) => a == b || a == 'none'
+
+      return (alg == 'vmprod' && or_none(lalg, 'vmprod') && ralg == 'none') ? 'vmprod' :
+        (alg == 'mvprod' && lalg == 'none' && or_none(ralg, 'mvprod')) ? 'mvprod' :
+          (alg == 'vvprod' && or_none(lalg, 'mvprod') && or_none(ralg, 'vmprod')) ? 'vvprod' :
+            (lalg == 'none' && ralg == 'none') ? alg :
+              'mixed'
     }
 
     const can_fuse = () => fuse != 'none' && this.alg_join() != 'mixed'
