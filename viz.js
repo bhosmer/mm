@@ -1305,7 +1305,10 @@ export class MatMul {
       }
 
       // start of cycle
-      curi == 0 && curk == 0 && results.forEach(r => r.hide())
+      if (curi == 0 && curk == 0) {
+        Object.values(vmps).forEach(vmp => vmp.setRowGuides())
+        results.forEach(r => r.hide())
+      }
 
       // new input hilights
       if (!this.params.anim['hide inputs']) {
@@ -1348,7 +1351,7 @@ export class MatMul {
     this.grid('ijk', (
       { start: i, extent: ix, index: ii },
       { start: j, extent: jx, index: ji },
-      { start: k, index: ki }
+      { start: k }
     ) => {
       const mvpinit = (iii, jii) => this.ijkmul(i + iii, j + jii, k)
       const data = Array2D.fromInit(sweep ? 1 : ix, jx, mvpinit)
@@ -1391,7 +1394,10 @@ export class MatMul {
       }
 
       // start of cycle
-      curk == 0 && curi == 0 && results.forEach(r => r.hide())
+      if (curk == 0 && curi == 0) {
+        Object.values(mvps).forEach(vmp => vmp.setRowGuides())
+        results.forEach(r => r.hide())
+      }
 
       // new input hilights
       if (!this.params.anim['hide inputs']) {
@@ -1484,7 +1490,10 @@ export class MatMul {
       }
 
       // start of cycle
-      curk == 0 && curj == 0 && results.forEach(r => r.hide())
+      if (curk == 0 && curj == 0) {
+        Object.values(vvps).forEach(vvp => vvp.setRowGuides())
+        results.forEach(r => r.hide())
+      }
 
       // new input highlights
       if (oldj >= 0 && !this.params.anim['hide inputs']) {
