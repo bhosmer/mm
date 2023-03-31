@@ -114,7 +114,7 @@ const CORNER_COLOR = new THREE.Uint8BufferAttribute([
 ], 4)
 CORNER_COLOR.normalized = true
 
-export function rowGuide(h, w, light = 1.0) {
+export function rowGuide(h, w, light = 1.0, denom = 8) {
   const group = new THREE.Group()
   const color = new THREE.Color()
 
@@ -128,15 +128,15 @@ export function rowGuide(h, w, light = 1.0) {
   draw(0, 0, h - 1, 0)
   draw(0, w - 1, h - 1, w - 1)
 
-  const rstride = Math.max(1, (h - 1) / 8)
+  const rstride = Math.max(1, (h - 1) / denom)
   for (let i = 0; i < h; i += rstride) {
     draw(i, 0, i, w - 1)
   }
 
   const corner_geometry = new THREE.BufferGeometry()
   corner_geometry.setAttribute('position', new THREE.Float32BufferAttribute([
-    0, h / 8, 0,
-    w / 8, 0, 0,
+    0, h / denom, 0,
+    w / denom, 0, 0,
     0, 0, 0,
   ], 3))
   CORNER_COLOR.array[3] = CORNER_COLOR.array[7] = CORNER_COLOR.array[3] = 255 * light

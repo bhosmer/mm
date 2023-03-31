@@ -525,7 +525,10 @@ export class Mat {
     }
     this.row_guide_groups = []
     if (light > 0.0) {
-      this.grid('ij', ({ start: i, end: ie, extent: ix, index: ii }, { start: j, end: je, extent: jx, index: ji }) => {
+      this.grid('ij', (
+        { start: i, extent: ix, index: ii },
+        { start: j, extent: jx, index: ji }
+      ) => {
         const g = util.rowGuide(ix, jx, light)
         util.updateProps(g.position, { x: j + ji, y: i + ii })
         this.inner_group.add(g)
