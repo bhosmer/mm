@@ -287,7 +287,7 @@ export function copyTree(obj) {
 //
 
 export function disposeAndClear(obj) {
-  obj.children && obj.children.map(disposeAndClear)
   obj.geometry && obj.geometry.dispose()
   obj.clear()
+  obj.children && obj.children.map(disposeAndClear)
 }
