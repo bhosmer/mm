@@ -151,16 +151,25 @@ export function rowGuide(h, w, light = 1.0, denom = 8) {
 // mm flow guide arrow
 // 
 
-const ARROW_COLOR = new THREE.Uint8BufferAttribute([
-  255, 128, 128, 255,
-  128, 255, 128, 255,
-  0, 128, 255, 255,
+const LEFT_ARROW_COLOR = new THREE.Uint8BufferAttribute([
+  150, 200, 255, 255,
+  150, 200, 255, 255,
+  150, 200, 255, 255,
 ], 4)
-ARROW_COLOR.normalized = true
+LEFT_ARROW_COLOR.normalized = true
+
+const RIGHT_ARROW_COLOR = new THREE.Uint8BufferAttribute([
+  255, 150, 150, 255,
+  255, 150, 150, 255,
+  255, 150, 150, 255,
+], 4)
+RIGHT_ARROW_COLOR.normalized = true
 
 export function flowGuide(h, d, w, placement, light = 1.0) {
-  ARROW_COLOR.array[3] = ARROW_COLOR.array[7] = ARROW_COLOR.array[3] = 255 * light
-  ARROW_COLOR.needsUpdate = true
+  LEFT_ARROW_COLOR.array[3] = LEFT_ARROW_COLOR.array[7] = LEFT_ARROW_COLOR.array[3] = 255 * light
+  LEFT_ARROW_COLOR.needsUpdate = true
+  RIGHT_ARROW_COLOR.array[3] = RIGHT_ARROW_COLOR.array[7] = RIGHT_ARROW_COLOR.array[3] = 255 * light
+  RIGHT_ARROW_COLOR.needsUpdate = true
 
   const { polarity, left, right, result, gap, left_scatter, right_scatter } = placement
   const extent = x => x + gap * 2 - 1
@@ -174,20 +183,20 @@ export function flowGuide(h, d, w, placement, light = 1.0) {
 
   const left_geometry = new THREE.BufferGeometry()
   left_geometry.setAttribute('position', new THREE.Float32BufferAttribute([
-    place_left(gap - left_scatter), center(h) - h / 8, place_result(center(d)),
-    place_left(gap - left_scatter), center(h) + h / 8, place_result(center(d)),
+    place_left(gap - left_scatter), center(h), place_result(center(d)),
+    place_left(center(w)), center(h), place_result(center(d)),
     place_left(center(w)), place_right(center(h)), place_result(gap),
   ], 3))
-  left_geometry.setAttribute('color', ARROW_COLOR)
+  left_geometry.setAttribute('color', LEFT_ARROW_COLOR)
   group.add(new THREE.Mesh(left_geometry, MMGUIDE_MATERIAL));
 
   const right_geometry = new THREE.BufferGeometry()
   right_geometry.setAttribute('position', new THREE.Float32BufferAttribute([
-    center(w) - w / 8, place_right(gap - right_scatter), place_result(center(d)),
-    center(w) + w / 8, place_right(gap - right_scatter), place_result(center(d)),
+    center(w), place_right(gap - right_scatter), place_result(center(d)),
+    center(w), center(h), place_result(center(d)),
     center(w), place_right(center(h)), place_result(gap),
   ], 3))
-  right_geometry.setAttribute('color', ARROW_COLOR)
+  right_geometry.setAttribute('color', RIGHT_ARROW_COLOR)
   group.add(new THREE.Mesh(right_geometry, MMGUIDE_MATERIAL));
 
   return group
