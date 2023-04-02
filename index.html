@@ -253,13 +253,13 @@
       let cam_changing = false
       let label_update_pending = false
 
-      const updateLegendsAndLabels = (labels = false) => {
+      const updateLegendsAndLabels = () => {
         if (!label_update_pending) {
           label_update_pending = true
           setTimeout(function () {
             raycaster.setFromCamera(pointer, camera)
             getObj().setLegends()
-            labels && getObj().updateLabels()
+            getObj().updateLabels()
             label_update_pending = false
           }, 100);
         }
@@ -274,7 +274,7 @@
 
       orbit.addEventListener('end', () => {
         cam_changing = false
-        updateLegendsAndLabels()
+        updateLegendsAndLabels(true)
       })
 
       orbit.addEventListener('change', () => setParams({ cam: camera.position }), false)
@@ -290,7 +290,7 @@
         pointer.x = (event.clientX / window.innerWidth) * 2 - 1
         pointer.y = - (event.clientY / window.innerHeight) * 2 + 1
         if (!cam_changing) {
-          updateLegendsAndLabels(true)
+          updateLegendsAndLabels()
         }
       }
       window.addEventListener('pointermove', onPointerMove)

@@ -389,7 +389,7 @@ export class Mat {
 
   sizeFromData(x) {
     if (x === undefined || isNaN(x)) {
-      // console.log(`HEY sizeFromData(${x})`)
+      console.log(`HEY sizeFromData(${x})`)
       return 0
     }
 
@@ -414,7 +414,7 @@ export class Mat {
 
   colorFromData(x) {
     if (x === undefined || isNaN(x)) {
-      // console.log(`HEY colorFromData(${x})`)
+      console.log(`HEY colorFromData(${x})`)
       return COLOR_TEMP.setHSL(0.0, 1.0, 1.0)
     }
 
@@ -857,10 +857,10 @@ export class MatMul {
 
     // ---
 
-    if (this.left.params.anim.alg == 'none') {
+    if (this.left.params.anim.alg == 'none' || this.left.params.anim.alg == 'default') {
       this.left.params.anim.alg = this.params.anim.alg
     }
-    if (this.right.params.anim.alg == 'none') {
+    if (this.right.params.anim.alg == 'none' || this.right.params.anim.alg == 'default') {
       this.right.params.anim.alg = this.params.anim.alg
     }
 
