@@ -57,17 +57,19 @@ export function updateFromSearchParams(obj, searchParams, strict = false) {
   searchParams.forEach((v, k) => comp_update[k] = v)
   const update = uncompress(comp_update)
   Object.entries(update).forEach(([k, v]) => {
+    let x
     if (unqual(k) in types) {
       const t = typeof types[unqual(k)]
-      const x = castToType(v, t)
-      if (x !== undefined) {
-        flat_obj[k] = x
-      } else {
-        err(`don't know how to cast param '${k}' to type ${t}`)
+      x = castToType(v, t)
+      if (x === undefined) {
+        err(`don't know how to cast param '${k}' to type ${t}, using string ${v}`)
+        x = v
       }
     } else {
-      err(`unknown param '${k}'`)
+      err(`unknown param '${k}', setting value ${v} as string`)
+      x = v
     }
+    flat_obj[k] = x
   })
 
   updateProps(obj, unflatten(flat_obj))

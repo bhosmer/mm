@@ -29,8 +29,8 @@
     import * as viz from './viz.js'
     import * as util from './util.js'
 
+    import { GUI } from 'https://cdn.jsdelivr.net/npm/lil-gui@0.18.1/+esm'
     import { FontLoader } from 'https://threejs.org/examples/jsm/loaders/FontLoader.js'
-    import { GUI } from 'https://threejs.org/examples/jsm/libs/lil-gui.module.min.js'
     import { OrbitControls } from 'https://threejs.org/examples/jsm/controls/OrbitControls.js'
     import { EffectComposer } from 'https://threejs.org/examples/jsm/postprocessing/EffectComposer.js'
     import { RenderPass } from 'https://threejs.org/examples/jsm/postprocessing/RenderPass.js'
@@ -106,9 +106,6 @@
         y: init_dims.j * 2,
         z: init_dims.k * 2,
       }
-      // gui: {
-      //    TODO folder state
-      // }
     }
 
     const expr = p => p.left && p.right ?
@@ -118,7 +115,7 @@
     // update URL with param changes
 
     let address_bar_update_pending = false
-    function setParams(obj, p = params) {
+    function setParams(obj, p = params, t = 1000) {
       for (const k in obj) {
         p[k] = obj[k]
       }
@@ -130,7 +127,7 @@
           const url = `${window.location.pathname}?${search_params}`
           window.history.replaceState({}, '', url)
           address_bar_update_pending = false
-        }, 1000)
+        }, t)
       }
     }
 
@@ -374,6 +371,16 @@
         }
       }
 
+      function addFolder(parent, name, p) {
+        const child = parent.addFolder(name).open((p.folder || 'open') == 'open')
+        child.onOpenClose(g => {
+          (g === child) && setParams({ folder: g._closed ? 'closed' : 'open' }, p, 0)
+        })
+        return child
+      }
+
+      // ---
+
       function syncChildParams(g, path, ancestors) {
         const height = p => p.matmul ? height(p.left) : p.h
         const width = p => p.matmul ? width(p.right) : p.w
@@ -490,7 +497,7 @@
 
         const title = name => (is_root ? '' : `${g._title} / `) + name
 
-        const gui_anim = g.addFolder('animation')
+        const gui_anim = addFolder(g, 'animation', p.anim)
         path(params).anim ||= { alg: 'none', 'j blocks': 1 } // temp?
         if (is_root) {
           addChoiceParam(gui_anim, 'alg', viz.ANIM_ALG, initObj, p => path(p).anim, path)
@@ -507,22 +514,22 @@
           addIntParam(gui_anim, 'j blocks', 1, 16, initObj, p => path(p).anim, path)
         }
 
-        const gui_left = g.addFolder(title('left'))
+        const gui_left = addFolder(g, title('left'), p.left)
         const add_left = p.left.matmul ? addMatmulParams : addMatParams
         add_left(gui_left, x => path(x).left, [path].concat(ancestors))
 
-        const gui_right = g.addFolder(title('right'))
+        const gui_right = addFolder(g, title('right'), p.right)
         const add_right = p.right.matmul ? addMatmulParams : addMatParams
         add_right(gui_right, x => path(x).right, [path].concat(ancestors))
       }
 
       // ---
 
-      const gui = new GUI()
+      const gui = new GUI({ title: 'mm' })
 
       addMatmulParams(gui)
 
-      const gui_deco = gui.addFolder('deco')
+      const gui_deco = addFolder(gui, 'deco', params.deco)
       addNumParam(gui_deco, 'legends', 0, 10, x => getObj().setLegends(x), p => p.deco)
       addIntParam(gui_deco, 'spotlight', 0, 10, x => getObj().updateLabels(params), p => p.deco)
       addNumParam(gui_deco, 'row guides', 0.0, 1.0, x => getObj().setRowGuides(x), p => p.deco)
@@ -530,7 +537,7 @@
       addParam(gui_deco, 'interior spotlight', x => getObj().updateLabels(params), p => p.deco)
       addParam(gui_deco, 'axes', x => initAxes(getObj().params.axes = x), p => p.deco)
 
-      const gui_layout = gui.addFolder('layout')
+      const gui_layout = addFolder(gui, 'layout', params.layout)
       addChoiceParam(gui_layout, 'polarity', viz.POLARITIES, initObj, p => p.layout)
       addChoiceParam(gui_layout, 'left placement', viz.LEFT_PLACEMENTS, initObj, p => p.layout)
       addChoiceParam(gui_layout, 'right placement', viz.RIGHT_PLACEMENTS, initObj, p => p.layout)
@@ -540,7 +547,7 @@
       addIntParam(gui_layout, 'molecule', 1, 8, initObj, p => p.layout)
       addNumParam(gui_layout, 'blast', -2.0, 2.0, initObj, p => p.layout)
 
-      const gui_viz = gui.addFolder('colors and sizes')
+      const gui_viz = addFolder(gui, 'colors and sizes', params.viz)
       addChoiceParam(gui_viz, 'sensitivity', viz.SENSITIVITIES, initObj, p => p.viz)
       addNumParam(gui_viz, 'min size', 0.0, 1.0, initObj, p => p.viz)
       addNumParam(gui_viz, 'min light', 0.0, 1.0, initObj, p => p.viz)
