@@ -618,7 +618,7 @@ export class Mat {
         const j = index % this.W
         if (!this.isHidden(i, j)) {
           const x = this.getData(i, j)
-          if (x != 0) { // declutter
+          if (x != 0 && !isNaN(x) && isFinite(x)) {
             let label = this.label_cache[index]
             const facing = this.isFacing()
             const rsu = this.isRightSideUp()
