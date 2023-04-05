@@ -292,7 +292,7 @@ function grid(info, dims, f) {
 // Mat
 //
 
-const ELEM_SIZE = 2000
+const ELEM_SIZE = 2500
 const ZERO_COLOR = new THREE.Color(0, 0, 0)
 const COLOR_TEMP = new THREE.Color()
 
