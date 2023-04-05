@@ -400,6 +400,19 @@ export class Mat {
     })
   }
 
+  getRangeInfo() {
+    const viz = this.params.viz
+    const use_absmin = viz.sensitivity == 'superlocal'
+    const local_sens = use_absmin || viz.sensitivity == 'local'
+    const absmax = local_sens ? this.absmax : this.getGlobalAbsmax()
+    const absmin = use_absmin ? this.absmin : 0
+    const absdiff = absmax - absmin
+    if (absmin > absmax) {
+      console.log(`HEY absmin ${absmin} > absmax ${absmax}`)
+    }
+    return { viz, absmin, absmax, absdiff }
+  }
+
   sizeFromData(x) {
     if (x === undefined || isNaN(x)) {
       console.log(`HEY sizeFromData(${x})`)
@@ -411,22 +424,13 @@ export class Mat {
       return ELEM_SIZE
     }
 
-    const viz = this.params.viz
-
-    const use_absmin = viz.sensitivity == 'superlocal'
-    const local_sens = use_absmin || viz.sensitivity == 'local'
-    const absmax = local_sens ? this.absmax : this.getGlobalAbsmax()
-    const absmin = use_absmin ? this.absmin : 0
-    if (absmin > absmax) {
-      console.log(`HEY absmin ${absmin} > absmax ${absmax}`)
-    }
-
-    const vol = absmax == absmin ? 0 : (absx - absmin) / (absmax - absmin)
+    const { viz, absmin, absmax, absdiff } = this.getRangeInfo()
+    const vol = absmax <= absmin ? 0 : (absx - absmin) / absdiff
     const zsize = viz['min size'] * ELEM_SIZE
     const size = zsize + (ELEM_SIZE - zsize) * Math.cbrt(vol)
 
     if (absx > absmax || size < 0 || size > ELEM_SIZE || isNaN(size)) {
-      console.log(`HEY x ${x} size ${size} absx ${absx} absmax ${absmax} absmin ${absmin} zsize ${zsize} sens ${local_sens}`)
+      console.log(`HEY x ${x} size ${size} absx ${absx} absmax ${absmax} absmin ${absmin} zsize ${zsize}`)
     }
 
     return size
@@ -443,21 +447,13 @@ export class Mat {
       return COLOR_TEMP.setHSL(1.0, 1.0, 1.0)
     }
 
-    const viz = this.params.viz
+    const { viz, absmin, absdiff } = this.getRangeInfo()
 
-    const use_absmin = viz.sensitivity == 'superlocal'
-    const local_sens = use_absmin || viz.sensitivity == 'local'
-    const absmax = local_sens ? this.absmax : this.getGlobalAbsmax()
-    const absmin = use_absmin ? this.absmin : 0
-    if (absmin > absmax) {
-      console.log(`HEY absmin ${absmin} > absmax ${absmax}`)
-    }
-
-    const hue_vol = absmax == absmin ? 0 : (x - Math.sign(x) * absmin) / (absmax - absmin)
+    const hue_vol = absdiff <= 0 ? 0 : (x - Math.sign(x) * absmin) / absdiff
     const gap = viz['hue gap'] * Math.sign(x)
     const hue = (viz['zero hue'] + gap + (Math.cbrt(hue_vol) * viz['hue spread'])) % 1
 
-    const light_vol = absmax == absmin ? 0 : (absx - absmin) / (absmax - absmin)
+    const light_vol = absdiff <= 0 ? 0 : (absx - absmin) / absdiff
     const range = viz['max light'] - viz['min light']
     const light = viz['min light'] + range * Math.cbrt(light_vol)
 
