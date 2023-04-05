@@ -227,6 +227,18 @@ class Array2D {
     return absmax
   }
 
+  absmin() {
+    const data = this.data
+    let absmin = Infinity
+    for (let i = 0; i < data.length; i++) {
+      const absx = Math.abs(data[i])
+      if (!isFinite(absmin) || absx < absmin) {
+        absmin = absx
+      }
+    }
+    return absmin
+  }
+
   transpose() {
     return Array2D.fromInit(this.w, this.h, (i, j) => this.get(j, i))
   }
@@ -314,6 +326,7 @@ export class Mat {
     this.H = data.h
     this.W = data.w
     this.absmax = this.data.absmax()
+    this.absmin = this.data.absmin()
 
     if (init_viz) {
       this.initViz()
@@ -393,20 +406,27 @@ export class Mat {
       return 0
     }
 
-    const local_sens = this.params.viz.sensitivity == 'local'
     const absx = Math.abs(x)
-    const absmax = local_sens ? this.absmax : this.getGlobalAbsmax()
-
     if (absx === Infinity) {
       return ELEM_SIZE
     }
 
-    const vol = absmax == 0 ? 0 : absx / absmax
-    const zsize = this.params.viz['min size'] * ELEM_SIZE
+    const viz = this.params.viz
+
+    const use_absmin = viz.sensitivity == 'superlocal'
+    const local_sens = use_absmin || viz.sensitivity == 'local'
+    const absmax = local_sens ? this.absmax : this.getGlobalAbsmax()
+    const absmin = use_absmin ? this.absmin : 0
+    if (absmin > absmax) {
+      console.log(`HEY absmin ${absmin} > absmax ${absmax}`)
+    }
+
+    const vol = absmax == absmin ? 0 : (absx - absmin) / (absmax - absmin)
+    const zsize = viz['min size'] * ELEM_SIZE
     const size = zsize + (ELEM_SIZE - zsize) * Math.cbrt(vol)
 
     if (absx > absmax || size < 0 || size > ELEM_SIZE || isNaN(size)) {
-      throw Error(`HEY x ${x} size ${size} absx ${absx} absmax ${absmax} zsize ${zsize} sens ${local_sens}`)
+      console.log(`HEY x ${x} size ${size} absx ${absx} absmax ${absmax} absmin ${absmin} zsize ${zsize} sens ${local_sens}`)
     }
 
     return size
@@ -418,20 +438,26 @@ export class Mat {
       return COLOR_TEMP.setHSL(0.0, 1.0, 1.0)
     }
 
-    const viz = this.params.viz
-    const local_sens = viz.sensitivity == 'local'
     const absx = Math.abs(x)
-    const absmax = local_sens ? this.absmax : this.getGlobalAbsmax()
-
     if (absx === Infinity) {
       return COLOR_TEMP.setHSL(1.0, 1.0, 1.0)
     }
 
-    const hue_vol = absmax == 0 ? 0 : x / absmax
+    const viz = this.params.viz
+
+    const use_absmin = viz.sensitivity == 'superlocal'
+    const local_sens = use_absmin || viz.sensitivity == 'local'
+    const absmax = local_sens ? this.absmax : this.getGlobalAbsmax()
+    const absmin = use_absmin ? this.absmin : 0
+    if (absmin > absmax) {
+      console.log(`HEY absmin ${absmin} > absmax ${absmax}`)
+    }
+
+    const hue_vol = absmax == absmin ? 0 : (x - Math.sign(x) * absmin) / (absmax - absmin)
     const gap = viz['hue gap'] * Math.sign(x)
     const hue = (viz['zero hue'] + gap + (Math.cbrt(hue_vol) * viz['hue spread'])) % 1
 
-    const light_vol = absmax == 0 ? 0 : absx / absmax
+    const light_vol = absmax == absmin ? 0 : (absx - absmin) / (absmax - absmin)
     const range = viz['max light'] - viz['min light']
     const light = viz['min light'] + range * Math.cbrt(light_vol)
 
@@ -450,6 +476,7 @@ export class Mat {
     this.data.reinit(init, epi, r, c)
     if (this.params.stretch_absmax) {
       this.absmax = Math.max(this.absmax, this.data.absmax())
+      this.absmin = Math.min(this.absmin, this.data.absmin())
     }
     this.setColorsAndSizes(r, c)
   }
@@ -566,7 +593,7 @@ export class Mat {
       size = Math.cbrt(Math.max(5, this.getDispH()) * Math.max(this.getDispW(), 5)) * size / 20
       this.name_text = this.context.getText(name, color, size)
       this.name_text.name = `${name}.name`
-      const { h, w } = util.bbhw(this.name_text.geometry)
+      const { h, w } = util.gbbhwd(this.name_text.geometry)
       this.name_text.geometry.rotateZ(rsu ? Math.PI : 0)
       this.name_text.geometry.rotateY(facing ? Math.PI : 0)
       const xdir = facing == rsu ? 1 : -1
@@ -633,7 +660,7 @@ export class Mat {
               label.geometry.rotateX(zdir * Math.PI)
               label.geometry.rotateY(facing ? 0 : Math.PI)
               label.geometry.rotateZ(rsu ? 0 : Math.PI)
-              const { h, w } = util.bbhw(label.geometry)
+              const { h, w } = util.gbbhwd(label.geometry)
               const disp_i = i + Math.floor(i / si)
               const disp_j = j + Math.floor(j / sj)
               label.geometry.translate(
@@ -659,7 +686,7 @@ export const POLARITIES = ['positive', 'negative', 'positive/negative', 'negativ
 export const LEFT_PLACEMENTS = ['left', 'right', 'left/right', 'right/left']
 export const RIGHT_PLACEMENTS = ['top', 'bottom', 'top/bottom', 'bottom/top']
 export const RESULT_PLACEMENTS = ['front', 'back', 'front/back', 'back/front']
-export const SENSITIVITIES = ['local', 'global']
+export const SENSITIVITIES = ['global', 'local', 'superlocal']
 export const ANIM_ALG = [
   'none', 'dotprod (row major)', 'dotprod (col major)', 'axpy', 'vmprod', 'mvprod', 'vvprod',
 ]
@@ -1122,7 +1149,7 @@ export class MatMul {
 
   // animation
 
-  initAnimation(cb) {
+  initAnimation(cb = undefined) {
     if (this.params.anim.alg == 'none') {
       if (this.params.anim['hide inputs']) {
         !this.params.left.matmul && this.left.show()
@@ -1561,6 +1588,47 @@ export class MatMul {
       // update labels
       this.updateLabels()
     }
+  }
+}
+
+export class Series {
+  constructor(items, offset) {
+    this.items = items
+    this.group = new THREE.Group()
+    const loc = new THREE.Vector3(0, 0, 0)
+    this.items.forEach(item => {
+      util.updateProps(item.group.position, loc)
+      const { h, w, d } = util.bbhwd(item.getBoundingBox())
+      offset.x != 0 && (loc.x += w + offset.x)
+      offset.y != 0 && (loc.y += h + offset.y)
+      offset.z != 0 && (loc.z += d + offset.z)
+      this.group.add(item.group)
+    })
+  }
+
+  getBoundingBox() {
+    return new THREE.Box3().setFromObject(this.group)
+  }
+
+  center() {
+    const c = this.getBoundingBox().getCenter(new THREE.Vector3())
+    util.updateProps(this.group.position, c.negate())
+  }
+
+  setLegends(enabled = undefined) {
+    this.items.forEach(item => item.setLegends(enabled))
+  }
+
+  updateLabels(params = undefined) {
+    this.items.forEach(item => item.updateLabels(params))
+  }
+
+  initAnimation() {
+    this.items.forEach(item => item.initAnimation())
+  }
+
+  disposeAll() {
+    util.disposeAndClear(this.group)
   }
 }
 

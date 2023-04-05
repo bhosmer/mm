@@ -206,15 +206,24 @@
 
       // obj
       let obj
+      let series
+
       function getObj() {
         return obj
       }
 
       function initObj() {
+        // ---
         if (obj) {
           scene.remove(obj.group)
           obj.disposeAll()
         }
+        // ---
+        // if (series) {
+        //   scene.remove(series.group)
+        //   series.disposeAll()
+        // }
+        // ---
 
         const ensureCounts = p => {
           p.count = 1 +
@@ -225,14 +234,48 @@
 
         obj = new viz.MatMul(ensureCounts(util.copyTree(params)), getContext())
 
+        // ---
+
         obj.group.rotation.x = Math.PI
         obj.center()
 
-        getObj().setLegends()
-        getObj().updateLabels()
-        getObj().initAnimation()
+        obj.setLegends()
+        obj.updateLabels()
+        obj.initAnimation()
 
         scene.add(obj.group)
+
+        // ---
+
+        // const mms = []
+        // for (let i = 0; i < 8; i++) {
+        //   const mm = i == 0 ?
+        //     obj :
+        //     new viz.MatMul(ensureCounts(util.copyTree(params)), getContext())
+        //   const f = mm => {
+        //     mm.params.name && (mm.params.name += ` [${i}]`)
+        //     mm.left && f(mm.left)
+        //     mm.right && f(mm.right)
+        //     mm.result && f(mm.result)
+        //   }
+        //   f(mm)
+        //   mms.push(mm)
+        // }
+        // const offset = new THREE.Vector3(0, 0, -mms[0].getDispD() * 8)
+
+        // series = new viz.Series(mms, offset)
+
+        // series.group.rotation.x = Math.PI
+        // series.center()
+
+        // series.setLegends()
+        // series.updateLabels()
+        // series.initAnimation()
+
+        // scene.add(series.group)
+
+        // ---
+
       }
 
       // renderer, composer
@@ -393,7 +436,7 @@
           util.updateProps(p, {
             epilog: 'none',
             left: {
-              name: `${p.name}L`,
+              name: `${p.name} L`,
               matmul: false,
               h: p.h,
               w: depth,
@@ -403,7 +446,7 @@
               dropout: 0,
             },
             right: {
-              name: `${p.name}R`,
+              name: `${p.name} R`,
               matmul: false,
               h: depth,
               w: p.w,
@@ -457,12 +500,12 @@
           initObj()
         }, path, path)
 
-        addIntParam(g, 'h', 1, 128, x => {
+        addIntParam(g, 'h', 1, 256, x => {
           fix_shape(p.h, p.w, p, ancestors)
           initObj()
         }, path, path)
 
-        addIntParam(g, 'w', 1, 128, x => {
+        addIntParam(g, 'w', 1, 256, x => {
           fix_shape(p.h, p.w, p, ancestors)
           initObj()
         }, path, path)

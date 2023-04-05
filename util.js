@@ -205,14 +205,19 @@ export function flowGuide(h, d, w, placement, light = 1.0) {
 }
 
 //
-// bounding box stuff for text positioning
+// bounding box stuff etc
 //
 
-export function bbhw(g) {
+export function bbhwd(bb) {
   return {
-    h: g.boundingBox.max.y - g.boundingBox.min.y,
-    w: g.boundingBox.max.x - g.boundingBox.min.x
+    h: bb.max.y - bb.min.y,
+    w: bb.max.x - bb.min.x,
+    d: bb.max.z - bb.min.z,
   }
+}
+
+export function gbbhwd(g) {
+  return bbhwd(g.boundingBox)
 }
 
 export function center(x, y = 0) {
