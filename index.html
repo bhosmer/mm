@@ -80,7 +80,7 @@
         'result placement': 'front',
         gap: 1,
         scatter: 0,
-        molecule: 3,
+        molecule: 1,
         blast: 0,
       },
       deco: {
@@ -301,7 +301,7 @@
             getObj().setLegends()
             getObj().updateLabels()
             label_update_pending = false
-          }, 100);
+          }, 10)
         }
       }
 
@@ -424,42 +424,52 @@
 
       // ---
 
+      const epilog_proto = 'none'
+
+      const anim_proto = () => ({
+        alg: 'none',
+        'j blocks': 1,
+      })
+
+      const layout_proto = () => ({
+        // polarity: 'negative/positive',
+        // 'left placement': 'left/right',
+        // 'right placement': 'top/bottom',
+        // 'result placement': 'front/back',
+        polarity: 'negative',
+        'left placement': 'left',
+        'right placement': 'top',
+        'result placement': 'front',
+      })
+
+      const child_mat_proto = (p, depth, is_left) => {
+        return {
+          name: `${p.name}${is_left ? 'L' : 'R'}`,
+          matmul: false,
+          h: is_left ? p.h : depth,
+          w: is_left ? depth : p.w,
+          init: is_left ? 'row major' : 'col major',
+          min: -1,
+          max: 1,
+          dropout: 0,
+        }
+      }
+
       function syncChildParams(g, path, ancestors) {
         const height = p => p.matmul ? height(p.left) : p.h
         const width = p => p.matmul ? width(p.right) : p.w
         const p = path(params)
         const pp = ancestors[0](params)
-        const is_left = p === pp.left
         clearFolder(g)
         if (p.matmul) {
+          const is_left = p === pp.left
           const depth = is_left ? width(pp.right) : height(pp.left)
           util.updateProps(p, {
-            epilog: 'none',
-            left: {
-              name: `${p.name} L`,
-              matmul: false,
-              h: p.h,
-              w: depth,
-              init: 'row major',
-              min: -1,
-              max: 1,
-              dropout: 0,
-            },
-            right: {
-              name: `${p.name} R`,
-              matmul: false,
-              h: depth,
-              w: p.w,
-              init: 'col major',
-              min: -1,
-              max: 1,
-              dropout: 0,
-            },
-            anim: {
-              alg: 'none',
-              'j blocks': 1,
-            },
-            // TODO layout
+            epilog: epilog_proto,
+            left: child_mat_proto(p, depth, true),
+            right: child_mat_proto(p, depth, false),
+            anim: anim_proto(),
+            layout: layout_proto(),
           })
           util.deleteProps(p, ['h', 'w', 'init', 'min', 'max', 'dropout'])
           return addMatmulParams(g, path, ancestors)
@@ -472,13 +482,13 @@
             max: 1,
             dropout: 0,
           })
-          util.deleteProps(p, ['left', 'right', 'epilog', 'anim'])
+          util.deleteProps(p, ['left', 'right', 'epilog', 'anim', 'layout'])
           return addMatParams(g, path, ancestors)
         }
       }
 
       // addMatParams
-      function addMatParams(g, path, ancestors) {
+      function addMatParams(g, path, ancestors, folder_init) {
         const height = p => p.matmul ? height(p.left) : p.h
         const width = p => p.matmul ? width(p.right) : p.w
 
@@ -523,10 +533,10 @@
       }
 
       // addMatmulParams
-      function addMatmulParams(g, path = x => x, ancestors = []) {
+      function addMatmulParams(g, path = x => x, ancestors = [], folder_init = 'closed') {
         const p = path(params)
         const is_root = ancestors.length == 0
-        const folder_init = is_root ? 'open' : 'closed'
+        // const folder_init = 'open' // is_root ? 'open' : 'closed'
 
         addParam(g, 'name', x => path(getObj()).setName(x), path, path)
 
@@ -541,14 +551,14 @@
 
         const title = name => (is_root ? '' : `${g._title} / `) + name
 
-        p.anim ||= { alg: 'none', 'j blocks': 1 } // temp?
+        p.anim ||= anim_proto() // temp?
         const gui_anim = addFolder(g, 'animation', p.anim, folder_init)
         if (is_root) {
-          addChoiceParam(gui_anim, 'alg', viz.ANIM_ALG, initObj, p => path(p).anim, path)
+          addChoiceParam(gui_anim, 'alg', viz.ANIM_ALG, initObj, p => p.anim)
           addIntParam(gui_anim, 'speed', 1, 100, _ => { }, p => p.anim)
           gui_anim.add({ pause: false }, 'pause').onChange(x => anim_pause = x)
           gui_anim.add({ step: animStep }, 'step')
-          addChoiceParam(gui_anim, 'fuse', viz.FUSE_MODE, initObj, p => path(p).anim, path)
+          addChoiceParam(gui_anim, 'fuse', viz.FUSE_MODE, initObj, p => p.anim)
           addParam(gui_anim, 'hide inputs', x => getObj().hideInputs(x), p => p.anim)
           addIntParam(gui_anim, 'i blocks', 1, 16, initObj, p => p.anim)
           addIntParam(gui_anim, 'j blocks', 1, 16, initObj, p => p.anim)
@@ -558,13 +568,27 @@
           addIntParam(gui_anim, 'j blocks', 1, 16, initObj, p => path(p).anim, path)
         }
 
+        p.layout ||= layout_proto() // temp?
+        const gui_layout = addFolder(g, 'layout', p.layout, folder_init)
+        addChoiceParam(gui_layout, 'polarity', viz.POLARITIES, initObj, p => path(p).layout, path)
+        addChoiceParam(gui_layout, 'left placement', viz.LEFT_PLACEMENTS, initObj, p => path(p).layout, path)
+        addChoiceParam(gui_layout, 'right placement', viz.RIGHT_PLACEMENTS, initObj, p => path(p).layout, path)
+        addChoiceParam(gui_layout, 'result placement', viz.RESULT_PLACEMENTS, initObj, p => path(p).layout, path)
+
+        if (is_root) {
+          addIntParam(gui_layout, 'gap', 1, 32, initObj, p => p.layout)
+          addIntParam(gui_layout, 'scatter', 0, 128, initObj, p => p.layout)
+          addIntParam(gui_layout, 'molecule', 1, 8, initObj, p => p.layout)
+          addNumParam(gui_layout, 'blast', -2.0, 2.0, initObj, p => p.layout)
+        }
+
         const gui_left = addFolder(g, title('left'), p.left, folder_init)
         const add_left = p.left.matmul ? addMatmulParams : addMatParams
-        add_left(gui_left, x => path(x).left, [path].concat(ancestors))
+        add_left(gui_left, x => path(x).left, [path].concat(ancestors), 'closed')
 
         const gui_right = addFolder(g, title('right'), p.right, folder_init)
         const add_right = p.right.matmul ? addMatmulParams : addMatParams
-        add_right(gui_right, x => path(x).right, [path].concat(ancestors))
+        add_right(gui_right, x => path(x).right, [path].concat(ancestors), 'closed')
       }
 
       // ---
@@ -573,7 +597,7 @@
 
       addMatmulParams(gui)
 
-      const gui_deco = addFolder(gui, 'deco', params.deco)
+      const gui_deco = addFolder(gui, 'deco', params.deco, 'closed')
       addNumParam(gui_deco, 'legends', 0, 10, x => getObj().setLegends(x), p => p.deco)
       addIntParam(gui_deco, 'spotlight', 0, 10, x => getObj().updateLabels(params), p => p.deco)
       addNumParam(gui_deco, 'row guides', 0.0, 1.0, x => getObj().setRowGuides(x), p => p.deco)
@@ -581,17 +605,7 @@
       addParam(gui_deco, 'interior spotlight', x => getObj().updateLabels(params), p => p.deco)
       addParam(gui_deco, 'axes', x => initAxes(getObj().params.axes = x), p => p.deco)
 
-      const gui_layout = addFolder(gui, 'layout', params.layout)
-      addChoiceParam(gui_layout, 'polarity', viz.POLARITIES, initObj, p => p.layout)
-      addChoiceParam(gui_layout, 'left placement', viz.LEFT_PLACEMENTS, initObj, p => p.layout)
-      addChoiceParam(gui_layout, 'right placement', viz.RIGHT_PLACEMENTS, initObj, p => p.layout)
-      addChoiceParam(gui_layout, 'result placement', viz.RESULT_PLACEMENTS, initObj, p => p.layout)
-      addIntParam(gui_layout, 'gap', 1, 32, initObj, p => p.layout)
-      addIntParam(gui_layout, 'scatter', 0, 128, initObj, p => p.layout)
-      addIntParam(gui_layout, 'molecule', 1, 8, initObj, p => p.layout)
-      addNumParam(gui_layout, 'blast', -2.0, 2.0, initObj, p => p.layout)
-
-      const gui_viz = addFolder(gui, 'colors and sizes', params.viz)
+      const gui_viz = addFolder(gui, 'colors and sizes', params.viz, 'closed')
       addChoiceParam(gui_viz, 'sensitivity', viz.SENSITIVITIES, initObj, p => p.viz)
       addNumParam(gui_viz, 'min size', 0.0, 1.0, initObj, p => p.viz)
       addNumParam(gui_viz, 'min light', 0.0, 1.0, initObj, p => p.viz)

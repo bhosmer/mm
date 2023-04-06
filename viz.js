@@ -292,7 +292,7 @@ function grid(info, dims, f) {
 // Mat
 //
 
-const ELEM_SIZE = 2500
+const ELEM_SIZE = 2400
 const ZERO_COLOR = new THREE.Color(0, 0, 0)
 const COLOR_TEMP = new THREE.Color()
 
@@ -376,16 +376,16 @@ export class Mat {
     this.setLegends()
   }
 
-  setColorsAndSizes(r = undefined, c = undefined, size = undefined, color = undefined) {
+  setColorsAndSizes(r = undefined, c = undefined, get_size = undefined, get_color = undefined) {
     const [rstart, rend] = toRange(r, this.H)
     const [cstart, cend] = toRange(c, this.W)
-    size = size || this.sizeFromData.bind(this)
-    color = color || this.colorFromData.bind(this)
+    get_size = get_size || this.sizeFromData.bind(this)
+    get_color = get_color || this.colorFromData.bind(this)
     for (let i = rstart; i < rend; i++) {
       for (let j = cstart; j < cend; j++) {
         const x = this.getData(i, j)
-        this.setSize(i, j, size(x))
-        this.setColor(i, j, color(x))
+        this.setSize(i, j, get_size(x))
+        this.setColor(i, j, get_color(x))
         this.checkLabel(i, j, x)
       }
     }
@@ -453,9 +453,12 @@ export class Mat {
     const gap = viz['hue gap'] * Math.sign(x)
     const hue = (viz['zero hue'] + gap + (Math.cbrt(hue_vol) * viz['hue spread'])) % 1
 
+    const min_light = Math.max(viz['min light'], 0.00001)
+    const max_light = Math.max(viz['max light'], min_light)
+    const range = max_light - min_light
+
     const light_vol = absdiff <= 0 ? 0 : (absx - absmin) / absdiff
-    const range = viz['max light'] - viz['min light']
-    const light = viz['min light'] + range * Math.cbrt(light_vol)
+    const light = min_light + range * Math.cbrt(light_vol)
 
     return COLOR_TEMP.setHSL(hue, 1.0, light)
   }
@@ -635,39 +638,38 @@ export class Mat {
       const { i: { size: si }, j: { size: sj } } = this.getBlockInfo()
       this.context.raycaster.params.Points.threshold = spotlight
       const intersects = this.context.raycaster.intersectObject(this.points)
-      intersects.forEach(x => {
-        const index = x.index
+      intersects.forEach(p => {
+        const index = p.index
         const i = Math.floor(index / this.W)
         const j = index % this.W
         if (!this.isHidden(i, j)) {
           const x = this.getData(i, j)
-          if (x != 0 && !isNaN(x) && isFinite(x)) {
-            let label = this.label_cache[index]
-            const facing = this.isFacing()
-            const rsu = this.isRightSideUp()
-            if (!label || label.facing != facing || label.rsu != rsu) {
-              const fsiz = 0.16 - 0.008 * Math.log10(Math.floor(1 + Math.abs(x)))
-              label = this.context.getText(`${x.toFixed(4)}`, 0xffffff, fsiz)
-              label.name = `${this.params.name}.label[${i}, ${j}]`
-              label.value = x
-              label.facing = facing
-              label.rsu = rsu
-              const zdir = facing ? 1 : -1
-              label.geometry.rotateX(zdir * Math.PI)
-              label.geometry.rotateY(facing ? 0 : Math.PI)
-              label.geometry.rotateZ(rsu ? 0 : Math.PI)
-              const { h, w } = util.gbbhwd(label.geometry)
-              const disp_i = i + Math.floor(i / si)
-              const disp_j = j + Math.floor(j / sj)
-              label.geometry.translate(
-                util.center(disp_j * 2, (rsu ? zdir : -zdir) * w),
-                h + util.center(disp_i * 2, h),
-                -zdir * 0.25
-              )
-              this.label_cache[index] = label
-            }
-            this.label_group.add(label)
+          let label = this.label_cache[index]
+          const facing = this.isFacing()
+          const rsu = this.isRightSideUp()
+          if (!label || label.facing != facing || label.rsu != rsu) {
+            const fsiz = isNaN(x) || !isFinite(x) ? 0.12 :
+              0.16 - 0.008 * Math.log10(Math.floor(1 + Math.abs(x)))
+            label = this.context.getText(x.toFixed(4), 0xffffff, fsiz)
+            label.name = `${this.params.name}.label[${i}, ${j}]`
+            label.value = x
+            label.facing = facing
+            label.rsu = rsu
+            const zdir = facing ? 1 : -1
+            label.geometry.rotateX(zdir * Math.PI)
+            label.geometry.rotateY(facing ? 0 : Math.PI)
+            label.geometry.rotateZ(rsu ? 0 : Math.PI)
+            const { h, w } = util.gbbhwd(label.geometry)
+            const disp_i = i + Math.floor(i / si)
+            const disp_j = j + Math.floor(j / sj)
+            label.geometry.translate(
+              util.center(disp_j * 2, (rsu ? zdir : -zdir) * w),
+              h + util.center(disp_i * 2, h),
+              -zdir * 0.25
+            )
+            this.label_cache[index] = label
           }
+          this.label_group.add(label)
         }
       })
     }
@@ -969,15 +971,15 @@ export class MatMul {
 
     // ---
 
-    this.left.params.layout.polarity = next(this.params.layout.polarity)
-    this.left.params.layout['left placement'] = next(this.params.layout['left placement'])
-    this.left.params.layout['right placement'] = next(this.params.layout['right placement'])
-    this.left.params.layout['result placement'] = next(this.params.layout['result placement'])
+    // this.left.params.layout.polarity = next(this.params.layout.polarity)
+    // this.left.params.layout['left placement'] = next(this.params.layout['left placement'])
+    // this.left.params.layout['right placement'] = next(this.params.layout['right placement'])
+    // this.left.params.layout['result placement'] = next(this.params.layout['result placement'])
 
-    this.right.params.layout.polarity = next(this.params.layout.polarity)
-    this.right.params.layout['left placement'] = next(this.params.layout['left placement'])
-    this.right.params.layout['right placement'] = next(this.params.layout['right placement'])
-    this.right.params.layout['result placement'] = next(this.params.layout['result placement'])
+    // this.right.params.layout.polarity = next(this.params.layout.polarity)
+    // this.right.params.layout['left placement'] = next(this.params.layout['left placement'])
+    // this.right.params.layout['right placement'] = next(this.params.layout['right placement'])
+    // this.right.params.layout['result placement'] = next(this.params.layout['result placement'])
 
     // ---
 
@@ -1568,7 +1570,8 @@ export class MatMul {
         const vvp = vvps[[i, j, k]]
         if (curj < jx && curk < kx) {
           const z = polarity > 0 ? gap + j + ji + curj : extz - gap - j - ji - curj
-          vvp.group.position.z = z
+          // vvp.group.position.z = z
+          util.updateProps(vvp.group.position, { x: k + curk, z })
           vvp.reinit((iii, kii) => this.ijkmul(i + iii, j + curj, k + curk + kii))
         }
       })
