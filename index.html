@@ -70,10 +70,6 @@
         'k blocks': 1,
       },
       layout: {
-        // polarity: 'negative/positive',
-        // 'left placement': 'left/right',
-        // 'right placement': 'top/bottom',
-        // 'result placement': 'front/back',
         polarity: 'negative',
         'left placement': 'left',
         'right placement': 'top',
@@ -84,7 +80,7 @@
         blast: 0,
       },
       deco: {
-        legends: 6,
+        legends: 3,
         'row guides': 0.5,
         'flow guides': 0.0,
         spotlight: 1,
@@ -108,14 +104,25 @@
       }
     }
 
-    const expr = p => p.left && p.right ?
-      `${expr(p.left)} @ ${p.right.matmul ? '(' + expr(p.right) + ')' : p.right.name}` :
-      p.name
+    function expr(p) {
+      if (!p.left || !p.right) {
+        return p.name
+      }
+      const passign = e => e.indexOf('=') >= 0 ? '(' + e + ')' : e
+      const l = p.left.matmul ? passign(expr(p.left)) : p.left.name
+      const r = p.right.matmul ? '(' + expr(p.right) + ')' : p.right.name
+      const x = `${l} @ ${r}`
+      return p.name == `${p.left.name} @ ${p.right.name}` ? x : `${p.name} = ${x}`
+    }
+
+    function updateTitle() {
+      document.getElementById('info').innerHTML = expr(params)
+    }
 
     // update URL with param changes
 
     let address_bar_update_pending = false
-    function setParams(obj, p = params, t = 1000) {
+    function setParams(obj, p = params, t = 10) {
       for (const k in obj) {
         p[k] = obj[k]
       }
@@ -124,7 +131,7 @@
         address_bar_update_pending = true
         setTimeout(function () {
           const search_params = util.makeSearchParams(params)
-          const url = `${window.location.pathname}?${search_params}`
+          const url = window.location.pathname + '?' + search_params
           window.history.replaceState({}, '', url)
           address_bar_update_pending = false
         }, t)
@@ -188,7 +195,7 @@
 
       // load params from url
       util.updateFromSearchParams(params, new URL(window.location).searchParams)
-      document.getElementById('info').innerHTML = expr(params)
+      updateTitle()
 
       // set camera position
       camera.position.set(params.cam.x, params.cam.y, params.cam.z)
@@ -253,7 +260,7 @@
         //     obj :
         //     new viz.MatMul(ensureCounts(util.copyTree(params)), getContext())
         //   const f = mm => {
-        //     mm.params.name && (mm.params.name += ` [${i}]`)
+        //     mm.params.name && (mm.params.name += ` [${ i }]`)
         //     mm.left && f(mm.left)
         //     mm.right && f(mm.right)
         //     mm.result && f(mm.result)
@@ -317,7 +324,9 @@
         updateLegendsAndLabels()
       })
 
-      orbit.addEventListener('change', () => setParams({ cam: camera.position }), false)
+      orbit.addEventListener('change', () => {
+        setParams({ cam: camera.position }, params, 100)
+      }, false)
 
       window.addEventListener('resize', function () {
         camera.aspect = window.innerWidth / window.innerHeight
@@ -431,16 +440,126 @@
         'j blocks': 1,
       })
 
-      const layout_proto = () => ({
-        // polarity: 'negative/positive',
-        // 'left placement': 'left/right',
-        // 'right placement': 'top/bottom',
-        // 'result placement': 'front/back',
-        polarity: 'negative',
-        'left placement': 'left',
-        'right placement': 'top',
-        'result placement': 'front',
+      // ---
+
+      // const layout_enc = layout => (
+      //   { 'negative': '-', 'positive': '+' }[layout.polarity] +
+      //   { 'left': 'L', 'right': 'R' }[layout['left placement']] +
+      //   { 'top': 'T', 'bottom': 'B' }[layout['right placement']] +
+      //   { 'front': 'F', 'back': 'B' }[layout['result placement']]
+      // )
+
+      const layout_enc = layout => (
+        (viz.POLARITIES.indexOf(layout.polarity) << 3) +
+        (viz.LEFT_PLACEMENTS.indexOf(layout['left placement']) << 2) +
+        (viz.RIGHT_PLACEMENTS.indexOf(layout['right placement']) << 1) +
+        viz.RESULT_PLACEMENTS.indexOf(layout['result placement'])
+      )
+
+      // const layout_dec = str => ({
+      //   polarity: { '-': 'negative', '+': 'positive' }[str[0]],
+      //   'left placement': { 'L': 'left', 'R': 'right' }[str[1]],
+      //   'right placement': { 'T': 'top', 'B': 'bottom' }[str[2]],
+      //   'result placement': { 'F': 'front', 'B': 'back' }[str[3]]
+      // })
+
+      const layout_dec = e => ({
+        polarity: viz.POLARITIES[e >> 3 & 1],
+        'left placement': viz.LEFT_PLACEMENTS[e >> 2 & 1],
+        'right placement': viz.RIGHT_PLACEMENTS[e >> 1 & 1],
+        'result placement': viz.RESULT_PLACEMENTS[e & 1]
       })
+
+      const layout_desc = e => '-+'[e >> 3 & 1] + 'LR'[e >> 2 & 1] + 'TB'[e >> 1 & 1] + 'FB'[e & 1]
+
+      const CHILD_LAYOUTS = {
+        true: [
+          11, -1, -1, 13,   // -LTF, -LTB, -LBF, -LBB
+          -1, -1, 8, -1,    // -RTF, -RTB, -RBF, -RBB
+          6, -1, -1, 0,     // +LTF, +LTB, +LBF, +LBB
+          -1, 3, -1, -1,   // +RTF, +RTB, +RBF, +RBB
+        ],
+        false: [
+          13, -1, -1, -1,   // -LTF, -LTB, -LBF, -LBB
+          -1, 11, -1, -1,   // -RTF, -RTB, -RBF, -RBB
+          -1, -1, -1, 5,   // +LTF, +LTB, +LBF, +LBB
+          -1, 0, -1, -1,    // +RTF, +RTB, +RBF, +RBB
+        ]
+      }
+
+      function child_layout(is_left, parent_layout) {
+        const pl = layout_enc(parent_layout)
+        const cl = CHILD_LAYOUTS[is_left][pl]
+        console.log(`HEY parent ${pl} ${layout_desc(pl)} child ${cl} ${cl >= 0 && layout_desc(cl)}`)
+        const child_layout = cl >= 0 ? layout_dec(cl) : undefined
+        return child_layout || util.copyTree(parent_layout)
+      }
+
+      function layout_proto(pp, is_left, obj) {
+        return child_layout(is_left, pp.layout)
+
+
+        // const {
+        //   polarity: parent_pol,
+        //   'left placement': parent_left,
+        //   'right placement': parent_right,
+        //   'result placement': parent_result
+        // } = pp.layout
+        // const inv = (x, a) => a[(a.indexOf(x) + 1) % 2]
+
+        // const [polarity, leftp, rightp, resultp] =
+        //   is_left ?
+        //     parent_left == 'left' ?
+        //       parent_pol == 'positive' ?
+        //         ['positive', 'right', 'bottom', 'front'] :
+        //         ['positive', 'left', 'bottom', 'back'] :
+        //       ['negative', 'left', 'top', 'right'] :
+        //     parent_right == 'top' ?
+        //       parent_pol == 'positive' ?
+        //         ['positive', 'right', 'bottom', 'front'] :
+        //         ['positive', 'right', 'top', 'back'] :
+        //       ['positive', 'right', 'top', 'back']
+        // ---
+        // return {
+        //   polarity: inv(parent_pol, viz.POLARITIES),
+        //   'left placement': inv(parent_left, viz.LEFT_PLACEMENTS),
+        //   'right placement': inv(parent_right, viz.RIGHT_PLACEMENTS),
+        //   'result placement': parent_result,
+        // }
+        // ---
+        // const outward = (parent_pol == 'negative') ==
+        //   (is_left ? (parent_left == 'left') : (parent_right == 'top'))
+
+        // return {
+        //   polarity: inv(parent_pol, viz.POLARITIES),
+        //   'left placement': outward ? 'left' : 'right',
+        //   'right placement': inv(parent_right, viz.RIGHT_PLACEMENTS),
+        //   'result placement': outward ? 'back' : 'front'
+        // }
+        // ---
+
+        // const [facing, rsu] = [obj.isFacing(), obj.isRightSideUp()]
+        // const near = facing && parent_pol == 'negative'
+        // return {
+        //   polarity: inv(parent_pol, viz.POLARITIES),
+        //   'left placement': facing == near ? 'left' : 'right',
+        //   'right placement': facing == near ? 'bottom' : 'top',
+        //   'result placement': facing == near ? 'back' : 'front',
+        // }
+
+        // const info = obj.getPlacementInfo()
+
+        // const outward = (parent_pol == 'negative') ==
+        //   (is_left ? (parent_left == 'left') : (parent_right == 'top'))
+
+        // return {
+        //   polarity: parent_pol,
+        //   'left placement': parent_left, // is_left ? [''],
+        //   'right placement': parent_right,
+        //   'result placement': parent_result
+        // }
+
+      }
 
       const child_mat_proto = (p, depth, is_left) => {
         return {
@@ -448,10 +567,10 @@
           matmul: false,
           h: is_left ? p.h : depth,
           w: is_left ? depth : p.w,
-          init: is_left ? 'row major' : 'col major',
-          min: -1,
-          max: 1,
-          dropout: 0,
+          init: p.init,
+          min: p.min,
+          max: p.max,
+          dropout: p.dropout,
         }
       }
 
@@ -469,7 +588,7 @@
             left: child_mat_proto(p, depth, true),
             right: child_mat_proto(p, depth, false),
             anim: anim_proto(),
-            layout: layout_proto(),
+            layout: layout_proto(pp, is_left, path(getObj())),
           })
           util.deleteProps(p, ['h', 'w', 'init', 'min', 'max', 'dropout'])
           return addMatmulParams(g, path, ancestors)
@@ -477,7 +596,7 @@
           util.updateProps(p, {
             h: height(p.left),
             w: width(p.right),
-            init: p === pp.left ? 'row major' : 'col major',
+            init: p === pp.left ? p.left.init : p.right.init,
             min: -1,
             max: 1,
             dropout: 0,
@@ -503,7 +622,10 @@
 
         const p = path(params)
 
-        addParam(g, 'name', x => path(getObj()).setName(x), path, path)
+        addParam(g, 'name', x => {
+          path(getObj()).setName(x)
+          updateTitle()
+        }, path, path)
 
         addParam(g, 'matmul', v => {
           syncChildParams(g, path, ancestors)
@@ -538,7 +660,10 @@
         const is_root = ancestors.length == 0
         // const folder_init = 'open' // is_root ? 'open' : 'closed'
 
-        addParam(g, 'name', x => path(getObj()).setName(x), path, path)
+        addParam(g, 'name', x => {
+          path(getObj()).setName(x)
+          updateTitle()
+        }, path, path)
 
         if (!is_root) {
           addParam(g, 'matmul', v => {
