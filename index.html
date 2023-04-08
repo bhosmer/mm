@@ -70,6 +70,7 @@
         'k blocks': 1,
       },
       layout: {
+        scheme: 'blocks',
         polarity: 'negative',
         'left placement': 'left',
         'right placement': 'top',
@@ -344,13 +345,15 @@
       }
       window.addEventListener('pointermove', onPointerMove)
 
+      // obj
+
+      initObj()
+
       // gui
 
       initGui(getObj, initObj, initAxes)
 
-      // let's go
-
-      initObj()
+      // go
 
       let last = 0
       function animate() {
@@ -442,26 +445,18 @@
 
       // ---
 
-      // const layout_enc = layout => (
-      //   { 'negative': '-', 'positive': '+' }[layout.polarity] +
-      //   { 'left': 'L', 'right': 'R' }[layout['left placement']] +
-      //   { 'top': 'T', 'bottom': 'B' }[layout['right placement']] +
-      //   { 'front': 'F', 'back': 'B' }[layout['result placement']]
-      // )
+      // temp
+      function first(x) {
+        const sep = x.indexOf('/')
+        return sep == -1 ? x : x.slice(0, sep)
+      }
 
       const layout_enc = layout => (
-        (viz.POLARITIES.indexOf(layout.polarity) << 3) +
-        (viz.LEFT_PLACEMENTS.indexOf(layout['left placement']) << 2) +
-        (viz.RIGHT_PLACEMENTS.indexOf(layout['right placement']) << 1) +
-        viz.RESULT_PLACEMENTS.indexOf(layout['result placement'])
+        (viz.POLARITIES.indexOf(first(layout.polarity)) << 3) +
+        (viz.LEFT_PLACEMENTS.indexOf(first(layout['left placement'])) << 2) +
+        (viz.RIGHT_PLACEMENTS.indexOf(first(layout['right placement'])) << 1) +
+        viz.RESULT_PLACEMENTS.indexOf(first(layout['result placement']))
       )
-
-      // const layout_dec = str => ({
-      //   polarity: { '-': 'negative', '+': 'positive' }[str[0]],
-      //   'left placement': { 'L': 'left', 'R': 'right' }[str[1]],
-      //   'right placement': { 'T': 'top', 'B': 'bottom' }[str[2]],
-      //   'result placement': { 'F': 'front', 'B': 'back' }[str[3]]
-      // })
 
       const layout_dec = e => ({
         polarity: viz.POLARITIES[e >> 3 & 1],
@@ -470,95 +465,68 @@
         'result placement': viz.RESULT_PLACEMENTS[e & 1]
       })
 
-      const layout_desc = e => '-+'[e >> 3 & 1] + 'LR'[e >> 2 & 1] + 'TB'[e >> 1 & 1] + 'FB'[e & 1]
+      const pol_ix = e => e >> 3 & 1
+      const left_ix = e => e >> 2 & 1
+      const right_ix = e => e >> 1 & 1
+      const result_ix = e => e & result_ix
+      const layout_desc = e => '-+'[pol_ix(e)] + 'LR'[left_ix(e)] + 'TB'[right_ix(e)] + 'FB'[result_ix(e)]
 
-      const CHILD_LAYOUTS = {
+      const BLOCKS_SCHEME = {
         true: [
-          11, -1, -1, 13,   // -LTF, -LTB, -LBF, -LBB
-          -1, -1, 8, -1,    // -RTF, -RTB, -RBF, -RBB
-          6, -1, -1, 0,     // +LTF, +LTB, +LBF, +LBB
-          -1, 3, -1, -1,   // +RTF, +RTB, +RBF, +RBB
+          11, 15, 9, 13,   // -LTF, -LTB, -LBF, -LBB
+          10, 14, 8, 12,    // -RTF, -RTB, -RBF, -RBB
+          6, 2, 4, 0,     // +LTF, +LTB, +LBF, +LBB
+          7, 3, 5, 1,   // +RTF, +RTB, +RBF, +RBB
         ],
         false: [
-          13, -1, -1, -1,   // -LTF, -LTB, -LBF, -LBB
-          -1, 11, -1, -1,   // -RTF, -RTB, -RBF, -RBB
-          -1, -1, -1, 5,   // +LTF, +LTB, +LBF, +LBB
-          -1, 0, -1, -1,    // +RTF, +RTB, +RBF, +RBB
+          13, 15, 12, 14,   // -LTF, -LTB, -LBF, -LBB
+          9, 11, 8, 10,   // -RTF, -RTB, -RBF, -RBB
+          6, 4, 7, 5,   // +LTF, +LTB, +LBF, +LBB
+          2, 0, 3, 1,    // +RTF, +RTB, +RBF, +RBB
         ]
       }
 
-      function child_layout(is_left, parent_layout) {
+      function child_layout(is_left, parent_layout, layouts = BLOCKS_SCHEME) {
         const pl = layout_enc(parent_layout)
-        const cl = CHILD_LAYOUTS[is_left][pl]
-        console.log(`HEY parent ${pl} ${layout_desc(pl)} child ${cl} ${cl >= 0 && layout_desc(cl)}`)
+        const cl = layouts[is_left][pl]
+        console.log(`HEY ${is_left ? 'left' : 'right'} parent ${pl} ${layout_desc(pl)} child ${cl} ${cl >= 0 && layout_desc(cl)}`)
         const child_layout = cl >= 0 ? layout_dec(cl) : undefined
         return child_layout || util.copyTree(parent_layout)
       }
 
-      function layout_proto(pp, is_left, obj) {
-        return child_layout(is_left, pp.layout)
+      const layout_proto = (scheme, pp, is_left) => ({
+        'custom': x => x,
+        'blocks': x => child_layout(is_left, x)
+      }[scheme](pp.layout))
 
+      function setLayoutScheme(scheme, params) {
+        const layouts = scheme == 'blocks' ? BLOCKS_SCHEME : undefined
+        function f(p) {
+          if (p.left.matmul) {
+            p.left.layout = child_layout(true, p.layout, layouts)
+            f(p.left, p)
+          }
+          if (p.right.matmul) {
+            p.right.layout = child_layout(false, p.layout, layouts)
+            f(p.right, p)
+          }
+        }
+        layouts && f(params)
+      }
 
-        // const {
-        //   polarity: parent_pol,
-        //   'left placement': parent_left,
-        //   'right placement': parent_right,
-        //   'result placement': parent_result
-        // } = pp.layout
-        // const inv = (x, a) => a[(a.indexOf(x) + 1) % 2]
-
-        // const [polarity, leftp, rightp, resultp] =
-        //   is_left ?
-        //     parent_left == 'left' ?
-        //       parent_pol == 'positive' ?
-        //         ['positive', 'right', 'bottom', 'front'] :
-        //         ['positive', 'left', 'bottom', 'back'] :
-        //       ['negative', 'left', 'top', 'right'] :
-        //     parent_right == 'top' ?
-        //       parent_pol == 'positive' ?
-        //         ['positive', 'right', 'bottom', 'front'] :
-        //         ['positive', 'right', 'top', 'back'] :
-        //       ['positive', 'right', 'top', 'back']
-        // ---
-        // return {
-        //   polarity: inv(parent_pol, viz.POLARITIES),
-        //   'left placement': inv(parent_left, viz.LEFT_PLACEMENTS),
-        //   'right placement': inv(parent_right, viz.RIGHT_PLACEMENTS),
-        //   'result placement': parent_result,
-        // }
-        // ---
-        // const outward = (parent_pol == 'negative') ==
-        //   (is_left ? (parent_left == 'left') : (parent_right == 'top'))
-
-        // return {
-        //   polarity: inv(parent_pol, viz.POLARITIES),
-        //   'left placement': outward ? 'left' : 'right',
-        //   'right placement': inv(parent_right, viz.RIGHT_PLACEMENTS),
-        //   'result placement': outward ? 'back' : 'front'
-        // }
-        // ---
-
-        // const [facing, rsu] = [obj.isFacing(), obj.isRightSideUp()]
-        // const near = facing && parent_pol == 'negative'
-        // return {
-        //   polarity: inv(parent_pol, viz.POLARITIES),
-        //   'left placement': facing == near ? 'left' : 'right',
-        //   'right placement': facing == near ? 'bottom' : 'top',
-        //   'result placement': facing == near ? 'back' : 'front',
-        // }
-
-        // const info = obj.getPlacementInfo()
-
-        // const outward = (parent_pol == 'negative') ==
-        //   (is_left ? (parent_left == 'left') : (parent_right == 'top'))
-
-        // return {
-        //   polarity: parent_pol,
-        //   'left placement': parent_left, // is_left ? [''],
-        //   'right placement': parent_right,
-        //   'result placement': parent_result
-        // }
-
+      function isLayoutScheme(scheme, params) {
+        const layouts = scheme == 'blocks' ? BLOCKS_SCHEME : undefined
+        const f = p => (
+          (!p.left.matmul || (
+            p.left.layout == child_layout(true, p.layout, layouts) &&
+            f(p.left, p)
+          )) &&
+          (!p.right.matmul || (
+            p.right.layout == child_layout(false, p.layout, layouts) &&
+            f(p.right, p)
+          ))
+        )
+        !layouts || f(params)
       }
 
       const child_mat_proto = (p, depth, is_left) => {
@@ -588,15 +556,17 @@
             left: child_mat_proto(p, depth, true),
             right: child_mat_proto(p, depth, false),
             anim: anim_proto(),
-            layout: layout_proto(pp, is_left, path(getObj())),
+            layout: layout_proto(params.layout.scheme, pp, is_left),
           })
           util.deleteProps(p, ['h', 'w', 'init', 'min', 'max', 'dropout'])
           return addMatmulParams(g, path, ancestors)
         } else {
+          const left_leaf = p => p.left.matmul ? left_leaf(p.left) : p.left
+          const right_leaf = p => p.right.matmul ? right_leaf(p.right) : p.right
           util.updateProps(p, {
             h: height(p.left),
             w: width(p.right),
-            init: p === pp.left ? p.left.init : p.right.init,
+            init: p === pp.left ? left_leaf(p).init : right_leaf(p).init,
             min: -1,
             max: 1,
             dropout: 0,
@@ -693,12 +663,35 @@
           addIntParam(gui_anim, 'j blocks', 1, 16, initObj, p => path(p).anim, path)
         }
 
-        p.layout ||= layout_proto() // temp?
+        if (!p.layout) {
+          const parent_path = ancestors[0]
+          const pp = parent_path(params)
+          p.layout = { // temp?
+            scheme: 'blocks',
+            ...layout_proto('blocks', pp, p == pp.left, parent_path(getObj()))
+          }
+        }
+
         const gui_layout = addFolder(g, 'layout', p.layout, folder_init)
-        addChoiceParam(gui_layout, 'polarity', viz.POLARITIES, initObj, p => path(p).layout, path)
-        addChoiceParam(gui_layout, 'left placement', viz.LEFT_PLACEMENTS, initObj, p => path(p).layout, path)
-        addChoiceParam(gui_layout, 'right placement', viz.RIGHT_PLACEMENTS, initObj, p => path(p).layout, path)
-        addChoiceParam(gui_layout, 'result placement', viz.RESULT_PLACEMENTS, initObj, p => path(p).layout, path)
+
+        if (is_root) {
+          addChoiceParam(gui_layout, 'scheme', viz.SCHEMES, v => {
+            setLayoutScheme(v, params)
+            initObj()
+          }, p => p.layout).listen()
+        }
+
+        function syncScheme(v) {
+          if (!isLayoutScheme(params.layout.scheme, params)) {
+            params.layout.scheme = 'custom'
+          }
+          initObj()
+        }
+
+        addChoiceParam(gui_layout, 'polarity', viz.POLARITIES, syncScheme, p => path(p).layout, path)
+        addChoiceParam(gui_layout, 'left placement', viz.LEFT_PLACEMENTS, syncScheme, p => path(p).layout, path)
+        addChoiceParam(gui_layout, 'right placement', viz.RIGHT_PLACEMENTS, syncScheme, p => path(p).layout, path)
+        addChoiceParam(gui_layout, 'result placement', viz.RESULT_PLACEMENTS, syncScheme, p => path(p).layout, path)
 
         if (is_root) {
           addIntParam(gui_layout, 'gap', 1, 32, initObj, p => p.layout)
