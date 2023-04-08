@@ -486,47 +486,65 @@
         ]
       }
 
-      function child_layout(is_left, parent_layout, layouts = BLOCKS_SCHEME) {
+      const ZIGZAG_SCHEME = {
+        true: [
+          11, 15, 9, 13,   // -LTF, -LTB, -LBF, -LBB
+          10, 14, 8, 12,    // -RTF, -RTB, -RBF, -RBB
+          6, 2, 4, 0,     // +LTF, +LTB, +LBF, +LBB
+          7, 3, 5, 1,   // +RTF, +RTB, +RBF, +RBB
+        ],
+        false: [
+          13, 15, 12, 14,   // -LTF, -LTB, -LBF, -LBB
+          9, 11, 8, 10,   // -RTF, -RTB, -RBF, -RBB
+          6, 4, 7, 5,   // +LTF, +LTB, +LBF, +LBB
+          2, 0, 3, 1,    // +RTF, +RTB, +RBF, +RBB
+        ]
+      }
+
+      const SCHEMES = {
+        'blocks': BLOCKS_SCHEME,
+        'zigzag': ZIGZAG_SCHEME,
+      }
+
+      function childLayout(is_left, parent_layout, scheme = BLOCKS_SCHEME) {
         const pl = layout_enc(parent_layout)
-        const cl = layouts[is_left][pl]
+        const cl = scheme[is_left][pl]
         console.log(`HEY ${is_left ? 'left' : 'right'} parent ${pl} ${layout_desc(pl)} child ${cl} ${cl >= 0 && layout_desc(cl)}`)
         const child_layout = cl >= 0 ? layout_dec(cl) : undefined
         return child_layout || util.copyTree(parent_layout)
       }
 
-      const layout_proto = (scheme, pp, is_left) => ({
-        'custom': x => x,
-        'blocks': x => child_layout(is_left, x)
-      }[scheme](pp.layout))
+      const layout_proto = (scheme_name, pp, is_left) =>
+        childLayout(is_left, pp.layout, SCHEMES[scheme_name])
 
-      function setLayoutScheme(scheme, params) {
-        const layouts = scheme == 'blocks' ? BLOCKS_SCHEME : undefined
+      function setLayoutScheme(name, params) {
+        const scheme = SCHEMES[name]
         function f(p) {
           if (p.left.matmul) {
-            p.left.layout = child_layout(true, p.layout, layouts)
+            p.left.layout = childLayout(true, p.layout, scheme)
             f(p.left, p)
           }
           if (p.right.matmul) {
-            p.right.layout = child_layout(false, p.layout, layouts)
+            p.right.layout = childLayout(false, p.layout, scheme)
             f(p.right, p)
           }
         }
-        layouts && f(params)
+        scheme && f(params)
       }
 
-      function isLayoutScheme(scheme, params) {
-        const layouts = scheme == 'blocks' ? BLOCKS_SCHEME : undefined
+      function isLayoutScheme(name, params) {
+        const scheme = SCHEMES[name]
         const f = p => (
           (!p.left.matmul || (
-            p.left.layout == child_layout(true, p.layout, layouts) &&
+            p.left.layout == childLayout(true, p.layout, scheme) &&
             f(p.left, p)
           )) &&
           (!p.right.matmul || (
-            p.right.layout == child_layout(false, p.layout, layouts) &&
+            p.right.layout == childLayout(false, p.layout, scheme) &&
             f(p.right, p)
           ))
         )
-        !layouts || f(params)
+        !scheme || f(params)
       }
 
       const child_mat_proto = (p, depth, is_left) => {
