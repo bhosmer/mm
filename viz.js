@@ -887,15 +887,15 @@ export class MatMul {
 
     // ---
 
-    const layout_desc = p => {
-      const pol = { 'positive': '+', 'negative': '-', 'positive/negative': '+/-', 'negative/positive': '-/+' }[p.layout.polarity]
-      const lfp = { 'left': 'L', 'right': 'R', 'left/right': 'L/R', 'right/left': 'R/L' }[p.layout['left placement']]
-      const rtp = { 'top': 'T', 'bottom': 'B', 'top/bottom': 'T/B', 'bottom/top': 'B/T' }[p.layout['right placement']]
-      const rsp = { 'front': 'F', 'back': 'B', 'front/back': 'F/B', 'back/front': 'B/F' }[p.layout['result placement']]
-      return `${pol}${lfp}${rtp}${rsp}`
-    }
+    // const layout_desc = p => {
+    //   const pol = { 'positive': '+', 'negative': '-', 'positive/negative': '+/-', 'negative/positive': '-/+' }[p.layout.polarity]
+    //   const lfp = { 'left': 'L', 'right': 'R', 'left/right': 'L/R', 'right/left': 'R/L' }[p.layout['left placement']]
+    //   const rtp = { 'top': 'T', 'bottom': 'B', 'top/bottom': 'T/B', 'bottom/top': 'B/T' }[p.layout['right placement']]
+    //   const rsp = { 'front': 'F', 'back': 'B', 'front/back': 'F/B', 'back/front': 'B/F' }[p.layout['result placement']]
+    //   return `${pol}${lfp}${rtp}${rsp}`
+    // }
 
-    this.result.params.name += ` ${layout_desc(this.params)}`
+    // this.result.params.name += ` ${layout_desc(this.params)}`
 
     // ---
 

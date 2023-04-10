@@ -443,17 +443,11 @@
 
       // ---
 
-      // temp
-      function first(x) {
-        const sep = x.indexOf('/')
-        return sep == -1 ? x : x.slice(0, sep)
-      }
-
       const layout_enc = layout => (
-        (viz.POLARITIES.indexOf(first(layout.polarity)) << 3) +
-        (viz.LEFT_PLACEMENTS.indexOf(first(layout['left placement'])) << 2) +
-        (viz.RIGHT_PLACEMENTS.indexOf(first(layout['right placement'])) << 1) +
-        viz.RESULT_PLACEMENTS.indexOf(first(layout['result placement']))
+        (viz.POLARITIES.indexOf(layout.polarity) << 3) +
+        (viz.LEFT_PLACEMENTS.indexOf(layout['left placement']) << 2) +
+        (viz.RIGHT_PLACEMENTS.indexOf(layout['right placement']) << 1) +
+        viz.RESULT_PLACEMENTS.indexOf(layout['result placement'])
       )
 
       const layout_dec = e => ({
@@ -527,14 +521,39 @@
         res: !!viz.RESULT_PLACEMENTS.indexOf(layout['result placement'])
       })
 
-      const info_layout = info => ({
-        polarity: viz.POLARITIES[+info.pol],
-        'left placement': viz.LEFT_PLACEMENTS[+info.left],
-        'right placement': viz.RIGHT_PLACEMENTS[+info.right],
-        'result placement': viz.RESULT_PLACEMENTS[+info.res]
+      const info_layout = ({ pol, left, right, res }) => ({
+        polarity: viz.POLARITIES[+pol],
+        'left placement': viz.LEFT_PLACEMENTS[+left],
+        'right placement': viz.RIGHT_PLACEMENTS[+right],
+        'result placement': viz.RESULT_PLACEMENTS[+res]
       })
 
-      // const next = (r, info) => ({ pol: r.pol(info), left: r.left(info), right: r.right(info), res: r.res(info) })
+      const blocks_rule = (is_left, { pol, left, right, res }) => ({
+        pol: !pol,
+        left: is_left ? pol != res : !left,
+        right: is_left ? !right : pol != res,
+        res: pol == (is_left ? left : right),
+      })
+
+      const zigzag_rule = (is_left, { pol, left, right, res }) => ({
+        pol: !pol,
+        left: is_left ? pol != res : left,
+        right: is_left ? right : pol != res,
+        res: pol == (is_left ? left : right),
+      })
+
+      const circle_rule = (is_left, { pol, left, right, res }) => ({
+        pol: pol,
+        left: is_left ? pol == res : left,
+        right: is_left ? right : pol == res,
+        res: pol == (is_left ? left : right),
+      })
+
+      const RULES = {
+        'blocks': blocks_rule,
+        'zigzag': zigzag_rule,
+        'circle': circle_rule,
+      }
 
       function test_scheme(scheme_name, r) {
         const scheme = SCHEMES[scheme_name]
@@ -558,78 +577,51 @@
         }
       }
 
-      const blocks_rule = (left, info) => ({
-        pol: !info.pol,
-        left: left ? info.pol != info.res : !info.left,
-        right: left ? !info.right : info.pol != info.res,
-        res: info.pol == (left ? info.left : info.right),
-      })
-
-      const zigzag_rule = (left, info) => ({
-        pol: !info.pol,
-        left: left ? info.pol != info.res : info.left,
-        right: left ? info.right : info.pol != info.res,
-        res: info.pol == (left ? info.left : info.right),
-      })
-
-      const circle_rule = (left, info) => ({
-        pol: info.pol,
-        left: left ? info.pol == info.res : info.left,
-        right: left ? info.right : info.pol == info.res,
-        res: info.pol == (left ? info.left : info.right),
-      })
-
-      // test_scheme('blocks', blocks_rule)
+      test_scheme('blocks', blocks_rule)
       test_scheme('circle', circle_rule)
+      test_scheme('zigzag', zigzag_rule)
 
-      function childLayout(is_left, parent_layout, scheme) {
-        const pl = layout_enc(parent_layout)
-        const cl = scheme[is_left][pl]
-        console.log(`HEY ${is_left ? 'left' : 'right'} parent ${pl} ${layout_desc(pl)} child ${cl} ${cl >= 0 && layout_desc(cl)} `)
-        const child_layout = cl >= 0 ? layout_dec(cl) : undefined
-        return child_layout || util.copyTree(parent_layout)
-      }
+      const childLayout = (is_left, parent_layout, rule) =>
+        info_layout(rule(is_left, layout_info(parent_layout)))
 
       function layoutProto(scheme_name, pp, is_left) {
-        console.log(`HEY layoutProto ${scheme_name} `)
-        const scheme = SCHEMES[scheme_name]
-        return scheme ? childLayout(is_left, pp.layout, scheme) : util.copyTree(pp.layout)
+        const rule = RULES[scheme_name]
+        return rule ? childLayout(is_left, pp.layout, rule) : util.copyTree(pp.layout)
       }
 
       function setLayoutScheme(scheme_name, params) {
-        console.log(`HEY setLayoutScheme ${scheme_name} `)
-        const scheme = SCHEMES[scheme_name]
+        const rule = RULES[scheme_name]
         function f(p) {
           if (p.left.matmul) {
-            p.left.layout = childLayout(true, p.layout, scheme)
+            p.left.layout = childLayout(true, p.layout, rule)
             f(p.left, p)
           }
           if (p.right.matmul) {
-            p.right.layout = childLayout(false, p.layout, scheme)
+            p.right.layout = childLayout(false, p.layout, rule)
             f(p.right, p)
           }
         }
-        scheme && f(params)
+        rule && f(params)
       }
 
       function isLayoutScheme(name, params) {
-        const scheme = SCHEMES[name]
+        const rule = RULES[name]
         const f = p => (
           (!p.left.matmul || (
-            p.left.layout == childLayout(true, p.layout, scheme) &&
+            p.left.layout == childLayout(true, p.layout, rule) &&
             f(p.left, p)
           )) &&
           (!p.right.matmul || (
-            p.right.layout == childLayout(false, p.layout, scheme) &&
+            p.right.layout == childLayout(false, p.layout, rule) &&
             f(p.right, p)
           ))
         )
-        !scheme || f(params)
+        !rule || f(params)
       }
 
       const child_mat_proto = (p, depth, is_left) => {
         return {
-          name: `${p.name}${is_left ? 'L' : 'R'} `,
+          name: p.name + (is_left ? 'L' : 'R'),
           matmul: false,
           h: is_left ? p.h : depth,
           w: is_left ? depth : p.w,
@@ -640,6 +632,7 @@
         }
       }
 
+      // child mat/matmul state change 
       function syncChildParams(g, path, ancestors) {
         const height = p => p.matmul ? height(p.left) : p.h
         const width = p => p.matmul ? width(p.right) : p.w
@@ -744,7 +737,6 @@
         const title = name => (is_root ? '' : `${g._title} / `) + name
 
         // anim
-        // p.anim ||= animProto() // temp?
         const gui_anim = addFolder(g, 'animation', p.anim, folder_init)
         if (is_root) {
           addChoiceParam(gui_anim, 'alg', viz.ANIM_ALG, initObj, p => p.anim)
@@ -762,22 +754,7 @@
         }
 
         // layout
-        // if (!p.layout) {
-        //   const parent_path = ancestors[0]
-        //   const pp = parent_path(params)
-        //   p.layout = { // temp?
-        //     scheme: 'blocks',
-        //     ...layoutProto('blocks', pp, p == pp.left, parent_path(getObj()))
-        //   }
-        // }
-
         const gui_layout = addFolder(g, 'layout', p.layout, folder_init)
-
-        // TODO 
-        // 1. disable non-root layout options unless scheme is custom
-        // 2. non-custom schemes re-layout after any root change
-        // 3. no need for listen or isLayoutScheme
-
         if (is_root) {
           addChoiceParam(gui_layout, 'scheme', viz.SCHEMES, v => {
             setLayoutScheme(v, params)
@@ -785,20 +762,20 @@
           }, p => p.layout).listen()
         }
 
-        const syncScheme = is_root ? v => {
-          setLayoutScheme(params.layout.scheme, params)
-          initObj()
-        } : v => {
-          if (!isLayoutScheme(params.layout.scheme, params)) {
+        const syncScheme = is_root ?
+          v => {
+            setLayoutScheme(params.layout.scheme, params)
+            initObj()
+          } :
+          v => {
             params.layout.scheme = 'custom'
+            initObj()
           }
-          initObj()
-        }
 
-        addChoiceParam(gui_layout, 'polarity', viz.POLARITIES, syncScheme, p => path(p).layout, path)
-        addChoiceParam(gui_layout, 'left placement', viz.LEFT_PLACEMENTS, syncScheme, p => path(p).layout, path)
-        addChoiceParam(gui_layout, 'right placement', viz.RIGHT_PLACEMENTS, syncScheme, p => path(p).layout, path)
-        addChoiceParam(gui_layout, 'result placement', viz.RESULT_PLACEMENTS, syncScheme, p => path(p).layout, path)
+        addChoiceParam(gui_layout, 'polarity', viz.POLARITIES, syncScheme, p => path(p).layout, path).listen()
+        addChoiceParam(gui_layout, 'left placement', viz.LEFT_PLACEMENTS, syncScheme, p => path(p).layout, path).listen()
+        addChoiceParam(gui_layout, 'right placement', viz.RIGHT_PLACEMENTS, syncScheme, p => path(p).layout, path).listen()
+        addChoiceParam(gui_layout, 'result placement', viz.RESULT_PLACEMENTS, syncScheme, p => path(p).layout, path).listen()
 
         if (is_root) {
           addIntParam(gui_layout, 'gap', 1, 32, initObj, p => p.layout)
@@ -807,10 +784,12 @@
           addNumParam(gui_layout, 'blast', -2.0, 2.0, initObj, p => p.layout)
         }
 
+        // left
         const gui_left = addFolder(g, title('left'), p.left, folder_init)
         const add_left = p.left.matmul ? addMatmulParams : addMatParams
         add_left(gui_left, x => path(x).left, [path].concat(ancestors), 'closed')
 
+        // right
         const gui_right = addFolder(g, title('right'), p.right, folder_init)
         const add_right = p.right.matmul ? addMatmulParams : addMatParams
         add_right(gui_right, x => path(x).right, [path].concat(ancestors), 'closed')
