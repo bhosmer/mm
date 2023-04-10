@@ -413,9 +413,14 @@
         )
       }
 
-      function findController(gui, property) {
-        return gui.controllers.find(c => c.property == property)
-      }
+      const findController = (gui, property) =>
+        gui.controllers.find(c => c.property == property)
+
+      const findFolder = (gui, _title) =>
+        gui.folders.find(f => f._title == _title)
+
+      const findFolders = (gui, _title, recursive = false) =>
+        (recursive ? gui.foldersRecursive() : gui.folders).filter(f => f._title == _title)
 
       function clearFolder(gui) {
         while (gui.folders.length > 0) {
@@ -441,148 +446,45 @@
         'j blocks': 1,
       })
 
-      // ---
+      // layout schemes
 
-      const layout_enc = layout => (
-        (viz.POLARITIES.indexOf(layout.polarity) << 3) +
-        (viz.LEFT_PLACEMENTS.indexOf(layout['left placement']) << 2) +
-        (viz.RIGHT_PLACEMENTS.indexOf(layout['right placement']) << 1) +
-        viz.RESULT_PLACEMENTS.indexOf(layout['result placement'])
-      )
-
-      const layout_dec = e => ({
-        polarity: viz.POLARITIES[e >> 3 & 1],
-        'left placement': viz.LEFT_PLACEMENTS[e >> 2 & 1],
-        'right placement': viz.RIGHT_PLACEMENTS[e >> 1 & 1],
-        'result placement': viz.RESULT_PLACEMENTS[e & 1]
-      })
-
-      const polx = e => e >> 3 & 1
-      const leftx = e => e >> 2 & 1
-      const rightx = e => e >> 1 & 1
-      const resx = e => e & 1
-      const layout_desc = e => '-+'[polx(e)] + 'LR'[leftx(e)] + 'TB'[rightx(e)] + 'FB'[resx(e)]
-
-      const BLOCKS_SCHEME = {
-        true: [
-          11, 15, 9, 13,   // -LTF, -LTB, -LBF, -LBB
-          10, 14, 8, 12,    // -RTF, -RTB, -RBF, -RBB
-          6, 2, 4, 0,     // +LTF, +LTB, +LBF, +LBB
-          7, 3, 5, 1,   // +RTF, +RTB, +RBF, +RBB
-        ],
-        false: [
-          13, 15, 12, 14,   // -LTF, -LTB, -LBF, -LBB
-          9, 11, 8, 10,   // -RTF, -RTB, -RBF, -RBB
-          6, 4, 7, 5,   // +LTF, +LTB, +LBF, +LBB
-          2, 0, 3, 1,    // +RTF, +RTB, +RBF, +RBB
-        ]
-      }
-
-      const ZIGZAG_SCHEME = {
-        true: [
-          9, 13, 11, 15,   // -LTF, -LTB, -LBF, -LBB
-          8, 12, 10, 14,   // -RTF, -RTB, -RBF, -RBB
-          4, 0, 6, 2,   // +LTF, +LTB, +LBF, +LBB
-          5, 1, 7, 3,   // +RTF, +RTB, +RBF, +RBB
-        ],
-        false: [
-          9, 11, 8, 10,   // -LTF, -LTB, -LBF, -LBB
-          13, 15, 12, 14,   // -RTF, -RTB, -RBF, -RBB
-          2, 0, 3, 1,   // +LTF, +LTB, +LBF, +LBB
-          6, 4, 7, 5,   // +RTF, +RTB, +RBF, +RBB
-        ]
-      }
-
-      const CIRCLE_SCHEME = {
-        true: [
-          5, 1, 7, 3,   // -LTF, -LTB, -LBF, -LBB
-          4, 0, 6, 2,   // -RTF, -RTB, -RBF, -RBB
-          8, 12, 10, 14,   // +LTF, +LTB, +LBF, +LBB
-          9, 13, 11, 15,   // +RTF, +RTB, +RBF, +RBB
-        ],
-        false: [
-          3, 1, 2, 0,   // -LTF, -LTB, -LBF, -LBB
-          7, 5, 6, 4,   // -RTF, -RTB, -RBF, -RBB
-          8, 10, 9, 11,   // +LTF, +LTB, +LBF, +LBB
-          12, 14, 13, 15,   // +RTF, +RTB, +RBF, +RBB
-        ]
-      }
-
-      const SCHEMES = {
-        'blocks': BLOCKS_SCHEME,
-        'zigzag': ZIGZAG_SCHEME,
-        'circle': CIRCLE_SCHEME,
-      }
-
-      const layout_info = layout => ({
+      const layoutToBool = layout => ({
         pol: !!viz.POLARITIES.indexOf(layout.polarity),
         left: !!viz.LEFT_PLACEMENTS.indexOf(layout['left placement']),
         right: !!viz.RIGHT_PLACEMENTS.indexOf(layout['right placement']),
         res: !!viz.RESULT_PLACEMENTS.indexOf(layout['result placement'])
       })
 
-      const info_layout = ({ pol, left, right, res }) => ({
+      const boolToLayout = ({ pol, left, right, res }) => ({
         polarity: viz.POLARITIES[+pol],
         'left placement': viz.LEFT_PLACEMENTS[+left],
         'right placement': viz.RIGHT_PLACEMENTS[+right],
         'result placement': viz.RESULT_PLACEMENTS[+res]
       })
 
-      const blocks_rule = (is_left, { pol, left, right, res }) => ({
-        pol: !pol,
-        left: is_left ? pol != res : !left,
-        right: is_left ? !right : pol != res,
-        res: pol == (is_left ? left : right),
-      })
-
-      const zigzag_rule = (is_left, { pol, left, right, res }) => ({
-        pol: !pol,
-        left: is_left ? pol != res : left,
-        right: is_left ? right : pol != res,
-        res: pol == (is_left ? left : right),
-      })
-
-      const circle_rule = (is_left, { pol, left, right, res }) => ({
-        pol: pol,
-        left: is_left ? pol == res : left,
-        right: is_left ? right : pol == res,
-        res: pol == (is_left ? left : right),
-      })
-
       const RULES = {
-        'blocks': blocks_rule,
-        'zigzag': zigzag_rule,
-        'circle': circle_rule,
+        'blocks': (left_child, { pol, left, right, res }) => ({
+          pol: !pol,
+          left: left_child ? pol != res : !left,
+          right: left_child ? !right : pol != res,
+          res: pol == (left_child ? left : right),
+        }),
+        'zigzag': (left_child, { pol, left, right, res }) => ({
+          pol: !pol,
+          left: left_child ? pol != res : left,
+          right: left_child ? right : pol != res,
+          res: pol == (left_child ? left : right),
+        }),
+        'circle': (left_child, { pol, left, right, res }) => ({
+          pol: pol,
+          left: left_child ? pol == res : left,
+          right: left_child ? right : pol == res,
+          res: pol == (left_child ? left : right),
+        }),
       }
 
-      function test_scheme(scheme_name, r) {
-        const scheme = SCHEMES[scheme_name]
-        console.log(`LEFT`)
-        for (let i = 0; i < 16; i++) {
-          const info = layout_info(layout_dec(i))
-          const next_info = r(true, info)
-          const next_by_rule = layout_enc(info_layout(next_info))
-          const next_by_scheme = scheme[true][i]
-          const ok = next_by_rule == next_by_scheme
-          console.log(`${scheme_name} left ${i} ${layout_desc(i)} scheme ${next_by_scheme} ${layout_desc(next_by_scheme)} rule ${next_by_rule} ${layout_desc(next_by_rule)} ok ${ok}`)
-        }
-        console.log(`RIGHT`)
-        for (let i = 0; i < 16; i++) {
-          const info = layout_info(layout_dec(i))
-          const next_info = r(false, info)
-          const next_by_rule = layout_enc(info_layout(next_info))
-          const next_by_scheme = scheme[false][i]
-          const ok = next_by_rule == next_by_scheme
-          console.log(`${scheme_name} right ${i} ${layout_desc(i)} scheme ${next_by_scheme} ${layout_desc(next_by_scheme)} rule ${next_by_rule} ${layout_desc(next_by_rule)} ok ${ok}`)
-        }
-      }
-
-      test_scheme('blocks', blocks_rule)
-      test_scheme('circle', circle_rule)
-      test_scheme('zigzag', zigzag_rule)
-
-      const childLayout = (is_left, parent_layout, rule) =>
-        info_layout(rule(is_left, layout_info(parent_layout)))
+      const childLayout = (left_child, parent_layout, rule) =>
+        boolToLayout(rule(left_child, layoutToBool(parent_layout)))
 
       function layoutProto(scheme_name, pp, is_left) {
         const rule = RULES[scheme_name]
@@ -594,32 +496,19 @@
         function f(p) {
           if (p.left.matmul) {
             p.left.layout = childLayout(true, p.layout, rule)
-            f(p.left, p)
+            f(p.left)
           }
           if (p.right.matmul) {
             p.right.layout = childLayout(false, p.layout, rule)
-            f(p.right, p)
+            f(p.right)
           }
         }
         rule && f(params)
       }
 
-      function isLayoutScheme(name, params) {
-        const rule = RULES[name]
-        const f = p => (
-          (!p.left.matmul || (
-            p.left.layout == childLayout(true, p.layout, rule) &&
-            f(p.left, p)
-          )) &&
-          (!p.right.matmul || (
-            p.right.layout == childLayout(false, p.layout, rule) &&
-            f(p.right, p)
-          ))
-        )
-        !rule || f(params)
-      }
+      // child mat/matmul state change 
 
-      const child_mat_proto = (p, depth, is_left) => {
+      const childMatProto = (p, depth, is_left) => {
         return {
           name: p.name + (is_left ? 'L' : 'R'),
           matmul: false,
@@ -632,7 +521,6 @@
         }
       }
 
-      // child mat/matmul state change 
       function syncChildParams(g, path, ancestors) {
         const height = p => p.matmul ? height(p.left) : p.h
         const width = p => p.matmul ? width(p.right) : p.w
@@ -644,8 +532,8 @@
           const depth = is_left ? width(pp.right) : height(pp.left)
           util.updateProps(p, {
             epilog: pp.epilog,
-            left: child_mat_proto(p, depth, true),
-            right: child_mat_proto(p, depth, false),
+            left: childMatProto(p, depth, true),
+            right: childMatProto(p, depth, false),
             anim: animProto(),
             layout: layoutProto(params.layout.scheme, pp, is_left),
           })
@@ -734,8 +622,6 @@
 
         addChoiceParam(g, 'epilog', viz.EPILOGS, initObj, path, path)
 
-        const title = name => (is_root ? '' : `${g._title} / `) + name
-
         // anim
         const gui_anim = addFolder(g, 'animation', p.anim, folder_init)
         if (is_root) {
@@ -756,40 +642,38 @@
         // layout
         const gui_layout = addFolder(g, 'layout', p.layout, folder_init)
         if (is_root) {
-          addChoiceParam(gui_layout, 'scheme', viz.SCHEMES, v => {
-            setLayoutScheme(v, params)
-            initObj()
-          }, p => p.layout).listen()
-        }
-
-        const syncScheme = is_root ?
-          v => {
+          const syncScheme = () => {
             setLayoutScheme(params.layout.scheme, params)
-            initObj()
-          } :
-          v => {
-            params.layout.scheme = 'custom'
+            const is_custom = params.layout.scheme == 'custom'
+            findFolders(findFolder(g, 'left'), 'layout', true).map(f => f.show(is_custom))
+            findFolders(findFolder(g, 'right'), 'layout', true).map(f => f.show(is_custom))
             initObj()
           }
 
-        addChoiceParam(gui_layout, 'polarity', viz.POLARITIES, syncScheme, p => path(p).layout, path).listen()
-        addChoiceParam(gui_layout, 'left placement', viz.LEFT_PLACEMENTS, syncScheme, p => path(p).layout, path).listen()
-        addChoiceParam(gui_layout, 'right placement', viz.RIGHT_PLACEMENTS, syncScheme, p => path(p).layout, path).listen()
-        addChoiceParam(gui_layout, 'result placement', viz.RESULT_PLACEMENTS, syncScheme, p => path(p).layout, path).listen()
+          addChoiceParam(gui_layout, 'scheme', viz.SCHEMES, syncScheme, p => p.layout).listen()
+          addChoiceParam(gui_layout, 'polarity', viz.POLARITIES, syncScheme, p => path(p).layout, path)
+          addChoiceParam(gui_layout, 'left placement', viz.LEFT_PLACEMENTS, syncScheme, p => path(p).layout, path)
+          addChoiceParam(gui_layout, 'right placement', viz.RIGHT_PLACEMENTS, syncScheme, p => path(p).layout, path)
+          addChoiceParam(gui_layout, 'result placement', viz.RESULT_PLACEMENTS, syncScheme, p => path(p).layout, path)
 
-        if (is_root) {
           addIntParam(gui_layout, 'gap', 1, 32, initObj, p => p.layout)
           addIntParam(gui_layout, 'scatter', 0, 128, initObj, p => p.layout)
           addIntParam(gui_layout, 'molecule', 1, 8, initObj, p => p.layout)
           addNumParam(gui_layout, 'blast', -2.0, 2.0, initObj, p => p.layout)
+        } else {
+          gui_layout.show(params.layout.scheme == 'custom')
+          addChoiceParam(gui_layout, 'polarity', viz.POLARITIES, initObj, p => path(p).layout, path)
+          addChoiceParam(gui_layout, 'left placement', viz.LEFT_PLACEMENTS, initObj, p => path(p).layout, path)
+          addChoiceParam(gui_layout, 'right placement', viz.RIGHT_PLACEMENTS, initObj, p => path(p).layout, path)
+          addChoiceParam(gui_layout, 'result placement', viz.RESULT_PLACEMENTS, initObj, p => path(p).layout, path)
         }
 
-        // left
+        // left/right
+        const title = name => (is_root ? '' : `${g._title} / `) + name
         const gui_left = addFolder(g, title('left'), p.left, folder_init)
         const add_left = p.left.matmul ? addMatmulParams : addMatParams
         add_left(gui_left, x => path(x).left, [path].concat(ancestors), 'closed')
 
-        // right
         const gui_right = addFolder(g, title('right'), p.right, folder_init)
         const add_right = p.right.matmul ? addMatmulParams : addMatParams
         add_right(gui_right, x => path(x).right, [path].concat(ancestors), 'closed')
@@ -798,7 +682,6 @@
       // ---
 
       const gui = new GUI({ title: 'mm' })
-
       addMatmulParams(gui)
 
       const gui_deco = addFolder(gui, 'deco', params.deco, 'closed')
