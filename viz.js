@@ -1,3 +1,5 @@
+"use strict"
+
 import * as THREE from 'three'
 import * as util from './util.js'
 
@@ -759,7 +761,7 @@ export class MatMul {
   }
 
   initLeft() {
-    const left_params = this.prepChildParams(this.params.left, info)
+    const left_params = this.prepChildParams(this.params.left)
     if (left_params.matmul) {
       left_params.anim['i blocks'] = this.params.anim['i blocks']
       left_params.anim['k blocks'] = this.params.anim['j blocks']
@@ -1553,63 +1555,3 @@ export class Series {
     util.disposeAndClear(this.group)
   }
 }
-
-//
-// eval
-//
-
-class Env {
-  constructor() {
-    this.lhs = undefined
-  }
-}
-
-class Var {
-  constructor(name, env) {
-    this.name = name;
-    this.env = env
-  }
-  valueOf() {
-    console.log(`HEY ${this.name}.valueOf()`)
-    this.env.lhs = this.env.lhs ? [this.env.lhs, this] : this
-    // if (this.env.params) {
-    //   this.env.params = {
-    //     ...this.env.params,
-    //     'right name': this.name, 'result name': `${this.env.params['left name']} * ${this.name}`
-    //   }
-    // } else {
-    //   this.env.params = { ...this.env.getDefaultParams(), 'left name': this.name }
-    // }
-    return 0
-  }
-}
-
-class Expr {
-  constructor(input) {
-    let expr = input.replaceAll('@', '*')
-    let done = false
-    let limit = 0
-    this.env = new Env()
-    while (!done && limit++ < 100) {
-      try {
-        done = true
-        eval(expr)
-      } catch (e) {
-        if (e.message.indexOf('is not defined') == -1) {
-          throw e
-        }
-        done = false
-        const name = /^([\w\-]+)/.exec(e.message)[0]
-        console.log(`HEY name ${name}`)
-        expr = `const ${name} = new Var('${name}', this.env);${expr}`
-        console.log(`HEY expr '${expr}'`)
-      }
-    }
-    if (limit == 1000) {
-      throw Error(`error evaluating input '${input}`)
-    }
-    this.expr = expr
-    console.log(`HEY this.expr = ${this.expr} env = ${this.envenv}`)
-  }
-}
-

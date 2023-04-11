@@ -1,3 +1,4 @@
+"use strict"
 import * as THREE from 'three'
 
 // https://threejs.org/examples/#webgl_buffergeometry_rawshader

@@ -25,6 +25,7 @@
   </script>
 
   <script type="module">
+    "use strict"
     import * as THREE from 'three'
     import * as viz from './viz.js'
     import * as util from './util.js'
@@ -37,49 +38,67 @@
 
     const init_dims = { i: 32, j: 32, k: 32 }
 
+    const default_epilog = 'layernorm'
+
+    const defaultLeft = () => ({
+      name: 'L',
+      matmul: false,
+      h: init_dims.i,
+      w: init_dims.j,
+      init: 'row major',
+      min: -1,
+      max: 1,
+      dropout: 0,
+    })
+
+    const defaultRight = () => ({
+      name: 'R',
+      matmul: false,
+      h: init_dims.j,
+      w: init_dims.k,
+      init: 'col major',
+      min: -1,
+      max: 1,
+      dropout: 0,
+    })
+
+    const defaultAnim = () => ({
+      alg: 'none',
+      'j blocks': 1,
+    })
+
+    const defaultRootAnim = () => ({
+      ...defaultAnim(),
+      fuse: 'none',
+      speed: 25,
+      'hide inputs': false,
+      'i blocks': 1,
+      'k blocks': 1,
+    })
+
+    const defaultLayout = () => ({
+      polarity: 'negative',
+      'left placement': 'left',
+      'right placement': 'top',
+      'result placement': 'front',
+    })
+
+    const defaultRootLayout = () => ({
+      ...defaultLayout(),
+      scheme: 'blocks',
+      gap: 1,
+      scatter: 0,
+      molecule: 1,
+      blast: 0,
+    })
+
     const params = {
       name: 'L @ R',
-      epilog: 'none',
-      left: {
-        name: 'L',
-        matmul: false,
-        h: init_dims.i,
-        w: init_dims.j,
-        init: 'row major',
-        min: -1,
-        max: 1,
-        dropout: 0,
-      },
-      right: {
-        name: 'R',
-        matmul: false,
-        h: init_dims.j,
-        w: init_dims.k,
-        init: 'col major',
-        min: -1,
-        max: 1,
-        dropout: 0,
-      },
-      anim: {
-        alg: 'none',
-        fuse: 'none',
-        speed: 25,
-        'hide inputs': false,
-        'i blocks': 1,
-        'j blocks': 1,
-        'k blocks': 1,
-      },
-      layout: {
-        scheme: 'blocks',
-        polarity: 'negative',
-        'left placement': 'left',
-        'right placement': 'top',
-        'result placement': 'front',
-        gap: 1,
-        scatter: 0,
-        molecule: 1,
-        blast: 0,
-      },
+      epilog: default_epilog,
+      left: defaultLeft(),
+      right: defaultRight(),
+      anim: defaultRootAnim(),
+      layout: defaultRootLayout(),
       deco: {
         legends: 3,
         'row guides': 0.5,
@@ -105,19 +124,19 @@
       }
     }
 
-    function expr(p) {
+    function title(p) {
       if (!p.left || !p.right) {
         return p.name
       }
       const passign = e => e.indexOf('=') >= 0 ? '(' + e + ')' : e
-      const l = p.left.matmul ? passign(expr(p.left)) : p.left.name
-      const r = p.right.matmul ? '(' + expr(p.right) + ')' : p.right.name
+      const l = p.left.matmul ? passign(title(p.left)) : p.left.name
+      const r = p.right.matmul ? '(' + title(p.right) + ')' : p.right.name
       const x = `${l} @ ${r}`
       return p.name == `${p.left.name} @ ${p.right.name}` ? x : `${p.name} = ${x}`
     }
 
     function updateTitle() {
-      document.getElementById('info').innerHTML = expr(params)
+      document.getElementById('info').innerHTML = title(params)
     }
 
     // update URL with param changes
@@ -378,7 +397,7 @@
     function initGui(getObj, _initObj, initAxes) {
 
       const initObj = () => {
-        document.getElementById('info').innerHTML = expr(params)
+        document.getElementById('info').innerHTML = title(params)
         _initObj()
       }
 
@@ -413,14 +432,14 @@
         )
       }
 
-      const findController = (gui, property) =>
-        gui.controllers.find(c => c.property == property)
+      const findController = (gui, x) =>
+        gui.controllers.find(c => c.property == x)
 
-      const findFolder = (gui, _title) =>
-        gui.folders.find(f => f._title == _title)
+      const findFolder = (g, x) =>
+        g.folders.find(f => f._title == x)
 
-      const findFolders = (gui, _title, recursive = false) =>
-        (recursive ? gui.foldersRecursive() : gui.folders).filter(f => f._title == _title)
+      const findFolders = (g, x, recursive = false) =>
+        (recursive ? g.foldersRecursive() : g.folders).filter(f => f._title == x)
 
       function clearFolder(gui) {
         while (gui.folders.length > 0) {
@@ -440,11 +459,6 @@
       }
 
       // ---
-
-      const animProto = () => ({
-        alg: 'none',
-        'j blocks': 1,
-      })
 
       // layout schemes
 
@@ -483,23 +497,18 @@
         }),
       }
 
-      const childLayout = (left_child, parent_layout, rule) =>
+      const childLayout = (parent_layout, rule, left_child) =>
         boolToLayout(rule(left_child, layoutToBool(parent_layout)))
-
-      function layoutProto(scheme_name, pp, is_left) {
-        const rule = RULES[scheme_name]
-        return rule ? childLayout(is_left, pp.layout, rule) : util.copyTree(pp.layout)
-      }
 
       function setLayoutScheme(scheme_name, params) {
         const rule = RULES[scheme_name]
         function f(p) {
           if (p.left.matmul) {
-            p.left.layout = childLayout(true, p.layout, rule)
+            p.left.layout = childLayout(p.layout, rule, true)
             f(p.left)
           }
           if (p.right.matmul) {
-            p.right.layout = childLayout(false, p.layout, rule)
+            p.right.layout = childLayout(p.layout, rule, false)
             f(p.right)
           }
         }
@@ -508,12 +517,12 @@
 
       // child mat/matmul state change 
 
-      const childMatProto = (p, depth, is_left) => {
+      const childMat = (p, depth, left_child) => {
         return {
-          name: p.name + (is_left ? 'L' : 'R'),
+          name: p.name + (left_child ? 'L' : 'R'),
           matmul: false,
-          h: is_left ? p.h : depth,
-          w: is_left ? depth : p.w,
+          h: left_child ? p.h : depth,
+          w: left_child ? depth : p.w,
           init: p.init,
           min: p.min,
           max: p.max,
@@ -530,12 +539,16 @@
         if (p.matmul) {
           const is_left = p === pp.left
           const depth = is_left ? width(pp.right) : height(pp.left)
+          const rule = RULES[params.layout.scheme]
+          const layoutProto = left_child => rule ?
+            childLayout(pp.layout, rule, left_child) :
+            util.copyTree(pp.layout)
           util.updateProps(p, {
             epilog: pp.epilog,
-            left: childMatProto(p, depth, true),
-            right: childMatProto(p, depth, false),
-            anim: animProto(),
-            layout: layoutProto(params.layout.scheme, pp, is_left),
+            left: childMat(p, depth, true),
+            right: childMat(p, depth, false),
+            anim: defaultAnim(),
+            layout: layoutProto(pp, is_left),
           })
           util.deleteProps(p, ['h', 'w', 'init', 'min', 'max', 'dropout'])
           return addMatmulParams(g, path, ancestors)
@@ -642,19 +655,11 @@
         // layout
         const gui_layout = addFolder(g, 'layout', p.layout, folder_init)
         if (is_root) {
-          const syncScheme = () => {
-            setLayoutScheme(params.layout.scheme, params)
-            const is_custom = params.layout.scheme == 'custom'
-            findFolders(findFolder(g, 'left'), 'layout', true).map(f => f.show(is_custom))
-            findFolders(findFolder(g, 'right'), 'layout', true).map(f => f.show(is_custom))
-            initObj()
-          }
-
-          addChoiceParam(gui_layout, 'scheme', viz.SCHEMES, syncScheme, p => p.layout).listen()
-          addChoiceParam(gui_layout, 'polarity', viz.POLARITIES, syncScheme, p => path(p).layout, path)
-          addChoiceParam(gui_layout, 'left placement', viz.LEFT_PLACEMENTS, syncScheme, p => path(p).layout, path)
-          addChoiceParam(gui_layout, 'right placement', viz.RIGHT_PLACEMENTS, syncScheme, p => path(p).layout, path)
-          addChoiceParam(gui_layout, 'result placement', viz.RESULT_PLACEMENTS, syncScheme, p => path(p).layout, path)
+          addChoiceParam(gui_layout, 'scheme', viz.SCHEMES, syncLayoutScheme, p => p.layout).listen()
+          addChoiceParam(gui_layout, 'polarity', viz.POLARITIES, syncLayoutScheme, p => path(p).layout, path)
+          addChoiceParam(gui_layout, 'left placement', viz.LEFT_PLACEMENTS, syncLayoutScheme, p => path(p).layout, path)
+          addChoiceParam(gui_layout, 'right placement', viz.RIGHT_PLACEMENTS, syncLayoutScheme, p => path(p).layout, path)
+          addChoiceParam(gui_layout, 'result placement', viz.RESULT_PLACEMENTS, syncLayoutScheme, p => path(p).layout, path)
 
           addIntParam(gui_layout, 'gap', 1, 32, initObj, p => p.layout)
           addIntParam(gui_layout, 'scatter', 0, 128, initObj, p => p.layout)
@@ -681,25 +686,132 @@
 
       // ---
 
+      const t = title(params)
+      const ex = { expr: t, prev: t }
+
+      function evalExpr(e) {
+
+        function parseExpr(s) {
+          try {
+            const node = spec => typeof spec == 'string' ? { name: spec } : make(spec)
+            const make = spec => {
+              const i = spec[1] == '=' ? 2 : 0
+              const rname = r => /\s+/.test(r.name) ? '(' + r.name + ')' : r.name
+              const f = (left, x) => {
+                const right = node(x)
+                return { left, right, name: left.name + ' @ ' + rname(right) }
+              }
+              const p = spec.slice(i + 1).reduce(f, node(spec[i]))
+              p.name = i == 0 ? p.left.name + ' @ ' + p.right.name : spec[0]
+              return p
+            }
+            s = '[' + s.replace(/\s+/g, '').
+              replace(/(\w+[\w\.\-\!\#\$\%\^\&\/\[\]]*)/g, '"$1"').
+              replaceAll('@', ',').
+              replaceAll('(', '[').
+              replaceAll(')', ']').
+              replaceAll('=', ',"=",') + ']'
+            let spec = eval?.(s)
+            while (spec.length == 1) {
+              spec = spec[0]
+            }
+            return make(spec)
+          } catch (e) {
+            console.log(`error evaluating '${s}': ${e.message}`)
+          }
+        }
+
+        const p = parseExpr(e)
+        if (p) {
+          ex.prev = ex.expr // already e
+
+          const findParams = (p, n) => p.name != n ?
+            (p.left && findParams(p.left, n)) || (p.right && findParams(p.right, n)) || {} :
+            p
+
+          const childParams = (p, is_left) => {
+            if (p.left && p.right) {
+              return {
+                name: p.name,
+                epilog: default_epilog,
+                anim: defaultAnim(),
+                layout: defaultLayout(),
+                ...findParams(params, p.name),
+                left: childParams(p.left, true),
+                right: childParams(p.right, false),
+                matmul: true,
+              }
+            } else {
+              return {
+                ...(is_left ? defaultLeft : defaultRight)(),
+                ...findParams(params, p.name),
+                ...p,
+                matmul: false
+              }
+            }
+          }
+
+          params.name = p.name
+          params.left = childParams(p.left, true)
+          params.right = childParams(p.right, false)
+
+          const gui_left = findFolder(gui, 'left')
+          clearFolder(gui_left)
+          const add_left = params.left.matmul ? addMatmulParams : addMatParams
+          add_left(gui_left, x => x.left, [x => x])
+
+          const gui_right = findFolder(gui, 'right')
+          clearFolder(gui_right)
+          const add_right = params.right.matmul ? addMatmulParams : addMatParams
+          add_right(gui_right, x => x.right, [x => x])
+
+          syncLayoutScheme()
+
+          initObj()
+        } else {
+          ex.expr = ex.prev
+        }
+      }
+
+      // ---
+
+      function addDecoParams(g) {
+        const gui_deco = addFolder(g, 'deco', params.deco, 'closed')
+        addNumParam(gui_deco, 'legends', 0, 10, x => getObj().setLegends(x), p => p.deco)
+        addIntParam(gui_deco, 'spotlight', 0, 10, x => getObj().updateLabels(params), p => p.deco)
+        addNumParam(gui_deco, 'row guides', 0.0, 1.0, x => getObj().setRowGuides(x), p => p.deco)
+        addNumParam(gui_deco, 'flow guides', 0.0, 1.0, x => getObj().setFlowGuide(x), p => p.deco)
+        addParam(gui_deco, 'interior spotlight', x => getObj().updateLabels(params), p => p.deco)
+        addParam(gui_deco, 'axes', x => initAxes(getObj().params.axes = x), p => p.deco)
+      }
+
+      function addVizParams(g) {
+        const gui_viz = addFolder(gui, 'colors and sizes', params.viz, 'closed')
+        addChoiceParam(gui_viz, 'sensitivity', viz.SENSITIVITIES, initObj, p => p.viz)
+        addNumParam(gui_viz, 'min size', 0.0, 1.0, initObj, p => p.viz)
+        addNumParam(gui_viz, 'min light', 0.0, 1.0, initObj, p => p.viz)
+        addNumParam(gui_viz, 'max light', 0.0, 1.0, initObj, p => p.viz)
+        addNumParam(gui_viz, 'zero hue', 0.0, 1.0, initObj, p => p.viz)
+        addNumParam(gui_viz, 'hue gap', 0.0, 1.0, initObj, p => p.viz)
+        addNumParam(gui_viz, 'hue spread', 0.0, 1.0, initObj, p => p.viz)
+      }
+
+      // --- 
+
       const gui = new GUI({ title: 'mm' })
+
+      function syncLayoutScheme() {
+        setLayoutScheme(params.layout.scheme, params)
+        const is_custom = params.layout.scheme == 'custom'
+        findFolders(findFolder(gui, 'left'), 'layout', true).map(f => f.show(is_custom))
+        findFolders(findFolder(gui, 'right'), 'layout', true).map(f => f.show(is_custom))
+        initObj()
+      }
+
+      gui.add(ex, 'expr').onFinishChange(evalExpr).listen()
       addMatmulParams(gui)
-
-      const gui_deco = addFolder(gui, 'deco', params.deco, 'closed')
-      addNumParam(gui_deco, 'legends', 0, 10, x => getObj().setLegends(x), p => p.deco)
-      addIntParam(gui_deco, 'spotlight', 0, 10, x => getObj().updateLabels(params), p => p.deco)
-      addNumParam(gui_deco, 'row guides', 0.0, 1.0, x => getObj().setRowGuides(x), p => p.deco)
-      addNumParam(gui_deco, 'flow guides', 0.0, 1.0, x => getObj().setFlowGuide(x), p => p.deco)
-      addParam(gui_deco, 'interior spotlight', x => getObj().updateLabels(params), p => p.deco)
-      addParam(gui_deco, 'axes', x => initAxes(getObj().params.axes = x), p => p.deco)
-
-      const gui_viz = addFolder(gui, 'colors and sizes', params.viz, 'closed')
-      addChoiceParam(gui_viz, 'sensitivity', viz.SENSITIVITIES, initObj, p => p.viz)
-      addNumParam(gui_viz, 'min size', 0.0, 1.0, initObj, p => p.viz)
-      addNumParam(gui_viz, 'min light', 0.0, 1.0, initObj, p => p.viz)
-      addNumParam(gui_viz, 'max light', 0.0, 1.0, initObj, p => p.viz)
-      addNumParam(gui_viz, 'zero hue', 0.0, 1.0, initObj, p => p.viz)
-      addNumParam(gui_viz, 'hue gap', 0.0, 1.0, initObj, p => p.viz)
-      addNumParam(gui_viz, 'hue spread', 0.0, 1.0, initObj, p => p.viz)
+      addDecoParams(gui)
+      addVizParams(gui)
     }
 
   </script>
