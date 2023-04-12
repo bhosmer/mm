@@ -5,7 +5,44 @@
   <title></title>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
-  <link type="text/css" rel="stylesheet" href="main.css" />
+  <style>
+    body {
+      margin: 0;
+      background-color: #000;
+      color: #fff;
+      font-family: Monospace;
+      font-size: 13px;
+      line-height: 24px;
+      overscroll-behavior: none;
+    }
+
+    canvas {
+      display: block;
+    }
+
+    #info {
+      position: absolute;
+      top: 0px;
+      width: 100%;
+      padding: 10px;
+      box-sizing: border-box;
+      text-align: center;
+      font-size: 15px;
+      -moz-user-select: none;
+      -webkit-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .lil-gui {
+      --padding: 8px;
+      --spacing: 2px;
+      --background-color: #222;
+      --folder-indent: 16px;
+    }
+  </style>
 </head>
 
 <body>
@@ -372,7 +409,7 @@
       }
 
       function set(n, v, f = initObj, param_path = p => p, obj_path = o => o) {
-        setParams({ [n]: v }, param_path(params)) // TODO always redundant?
+        setParams({ [n]: v }, param_path(params))
         if (obj_path(getObj()).params[n] != v) {
           f(v)
         }
@@ -586,7 +623,10 @@
         }, path).listen()
 
         p.url ||= '' // temp
-        g.add(p, 'url').onFinishChange(initObj).show(p.init == 'url')
+        g.add(p, 'url').onFinishChange(url => {
+          setParams({ url }, p)
+          initObj()
+        }).show(p.init == 'url')
         addNumParam(g, 'min', -1.0, 1.0, initObj, path, path).show(viz.useRange(p.init))
         addNumParam(g, 'max', 0.0, 1.0, initObj, path, path).show(viz.useRange(p.init))
         addNumParam(g, 'dropout', 0.0, 1.0, initObj, path, path).show(viz.useDropout(p.init))

@@ -149,7 +149,7 @@ function softmax_(h, w, data) {
     for (let j = 0; j < w; j++, ptr++) {
       d += Math.exp(data[ptr])
       if (!isFinite(d)) {
-        console.log(`HEY denom at data[${ptr}) = ${data[ptr]} becomes infinite`)
+        util.log(`HEY denom at data[${ptr}) = ${data[ptr]} becomes infinite`)
         break
       }
     }
@@ -161,7 +161,7 @@ function softmax_(h, w, data) {
     for (let j = 0; j < w; j++, ptr++) {
       const x = Math.exp(data[ptr]) / denom
       if (isNaN(x)) {
-        console.log(`HEY Math.exp(data[${ptr}) = ${data[ptr]}]) / ${denom} is NaN`)
+        util.log(`HEY Math.exp(data[${ptr}) = ${data[ptr]}]) / ${denom} is NaN`)
         data[ptr] = 0
       } else {
         data[ptr] = x
@@ -438,14 +438,14 @@ export class Mat {
     const absmin = use_absmin ? this.absmin : 0
     const absdiff = absmax - absmin
     if (absmin > absmax) {
-      console.log(`HEY absmin ${absmin} > absmax ${absmax}`)
+      util.log(`HEY absmin ${absmin} > absmax ${absmax}`)
     }
     return { viz, absmin, absmax, absdiff }
   }
 
   sizeFromData(x) {
     if (x === undefined || isNaN(x)) {
-      console.log(`HEY sizeFromData(${x})`)
+      util.log(`HEY sizeFromData(${x})`)
       return 0
     }
 
@@ -460,7 +460,7 @@ export class Mat {
     const size = zsize + (ELEM_SIZE - zsize) * Math.cbrt(vol)
 
     if (absx > absmax || size < 0 || size > ELEM_SIZE || isNaN(size)) {
-      console.log(`HEY x ${x} size ${size} absx ${absx} absmax ${absmax} absmin ${absmin} zsize ${zsize}`)
+      util.log(`HEY x ${x} size ${size} absx ${absx} absmax ${absmax} absmin ${absmin} zsize ${zsize}`)
     }
 
     return size
@@ -468,7 +468,7 @@ export class Mat {
 
   colorFromData(x) {
     if (x === undefined || isNaN(x)) {
-      console.log(`HEY colorFromData(${x})`)
+      util.log(`HEY colorFromData(${x})`)
       return COLOR_TEMP.setHSL(0.0, 1.0, 1.0)
     }
 
@@ -606,8 +606,6 @@ export class Mat {
     const rsu = this.isRightSideUp()
     const name = this.params.name
 
-    // console.log(`HEY ${name} facing ${facing} rsu ${rsu}`)
-
     if ((size === undefined || size == this.params.deco.legends) &&
       this.legendState &&
       this.legendState.facing == facing &&
@@ -742,7 +740,7 @@ export class MatMul {
     this.W = width(params.right)
 
     if (this.D != height(params.right)) {
-      console.log(`HEY left width ${this.D} != right height ${height(params.right)}`)
+      util.log(`HEY left width ${this.D} != right height ${height(params.right)}`)
     }
 
     this.initLeft()
@@ -838,7 +836,7 @@ export class MatMul {
       x += l * r
     }
     if (isNaN(x)) {
-      console.log(`HEY dotprod_val(${i}, ${k}, ${minj}, ${maxj}) is NaN`)
+      util.log(`HEY dotprod_val(${i}, ${k}, ${minj}, ${maxj}) is NaN`)
       return 0
     }
     const epi = this.params.epilog
