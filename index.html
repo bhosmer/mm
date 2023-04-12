@@ -585,6 +585,7 @@
           initObj()
         }, path).listen()
 
+        p.url ||= '' // temp
         g.add(p, 'url').onFinishChange(initObj).show(p.init == 'url')
         addNumParam(g, 'min', -1.0, 1.0, initObj, path, path).show(viz.useRange(p.init))
         addNumParam(g, 'max', 0.0, 1.0, initObj, path, path).show(viz.useRange(p.init))

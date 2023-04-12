@@ -84,19 +84,19 @@ const USE_DROPOUT = USE_RANGE.concat(['pt linear'])
 export const useRange = name => USE_RANGE.indexOf(name) >= 0
 export const useDropout = name => USE_DROPOUT.indexOf(name) >= 0
 
-const data_cache = {}
+const DATA_CACHE = {}
 
 export function tryLoadData(data_url) {
-  if (data_cache[data_url]) {
-    return data_cache[data_url]
+  if (DATA_CACHE[data_url]) {
+    return DATA_CACHE[data_url]
   }
   try {
     const url = new URL(data_url)
     const req = new XMLHttpRequest()
     req.open("GET", url, false)
     req.send(null)
-    data_cache[url] = req.responseText.split(/\r?\n|\r/).map(l => l.split(',').map(s => +s))
-    return data_cache[url]
+    DATA_CACHE[url] = req.responseText.split(/\r?\n|\r/).map(l => l.split(',').map(s => +s))
+    return DATA_CACHE[url]
   } catch (e) {
     console.log(`error loading from URL '${data_url}' message '${e.message}`)
   }
