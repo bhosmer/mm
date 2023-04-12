@@ -76,7 +76,7 @@ export const INIT_FUNCS = {
   diff: (i, j) => i == j ? 1 : i == j + 1 ? -1 : 0,
 }
 
-export const INITS = Object.keys(INIT_FUNCS)
+export const INITS = Object.keys(INIT_FUNCS).concat('url')
 
 const USE_RANGE = ['rows', 'cols', 'row major', 'col major', 'uniform', 'gaussian']
 const USE_DROPOUT = USE_RANGE.concat(['pt linear'])
@@ -84,23 +84,50 @@ const USE_DROPOUT = USE_RANGE.concat(['pt linear'])
 export const useRange = name => USE_RANGE.indexOf(name) >= 0
 export const useDropout = name => USE_DROPOUT.indexOf(name) >= 0
 
-function getInitFunc(name, min = 0, max = 1, dropout = 0) {
-  const f = INIT_FUNCS[name]
-  if (!f) {
-    throw Error(`unrecognized initializer ${name}`)
+const data_cache = {}
+
+export function tryLoadData(data_url) {
+  if (data_cache[data_url]) {
+    return data_cache[data_url]
   }
-  const scaled = useRange(name) && (min != 0 || max != 1) ?
+  try {
+    const url = new URL(data_url)
+    const req = new XMLHttpRequest()
+    req.open("GET", url, false)
+    req.send(null)
+    data_cache[url] = req.responseText.split(/\r?\n|\r/).map(l => l.split(',').map(s => +s))
+    return data_cache[url]
+  } catch (e) {
+    console.log(`error loading from URL '${data_url}' message '${e.message}`)
+  }
+}
+
+function tryURLInit(maybe_url) {
+  const data = tryLoadData(maybe_url)
+  if (data) {
+    return (i, j, h, w) => {
+      const row = data[i % data.length]
+      return row[j % row.length]
+    }
+  }
+}
+
+function getInitFunc(init_params) {
+  const { init, min, max, dropout, url } = init_params
+  const f = INIT_FUNCS[init] || (init == 'url' && tryURLInit(url))
+  if (!f) {
+    console.log(init == 'url' ?
+      `'can't load from URL '${url}'` :
+      `unrecognized initializer '${init}'`)
+    return () => 0
+  }
+  const scaled = useRange(init) && (min != 0 || max != 1) ?
     (i, j, h, w) => min + Math.max(0, max - min) * f(i, j, h, w) :
     f
   const sparse = dropout > 0 ?
     (i, j, h, w) => Math.random() > dropout ? scaled(i, j, h, w) : 0 :
     scaled
   return sparse
-}
-
-function initFuncFromParams(init_params) {
-  const { name, min, max, dropout } = init_params
-  return getInitFunc(name, min, max, dropout)
 }
 
 // epilogs
@@ -187,7 +214,7 @@ function initArrayData_(data, h, w, init, epi = undefined, r = undefined, c = un
   }
 }
 
-class Array2D {
+export class Array2D {
 
   static fromInit(h, w, init, epi = undefined) {
     const data = new Float32Array(h * w)
@@ -656,7 +683,7 @@ export class Mat {
           if (!label || label.facing != facing || label.rsu != rsu) {
             const fsiz = isNaN(x) || !isFinite(x) ? 0.12 :
               0.16 - 0.008 * Math.log10(Math.floor(1 + Math.abs(x)))
-            label = this.context.getText(x.toFixed(4), 0xffffff, fsiz)
+            label = this.context.getText(x.toFixed(5), 0xffffff, fsiz)
             label.name = `${this.params.name}.label[${i}, ${j}]`
             label.value = x
             label.facing = facing
@@ -767,8 +794,7 @@ export class MatMul {
       left_params.anim['k blocks'] = this.params.anim['j blocks']
       this.left = new MatMul(left_params, this.context, false)
     } else {
-      const { init, min, max, dropout } = left_params
-      const f = getInitFunc(init, min, max, dropout)
+      const f = getInitFunc(left_params)
       const data = Array2D.fromInit(this.H, this.D, f)
       this.left = new Mat(data, left_params, this.context, false)
     }
@@ -783,8 +809,7 @@ export class MatMul {
     } else {
       right_params.anim['i blocks'] = right_params.anim['j blocks']
       right_params.anim['j blocks'] = right_params.anim['k blocks']
-      const { init, min, max, dropout } = right_params
-      const f = getInitFunc(init, min, max, dropout)
+      const f = getInitFunc(right_params)
       const data = Array2D.fromInit(this.D, this.W, f)
       this.right = new Mat(data, right_params, this.context, false)
     }
@@ -793,14 +818,6 @@ export class MatMul {
   initResult() {
     const result_init = (i, j) => this.dotprod_val(i, j)
     const data = Array2D.fromInit(this.H, this.W, result_init, this.params.epilog)
-    // const params = {
-    //   ...this.getLeafParams(),
-    //   // TODO clean up
-    //   // node_height: this.params.node_height,
-    //   // node_depth: this.params.node_depth,
-    //   // max_depth: this.params.max_depth,
-    //   // count: this.params.count
-    // }
     const result_params = this.prepChildParams()
     result_params.anim['i blocks'] = result_params.anim['i blocks']
     result_params.anim['j blocks'] = result_params.anim['k blocks']

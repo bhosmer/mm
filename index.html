@@ -46,6 +46,7 @@
       h: init_dims.i,
       w: init_dims.j,
       init: 'row major',
+      url: '',
       min: -1,
       max: 1,
       dropout: 0,
@@ -57,6 +58,7 @@
       h: init_dims.j,
       w: init_dims.k,
       init: 'col major',
+      url: '',
       min: -1,
       max: 1,
       dropout: 0,
@@ -271,38 +273,6 @@
         obj.initAnimation()
 
         scene.add(obj.group)
-
-        // ---
-
-        // const mms = []
-        // for (let i = 0; i < 8; i++) {
-        //   const mm = i == 0 ?
-        //     obj :
-        //     new viz.MatMul(ensureCounts(util.copyTree(params)), getContext())
-        //   const f = mm => {
-        //     mm.params.name && (mm.params.name += ` [${ i }]`)
-        //     mm.left && f(mm.left)
-        //     mm.right && f(mm.right)
-        //     mm.result && f(mm.result)
-        //   }
-        //   f(mm)
-        //   mms.push(mm)
-        // }
-        // const offset = new THREE.Vector3(0, 0, -mms[0].getDispD() * 8)
-
-        // series = new viz.Series(mms, offset)
-
-        // series.group.rotation.x = Math.PI
-        // series.center()
-
-        // series.setLegends()
-        // series.updateLabels()
-        // series.initAnimation()
-
-        // scene.add(series.group)
-
-        // ---
-
       }
 
       // renderer, composer
@@ -402,7 +372,7 @@
       }
 
       function set(n, v, f = initObj, param_path = p => p, obj_path = o => o) {
-        setParams({ [n]: v }, param_path(params))
+        setParams({ [n]: v }, param_path(params)) // TODO always redundant?
         if (obj_path(getObj()).params[n] != v) {
           f(v)
         }
@@ -524,6 +494,7 @@
           h: left_child ? p.h : depth,
           w: left_child ? depth : p.w,
           init: p.init,
+          url: p.url,
           min: p.min,
           max: p.max,
           dropout: p.dropout,
@@ -550,7 +521,7 @@
             anim: defaultAnim(),
             layout: layoutProto(pp, is_left),
           })
-          util.deleteProps(p, ['h', 'w', 'init', 'min', 'max', 'dropout'])
+          util.deleteProps(p, ['h', 'w', 'init', 'url', 'min', 'max', 'dropout'])
           return addMatmulParams(g, path, ancestors)
         } else {
           const left_leaf = p => p.left.matmul ? left_leaf(p.left) : p.left
@@ -559,6 +530,7 @@
             h: height(p.left),
             w: width(p.right),
             init: p === pp.left ? left_leaf(p).init : right_leaf(p).init,
+            url: p === pp.left ? left_leaf(p).url : right_leaf(p).url,
             min: -1,
             max: 1,
             dropout: 0,
@@ -569,6 +541,7 @@
       }
 
       // addMatParams
+
       function addMatParams(g, path, ancestors, folder_init) {
         const height = p => p.matmul ? height(p.left) : p.h
         const width = p => p.matmul ? width(p.right) : p.w
@@ -597,27 +570,30 @@
         addIntParam(g, 'h', 1, 256, x => {
           fix_shape(p.h, p.w, p, ancestors)
           initObj()
-        }, path, path)
+        }, path, path).listen()
 
         addIntParam(g, 'w', 1, 256, x => {
           fix_shape(p.h, p.w, p, ancestors)
           initObj()
-        }, path, path)
+        }, path, path).listen()
 
         addChoiceParam(g, 'init', viz.INITS, v => {
+          findController(g, 'url').show(v == 'url')
           findController(g, 'min').show(viz.useRange(v))
           findController(g, 'max').show(viz.useRange(v))
           findController(g, 'dropout').show(viz.useDropout(v))
           initObj()
-        }, path)
+        }, path).listen()
 
+        g.add(p, 'url').onFinishChange(initObj).show(p.init == 'url')
         addNumParam(g, 'min', -1.0, 1.0, initObj, path, path).show(viz.useRange(p.init))
         addNumParam(g, 'max', 0.0, 1.0, initObj, path, path).show(viz.useRange(p.init))
         addNumParam(g, 'dropout', 0.0, 1.0, initObj, path, path).show(viz.useDropout(p.init))
       }
 
       // addMatmulParams
-      function addMatmulParams(g, path = x => x, ancestors = [], folder_init = 'closed') {
+
+      function addMatmulParams(g, path = x => x, ancestors = [], folder_init = 'open') {
         const p = path(params)
         const is_root = ancestors.length == 0
 
@@ -677,11 +653,11 @@
         const title = name => (is_root ? '' : `${g._title} / `) + name
         const gui_left = addFolder(g, title('left'), p.left, folder_init)
         const add_left = p.left.matmul ? addMatmulParams : addMatParams
-        add_left(gui_left, x => path(x).left, [path].concat(ancestors), 'closed')
+        add_left(gui_left, x => path(x).left, [path].concat(ancestors), 'open')
 
         const gui_right = addFolder(g, title('right'), p.right, folder_init)
         const add_right = p.right.matmul ? addMatmulParams : addMatParams
-        add_right(gui_right, x => path(x).right, [path].concat(ancestors), 'closed')
+        add_right(gui_right, x => path(x).right, [path].concat(ancestors), 'open')
       }
 
       // ---
@@ -776,7 +752,7 @@
       // ---
 
       function addDecoParams(g) {
-        const gui_deco = addFolder(g, 'deco', params.deco, 'closed')
+        const gui_deco = addFolder(g, 'deco', params.deco, 'open')
         addNumParam(gui_deco, 'legends', 0, 10, x => getObj().setLegends(x), p => p.deco)
         addIntParam(gui_deco, 'spotlight', 0, 10, x => getObj().updateLabels(params), p => p.deco)
         addNumParam(gui_deco, 'row guides', 0.0, 1.0, x => getObj().setRowGuides(x), p => p.deco)
@@ -786,7 +762,7 @@
       }
 
       function addVizParams(g) {
-        const gui_viz = addFolder(gui, 'colors and sizes', params.viz, 'closed')
+        const gui_viz = addFolder(gui, 'colors and sizes', params.viz, 'open')
         addChoiceParam(gui_viz, 'sensitivity', viz.SENSITIVITIES, initObj, p => p.viz)
         addNumParam(gui_viz, 'min size', 0.0, 1.0, initObj, p => p.viz)
         addNumParam(gui_viz, 'min light', 0.0, 1.0, initObj, p => p.viz)
