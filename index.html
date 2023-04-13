@@ -37,10 +37,16 @@
     }
 
     .lil-gui {
-      --padding: 8px;
-      --spacing: 2px;
-      --background-color: #222;
       --folder-indent: 16px;
+      --title-background-color: #555;
+    }
+
+    .lil-gui.autoPlace {
+      right: 0;
+    }
+
+    .lil-gui .title {
+      background-color: #555;
     }
   </style>
 </head>
@@ -75,7 +81,7 @@
 
     const init_dims = { i: 32, j: 32, k: 32 }
 
-    const default_epilog = 'layernorm'
+    const default_epilog = 'none'
 
     const defaultLeft = () => ({
       name: 'L',
