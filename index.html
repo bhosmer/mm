@@ -79,6 +79,8 @@
     import { EffectComposer } from 'https://threejs.org/examples/jsm/postprocessing/EffectComposer.js'
     import { RenderPass } from 'https://threejs.org/examples/jsm/postprocessing/RenderPass.js'
 
+    // various defaults
+
     const init_dims = { i: 32, j: 32, k: 32 }
 
     const default_epilog = 'none'
@@ -137,6 +139,10 @@
       blast: 0,
     })
 
+    //
+    // params start with single-mm default, get updated from url params
+    //
+
     const params = {
       name: 'L @ R',
       epilog: default_epilog,
@@ -146,8 +152,8 @@
       layout: defaultRootLayout(),
       deco: {
         legends: 3,
-        'row guides': 0.5,
-        'flow guides': 0.0,
+        'row guides': 1,
+        'flow guides': 0.3,
         spotlight: 1,
         'interior spotlight': false,
         axes: false,
@@ -184,52 +190,20 @@
       document.getElementById('info').innerHTML = title(params)
     }
 
-    // update URL with param changes
-
-    let address_bar_update_pending = false
-    function setParams(obj, p = params, t = 10) {
-      for (const k in obj) {
-        p[k] = obj[k]
-      }
-      // throttle address bar update
-      if (!address_bar_update_pending) {
-        address_bar_update_pending = true
-        setTimeout(function () {
-          const search_params = util.makeSearchParams(params)
-          const url = window.location.pathname + '?' + search_params
-          window.history.replaceState({}, '', url)
-          address_bar_update_pending = false
-        }, t)
-      }
+    function saveParams() {
+      const search_params = util.makeSearchParams(params)
+      const url = window.location.pathname + '?' + search_params
+      window.history.pushState({}, '', url)
     }
 
-    // note: everything is kicked off from this handler 
-    // bc I'm too lazy to make things async in here
+    //
+    // three.js globals
+    //
 
-    let getText
-    const loader = new FontLoader();
-    loader.load('droid_sans_regular.typeface.json', function (font) {
-
-      getText = function (msg, color = 0x006699, size = 1) {
-        const shapes = font.generateShapes(msg, size);
-        const geometry = new THREE.ShapeGeometry(shapes);
-        geometry.computeBoundingBox();
-        const matLite = new THREE.MeshBasicMaterial({
-          color: color,
-          side: THREE.DoubleSide
-        })
-        return new THREE.Mesh(geometry, matLite)
-      }
-
-      const animate = init()
-      animate()
-    })
-
-    // camera
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 5, 10000);
+
     const pointer = new THREE.Vector2(window.innerWidth / 2, window.innerHeight / 2)
 
-    // raycaster, used for spotlight intersections
     const raycaster = new THREE.Raycaster()
     raycaster.far = 128
     raycaster.params.Points.threshold = 0
@@ -244,6 +218,7 @@
       }
     }
 
+    // animation loop circuit breaker
     let anim_pause = false
     let anim_step = false
     function animStep() {
@@ -253,17 +228,36 @@
     }
 
     //
+    // everything is kicked off from this handler 
+    // bc I'm too lazy to make things async in here
+    //
+
+    let getText
+    const loader = new FontLoader();
+    loader.load('droid_sans_regular.typeface.json', font => {
+      // everybody uses this for text
+      getText = (msg, color = 0x006699, size = 1) => {
+        const shapes = font.generateShapes(msg, size);
+        const geometry = new THREE.ShapeGeometry(shapes);
+        geometry.computeBoundingBox();
+        const matLite = new THREE.MeshBasicMaterial({
+          color: color,
+          side: THREE.DoubleSide
+        })
+        return new THREE.Mesh(geometry, matLite)
+      }
+      // set up everything else
+      const animate = initScene()
+      // run
+      animate()
+    })
+
+    //
     // main
     //
-    function init() {
+
+    function initScene() {
       const scene = new THREE.Scene()
-
-      // load params from url
-      util.updateFromSearchParams(params, new URL(window.location).searchParams)
-      updateTitle()
-
-      // set camera position
-      camera.position.set(params.cam.x, params.cam.y, params.cam.z)
 
       // axes
       const axes = util.axes()
@@ -274,28 +268,20 @@
           scene.remove(axes)
         }
       }
-      initAxes(params.axes)
 
       // obj
-      let obj
-      let series
+
+      let obj, gui
 
       function getObj() {
         return obj
       }
 
       function initObj() {
-        // ---
         if (obj) {
           scene.remove(obj.group)
           obj.disposeAll()
         }
-        // ---
-        // if (series) {
-        //   scene.remove(series.group)
-        //   series.disposeAll()
-        // }
-        // ---
 
         const ensureCounts = p => {
           p.count = 1 +
@@ -306,8 +292,6 @@
 
         obj = new viz.MatMul(ensureCounts(util.copyTree(params)), getContext())
 
-        // ---
-
         obj.group.rotation.x = Math.PI
         obj.center()
 
@@ -316,6 +300,17 @@
         obj.initAnimation()
 
         scene.add(obj.group)
+      }
+
+      function initFromSearchParams() {
+        util.updateFromSearchParams(params, new URL(window.location).searchParams)
+        updateTitle()
+        camera.position.set(params.cam.x, params.cam.y, params.cam.z)
+        orbit.update()
+        initAxes(params.axes)
+        initObj()
+        gui && gui.destroy()
+        gui = initGui(getObj, initObj, initAxes)
       }
 
       // renderer, composer
@@ -328,83 +323,110 @@
       const composer = new EffectComposer(renderer)
       composer.addPass(new RenderPass(scene, camera))
 
-      // labels
+      // update object labels from view changes
+      // throttle a little
 
-      let cam_changing = false
       let label_update_pending = false
-
-      const updateLegendsAndLabels = () => {
+      const requestLabelUpdate = () => {
         if (!label_update_pending) {
           label_update_pending = true
-          setTimeout(function () {
+          setTimeout(() => {
+            label_update_pending = false
             raycaster.setFromCamera(pointer, camera)
             getObj().setLegends()
             getObj().updateLabels()
-            label_update_pending = false
           }, 10)
         }
       }
 
-      // orbit
+      // update params from camera changes
+      // zooms can blast these
+
+      let camera_save_pending = false
+      let last_camera_save_request = 0
+      const requestCameraPositionSave = () => {
+        last_camera_save_request = performance.now()
+        if (!camera_save_pending) {
+          camera_save_pending = true
+          setTimeout(() => {
+            camera_save_pending = false
+            const t = performance.now()
+            if (t - last_camera_save_request > 250) {
+              saveParams()
+            } else {
+              requestCameraPositionSave()
+            }
+          }, 250)
+        }
+      }
+
+      //
+      // orbit control
+      //
 
       let orbit = new OrbitControls(camera, renderer.domElement)
+
       orbit.listenToKeyEvents(window)
+
+      let cam_changing = false
 
       orbit.addEventListener('start', () => cam_changing = true)
 
-      orbit.addEventListener('end', () => {
-        cam_changing = false
-        updateLegendsAndLabels()
-      })
-
       orbit.addEventListener('change', () => {
-        setParams({ cam: camera.position }, params, 100)
+        params.cam = camera.position
       }, false)
 
-      window.addEventListener('resize', function () {
+      orbit.addEventListener('end', () => {
+        // these happen only at the end of drags, but multiple times per zoom
+        cam_changing = false
+        requestLabelUpdate()
+        requestCameraPositionSave()
+      })
+
+      //
+      // window events
+      //
+
+      window.addEventListener('popstate', initFromSearchParams, false)
+
+      window.addEventListener('resize', () => {
         camera.aspect = window.innerWidth / window.innerHeight
         camera.updateProjectionMatrix()
         composer.setSize(window.innerWidth, window.innerHeight)
         renderer.setSize(window.innerWidth, window.innerHeight)
       }, false)
 
-      function onPointerMove(event) {
-        pointer.x = (event.clientX / window.innerWidth) * 2 - 1
-        pointer.y = - (event.clientY / window.innerHeight) * 2 + 1
+      window.addEventListener('pointermove', e => {
+        pointer.x = (e.clientX / window.innerWidth) * 2 - 1
+        pointer.y = - (e.clientY / window.innerHeight) * 2 + 1
         if (!cam_changing) {
-          updateLegendsAndLabels()
+          requestLabelUpdate()
         }
-      }
-      window.addEventListener('pointermove', onPointerMove)
+      })
 
-      // obj
+      // animation loop
 
-      initObj()
-
-      // gui
-
-      initGui(getObj, initObj, initAxes)
-
-      // go
-
-      let last = 0
+      let last_anim = 0
       function animate() {
         const t = performance.now()
         if (params.anim.alg != 'none' &&
           (anim_step || !anim_pause) &&
-          (t - last) > (1000 / params.anim.speed)) {
+          (t - last_anim) > (1000 / params.anim.speed)) {
           obj.bump()
-          last = t
+          last_anim = t
           anim_step = false
         }
         composer.render(scene, camera)
         requestAnimationFrame(animate)
       }
+
+      initFromSearchParams()
+
       return animate
     }
 
     //
-    // Gui
+    // gui
     //
 
     function initGui(getObj, _initObj, initAxes) {
@@ -414,9 +436,9 @@
         _initObj()
       }
 
-      function set(n, v, f = initObj, param_path = p => p, obj_path = o => o) {
-        setParams({ [n]: v }, param_path(params))
-        if (obj_path(getObj()).params[n] != v) {
+      function set(k, v, f = initObj, param_path = p => p, obj_path = o => o) {
+        param_path(params)[k] = v
+        if (obj_path(getObj()).params[k] != v) {
           f(v)
         }
       }
@@ -466,7 +488,9 @@
       function addFolder(parent, name, p, init = 'open') {
         const child = parent.addFolder(name).open((p.folder || init) == 'open')
         child.onOpenClose(g => {
-          (g === child) && setParams({ folder: g._closed ? 'closed' : 'open' }, p, 0)
+          if (g === child) {
+            p.folder = g._closed ? 'closed' : 'open'
+          }
         })
         return child
       }
@@ -630,7 +654,8 @@
 
         p.url ||= '' // temp
         g.add(p, 'url').onFinishChange(url => {
-          setParams({ url }, p)
+          console.log(`HEY url onFinishChange`)
+          p.url = url
           initObj()
         }).show(p.init == 'url')
         addNumParam(g, 'min', -1.0, 1.0, initObj, path, path).show(viz.useRange(p.init))
@@ -835,6 +860,13 @@
       addMatmulParams(gui)
       addDecoParams(gui)
       addVizParams(gui)
+
+      gui.onFinishChange(() => {
+        console.log(`HEY onFinishChange`)
+        saveParams()
+      })
+
+      return gui
     }
 
   </script>
