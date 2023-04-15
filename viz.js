@@ -1441,7 +1441,7 @@ export class MatMul {
       const vvp = new Mat(data, this.getAnimIntermediateParams(), this.context, true)
       vvp.hide()
       const z = polarity > 0 ? gap + j + ji : extz - gap - j - ji
-      util.updateProps(vvp.group.position, { x: k + ki, y: i + ii, z })
+      util.updateProps(vvp.group.position, { x: k + ki * gap, y: i + ii * gap, z })
       vvps[[i, j, k]] = vvp
       this.anim_mats.push(vvp)
       this.group.add(vvp.group)
@@ -1511,7 +1511,7 @@ export class MatMul {
         const vvp = vvps[[i, j, k]]
         if (curj < jx && curk < kx) {
           const z = polarity > 0 ? gap + j + (ji * gap) + curj : extz - gap - j - (ji * gap) - curj
-          util.updateProps(vvp.group.position, { x: k + curk, z })
+          util.updateProps(vvp.group.position, { x: k + ki * gap + curk, z })
           vvp.reinit((iii, kii) => this.ijkmul(i + iii, j + curj, k + curk + kii))
         }
       })
