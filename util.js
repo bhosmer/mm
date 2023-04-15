@@ -303,10 +303,16 @@ export function copyTree(obj) {
 // misc THREE utils
 //
 
+let renderer
+
+export function stashRenderer(r) {
+  renderer = r
+}
+
 export function disposeAndClear(obj) {
   obj.geometry && obj.geometry.dispose()
-  obj.clear()
   obj.children && obj.children.map(disposeAndClear)
+  obj.clear()
 }
 
 //

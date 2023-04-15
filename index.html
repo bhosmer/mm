@@ -197,7 +197,7 @@
     }
 
     //
-    // three.js globals
+    // three.js global context
     //
 
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 5, 10000);
@@ -208,6 +208,20 @@
     raycaster.far = 128
     raycaster.params.Points.threshold = 0
     raycaster.setFromCamera(pointer, camera)
+
+    const scene = new THREE.Scene()
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio)
+    renderer.setSize(window.innerWidth, window.innerHeight)
+    document.getElementById('container').appendChild(renderer.domElement)
+
+    const composer = new EffectComposer(renderer)
+    composer.addPass(new RenderPass(scene, camera))
+
+    // diag info updated on render
+    const render_info = renderer.info.memory
+    util.stashRenderer(renderer)
 
     // object params plus env stuff for text, spotlight, isFacing etc
     function getContext() {
@@ -257,8 +271,6 @@
     //
 
     function initScene() {
-      const scene = new THREE.Scene()
-
       // axes
       const axes = util.axes()
       function initAxes(enabled) {
@@ -312,16 +324,6 @@
         gui && gui.destroy()
         gui = initGui(getObj, initObj, initAxes)
       }
-
-      // renderer, composer
-
-      const renderer = new THREE.WebGLRenderer({ antialias: true });
-      renderer.setPixelRatio(window.devicePixelRatio)
-      renderer.setSize(window.innerWidth, window.innerHeight)
-      document.getElementById('container').appendChild(renderer.domElement)
-
-      const composer = new EffectComposer(renderer)
-      composer.addPass(new RenderPass(scene, camera))
 
       // update object labels from view changes
       // throttle a little
@@ -416,6 +418,7 @@
           last_anim = t
           anim_step = false
         }
+        util.updateProps(render_info, renderer.info.memory)
         composer.render(scene, camera)
         requestAnimationFrame(animate)
       }
@@ -862,10 +865,11 @@
       addDecoParams(gui)
       addVizParams(gui)
 
-      gui.onFinishChange(() => {
-        console.log(`HEY onFinishChange`)
-        saveParams()
-      })
+      const gui_diag = gui.addFolder('diag').close()
+      gui_diag.add(render_info, 'geometries').listen()
+      gui_diag.add(render_info, 'textures').listen()
+
+      gui.onFinishChange(saveParams)
 
       return gui
     }
