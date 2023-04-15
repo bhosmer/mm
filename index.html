@@ -490,6 +490,7 @@
         child.onOpenClose(g => {
           if (g === child) {
             p.folder = g._closed ? 'closed' : 'open'
+            saveParams()
           }
         })
         return child
