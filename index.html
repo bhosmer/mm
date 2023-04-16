@@ -613,19 +613,19 @@
 
       // addMatParams
 
-      function addMatParams(g, path, ancestors, folder_init) {
+      const fix_shape = (h, w, p, anc) => {
         const height = p => p.matmul ? height(p.left) : p.h
         const width = p => p.matmul ? width(p.right) : p.w
 
         const seth = (p, h) => p.matmul ? seth(p.left, h) : (p.h = h)
         const setw = (p, w) => p.matmul ? setw(p.right, w) : (p.w = w)
 
-        const fix_shape = (h, w, p, anc) => {
-          const pp = anc[0](params)
-          p === pp.left ? seth(pp.right, w) : setw(pp.left, h)
-          anc.length > 1 && fix_shape(height(pp.left), width(pp.right), pp, anc.slice(1))
-        }
+        const pp = anc[0](params)
+        p === pp.left ? seth(pp.right, w) : setw(pp.left, h)
+        anc.length > 1 && fix_shape(height(pp.left), width(pp.right), pp, anc.slice(1))
+      }
 
+      function addMatParams(g, path, ancestors, folder_init) {
         const p = path(params)
 
         addParam(g, 'name', x => {
@@ -635,7 +635,8 @@
 
         addParam(g, 'matmul', v => {
           syncChildParams(g, path, ancestors)
-          initObj()
+          syncLayoutSchemeAndInit()
+          // initObj()
         }, path, path)
 
         addIntParam(g, 'h', 1, 256, x => {
@@ -707,11 +708,11 @@
         // layout
         const gui_layout = addFolder(g, 'layout', p.layout, folder_init)
         if (is_root) {
-          addChoiceParam(gui_layout, 'scheme', viz.SCHEMES, syncLayoutScheme, p => p.layout).listen()
-          addChoiceParam(gui_layout, 'polarity', viz.POLARITIES, syncLayoutScheme, p => path(p).layout, path)
-          addChoiceParam(gui_layout, 'left placement', viz.LEFT_PLACEMENTS, syncLayoutScheme, p => path(p).layout, path)
-          addChoiceParam(gui_layout, 'right placement', viz.RIGHT_PLACEMENTS, syncLayoutScheme, p => path(p).layout, path)
-          addChoiceParam(gui_layout, 'result placement', viz.RESULT_PLACEMENTS, syncLayoutScheme, p => path(p).layout, path)
+          addChoiceParam(gui_layout, 'scheme', viz.SCHEMES, syncLayoutSchemeAndInit, p => p.layout).listen()
+          addChoiceParam(gui_layout, 'polarity', viz.POLARITIES, syncLayoutSchemeAndInit, p => path(p).layout, path)
+          addChoiceParam(gui_layout, 'left placement', viz.LEFT_PLACEMENTS, syncLayoutSchemeAndInit, p => path(p).layout, path)
+          addChoiceParam(gui_layout, 'right placement', viz.RIGHT_PLACEMENTS, syncLayoutSchemeAndInit, p => path(p).layout, path)
+          addChoiceParam(gui_layout, 'result placement', viz.RESULT_PLACEMENTS, syncLayoutSchemeAndInit, p => path(p).layout, path)
 
           addIntParam(gui_layout, 'gap', 1, 32, initObj, p => p.layout)
           addIntParam(gui_layout, 'scatter', 0, 128, initObj, p => p.layout)
@@ -782,13 +783,16 @@
             p
 
           const childParams = (p, is_left) => {
+            const found = findParams(params, p.name)
             if (p.left && p.right) {
+              const foundl = findParams(params, p.left.name)
+              const foundr = findParams(params, p.right.name)
               return {
                 name: p.name,
                 epilog: default_epilog,
                 anim: defaultAnim(),
                 layout: defaultLayout(),
-                ...findParams(params, p.name),
+                ...found,
                 left: childParams(p.left, true),
                 right: childParams(p.right, false),
                 matmul: true,
@@ -796,7 +800,7 @@
             } else {
               return {
                 ...(is_left ? defaultLeft : defaultRight)(),
-                ...findParams(params, p.name),
+                ...found,
                 ...p,
                 matmul: false
               }
@@ -817,9 +821,7 @@
           const add_right = params.right.matmul ? addMatmulParams : addMatParams
           add_right(gui_right, x => x.right, [x => x])
 
-          syncLayoutScheme()
-
-          initObj()
+          syncLayoutSchemeAndInit()
         } else {
           ex.expr = ex.prev
         }
@@ -852,7 +854,7 @@
 
       const gui = new GUI({ title: 'mm' })
 
-      function syncLayoutScheme() {
+      function syncLayoutSchemeAndInit() {
         setLayoutScheme(params.layout.scheme, params)
         const is_custom = params.layout.scheme == 'custom'
         findFolders(findFolder(gui, 'left'), 'layout', true).map(f => f.show(is_custom))

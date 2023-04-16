@@ -314,13 +314,3 @@ export function disposeAndClear(obj) {
   obj.children && obj.children.map(disposeAndClear)
   obj.clear()
 }
-
-//
-// log
-//
-
-const DEBUG = false
-
-export function log(msg) {
-  DEBUG && console.log(msg)
-}
