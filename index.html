@@ -612,19 +612,20 @@
         }
       }
 
-      // addMatParams
+      // adjust surroundings to match a param node h/w
+      const fix_shape = (h, w, p, anc, root) => {
+        const height = p => p.left ? height(p.left) : p.h
+        const width = p => p.right ? width(p.right) : p.w
 
-      const fix_shape = (h, w, p, anc) => {
-        const height = p => p.matmul ? height(p.left) : p.h
-        const width = p => p.matmul ? width(p.right) : p.w
+        const seth = (p, h) => p.left ? seth(p.left, h) : (p.h = h)
+        const setw = (p, w) => p.right ? setw(p.right, w) : (p.w = w)
 
-        const seth = (p, h) => p.matmul ? seth(p.left, h) : (p.h = h)
-        const setw = (p, w) => p.matmul ? setw(p.right, w) : (p.w = w)
-
-        const pp = anc[0](params)
+        const pp = anc[0](root)
         p === pp.left ? seth(pp.right, w) : setw(pp.left, h)
-        anc.length > 1 && fix_shape(height(pp.left), width(pp.right), pp, anc.slice(1))
+        anc.length > 1 && fix_shape(height(pp.left), width(pp.right), pp, anc.slice(1), root)
       }
+
+      // addMatParams
 
       function addMatParams(g, path, ancestors, folder_init) {
         const p = path(params)
@@ -641,12 +642,12 @@
         }, path, path)
 
         addIntParam(g, 'h', 1, 256, x => {
-          fix_shape(p.h, p.w, p, ancestors)
+          fix_shape(p.h, p.w, p, ancestors, params)
           initObj()
         }, path, path).listen()
 
         addIntParam(g, 'w', 1, 256, x => {
-          fix_shape(p.h, p.w, p, ancestors)
+          fix_shape(p.h, p.w, p, ancestors, params)
           initObj()
         }, path, path).listen()
 
@@ -698,9 +699,9 @@
           gui_anim.add({ step: animStep }, 'step')
           addChoiceParam(gui_anim, 'fuse', viz.FUSE_MODE, initObj, p => p.anim)
           addParam(gui_anim, 'hide inputs', x => getObj().hideInputs(x), p => p.anim)
-          addIntParam(gui_anim, 'i blocks', 1, 16, initObj, p => p.anim)
-          addIntParam(gui_anim, 'j blocks', 1, 16, initObj, p => p.anim)
-          addIntParam(gui_anim, 'k blocks', 1, 16, initObj, p => p.anim)
+          addIntParam(gui_anim, 'i blocks', 1, 8, initObj, p => p.anim)
+          addIntParam(gui_anim, 'j blocks', 1, 8, initObj, p => p.anim)
+          addIntParam(gui_anim, 'k blocks', 1, 8, initObj, p => p.anim)
         } else {
           addChoiceParam(gui_anim, 'alg', viz.ANIM_ALG, initObj, p => path(p).anim, path)
           addIntParam(gui_anim, 'j blocks', 1, 16, initObj, p => path(p).anim, path)
@@ -779,28 +780,30 @@
         if (p) {
           ex.prev = ex.expr // already e
 
-          const findParams = (p, n) => p.name != n ?
-            (p.left && findParams(p.left, n)) || (p.right && findParams(p.right, n)) || undefined :
-            p
+          const findParams = (p, n) => p.name == n ? p :
+            (p.left && findParams(p.left, n)) ||
+            (p.right && findParams(p.right, n)) ||
+            undefined
 
           const childParams = (p, is_left) => {
             const found = findParams(params, p.name)
             if (p.left && p.right) {
-              if (found && found.matmul) {
+              if (found && found.left && found.right) {
                 return {
                   ...found,
                   left: childParams(p.left, true),
                   right: childParams(p.right, false),
+                  matmul: true,
                 }
               } else {
                 const cp = {
-                  matmul: true,
                   epilog: default_epilog,
                   anim: defaultAnim(),
                   layout: defaultLayout(),
                   left: childParams(p.left, true),
                   right: childParams(p.right, false),
                   name: p.name,
+                  matmul: true,
                 }
                 if (found) {
                   left_leaf(cp).h = found.h
@@ -810,25 +813,39 @@
               }
             } else {
               if (found) {
-                if (found.matmul) {
-                  return {
-                    ...left_leaf(found),
-                    w: right_leaf(found).w,
-                    name: p.name,
-                  }
+                return !(found.left && found.right) ? found : {
+                  ...left_leaf(found),
+                  w: right_leaf(found).w,
+                  name: p.name,
+                  matmul: false,
                 }
-                return found
               }
               return {
                 ...(is_left ? defaultLeft() : defaultRight()),
                 name: p.name,
+                matmul: false,
               }
             }
           }
 
-          params.name = p.name
-          params.left = childParams(p.left, true)
-          params.right = childParams(p.right, false)
+          const new_params = {
+            name: p.name,
+            left: childParams(p.left, true),
+            right: childParams(p.right, false)
+          }
+
+          const fix_tree = (p, anc = [p => p]) => {
+            if (p.left && p.right) {
+              const path = anc[0]
+              fix_tree(p.left, [p => path(p).left].concat(anc))
+              fix_tree(p.right, [p => path(p).right].concat(anc))
+            } else {
+              fix_shape(p.h, p.w, p, anc.slice(1), new_params)
+            }
+          }
+
+          fix_tree(new_params)
+          util.updateProps(params, new_params)
 
           // @@@ TODO fix_shape @@@
 
