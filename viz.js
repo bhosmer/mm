@@ -161,7 +161,7 @@ function softmax_(h, w, data) {
     for (let j = 0; j < w; j++, ptr++) {
       const x = Math.exp(data[ptr]) / denom
       if (isNaN(x)) {
-        console.log(`HEY Math.exp(data[${ptr}) = ${data[ptr]}]) / ${denom} is NaN`)
+        // console.log(`HEY Math.exp(data[${ptr}) = ${data[ptr]}]) / ${denom} is NaN`)
         data[ptr] = 0
       } else {
         data[ptr] = x

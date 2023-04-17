@@ -572,6 +572,9 @@
         }
       }
 
+      const left_leaf = p => p.left.matmul ? left_leaf(p.left) : p.left
+      const right_leaf = p => p.right.matmul ? right_leaf(p.right) : p.right
+
       function syncChildParams(g, path, ancestors) {
         const height = p => p.matmul ? height(p.left) : p.h
         const width = p => p.matmul ? width(p.right) : p.w
@@ -595,8 +598,6 @@
           util.deleteProps(p, ['h', 'w', 'init', 'url', 'min', 'max', 'dropout'])
           return addMatmulParams(g, path, ancestors)
         } else {
-          const left_leaf = p => p.left.matmul ? left_leaf(p.left) : p.left
-          const right_leaf = p => p.right.matmul ? right_leaf(p.right) : p.right
           util.updateProps(p, {
             h: height(p.left),
             w: width(p.right),
@@ -779,30 +780,48 @@
           ex.prev = ex.expr // already e
 
           const findParams = (p, n) => p.name != n ?
-            (p.left && findParams(p.left, n)) || (p.right && findParams(p.right, n)) || {} :
+            (p.left && findParams(p.left, n)) || (p.right && findParams(p.right, n)) || undefined :
             p
 
           const childParams = (p, is_left) => {
             const found = findParams(params, p.name)
             if (p.left && p.right) {
-              const foundl = findParams(params, p.left.name)
-              const foundr = findParams(params, p.right.name)
-              return {
-                name: p.name,
-                epilog: default_epilog,
-                anim: defaultAnim(),
-                layout: defaultLayout(),
-                ...found,
-                left: childParams(p.left, true),
-                right: childParams(p.right, false),
-                matmul: true,
+              if (found && found.matmul) {
+                return {
+                  ...found,
+                  left: childParams(p.left, true),
+                  right: childParams(p.right, false),
+                }
+              } else {
+                const cp = {
+                  matmul: true,
+                  epilog: default_epilog,
+                  anim: defaultAnim(),
+                  layout: defaultLayout(),
+                  left: childParams(p.left, true),
+                  right: childParams(p.right, false),
+                  name: p.name,
+                }
+                if (found) {
+                  left_leaf(cp).h = found.h
+                  right_leaf(cp).w = found.w
+                }
+                return cp
               }
             } else {
+              if (found) {
+                if (found.matmul) {
+                  return {
+                    ...left_leaf(found),
+                    w: right_leaf(found).w,
+                    name: p.name,
+                  }
+                }
+                return found
+              }
               return {
-                ...(is_left ? defaultLeft : defaultRight)(),
-                ...found,
-                ...p,
-                matmul: false
+                ...(is_left ? defaultLeft() : defaultRight()),
+                name: p.name,
               }
             }
           }
@@ -810,6 +829,8 @@
           params.name = p.name
           params.left = childParams(p.left, true)
           params.right = childParams(p.right, false)
+
+          // @@@ TODO fix_shape @@@
 
           const gui_left = findFolder(gui, 'left')
           clearFolder(gui_left)
