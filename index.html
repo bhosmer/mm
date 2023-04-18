@@ -435,7 +435,7 @@
     function initGui(getObj, _initObj, initAxes) {
 
       const initObj = () => {
-        document.getElementById('info').innerHTML = title(params)
+        updateTitle()
         _initObj()
       }
 
@@ -604,7 +604,7 @@
             layout: layoutProto(pp, is_left),
           })
           util.deleteProps(p, ['h', 'w', 'init', 'url', 'min', 'max', 'dropout'])
-          return addMatmulParams(g, path, ancestors)
+          addMatmulParams(g, path, ancestors)
         } else {
           util.updateProps(p, {
             h: height(p.left),
@@ -616,8 +616,9 @@
             dropout: 0,
           })
           util.deleteProps(p, ['left', 'right', 'epilog', 'anim', 'layout'])
-          return addMatParams(g, path, ancestors)
+          addMatParams(g, path, ancestors)
         }
+        params.expr = title(params)
       }
 
       // adjust surroundings to match a param node h/w
