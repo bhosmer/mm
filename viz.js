@@ -1489,7 +1489,7 @@ export class MatMul {
       }
 
       // new input highlights
-      if (oldj >= 0 && !this.params.anim['hide inputs']) {
+      if (!this.params.anim['hide inputs']) {
         sweep ?
           this.grid('jk', ({ start: j, extent: jx }, { start: k, extent: kx }) => {
             curj < jx && curk < kx && this.right.bumpColor(j + curj, k + curk)
