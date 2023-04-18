@@ -144,6 +144,7 @@
     //
 
     const params = {
+      expr: 'L @ R',
       name: 'L @ R',
       epilog: default_epilog,
       left: defaultLeft(),
@@ -221,7 +222,6 @@
 
     // diag info updated on render
     const render_info = renderer.info.memory
-    util.stashRenderer(renderer)
 
     // object params plus env stuff for text, spotlight, isFacing etc
     function getContext() {
@@ -479,12 +479,12 @@
       const findFolders = (g, x, recursive = false) =>
         (recursive ? g.foldersRecursive() : g.folders).filter(f => f._title == x)
 
-      function clearFolder(gui) {
-        while (gui.folders.length > 0) {
-          gui.folders[0].destroy()
+      function clearFolder(g) {
+        while (g.folders.length > 0) {
+          g.folders[0].destroy()
         }
-        while (gui.controllers.length > 0) {
-          gui.controllers[0].destroy()
+        while (g.controllers.length > 0) {
+          g.controllers[0].destroy()
         }
       }
 
@@ -530,7 +530,7 @@
           right: left_child ? right : pol != res,
           res: pol == (left_child ? left : right),
         }),
-        'circle': (left_child, { pol, left, right, res }) => ({
+        'wheel': (left_child, { pol, left, right, res }) => ({
           pol: pol,
           left: left_child ? pol == res : left,
           right: left_child ? right : pol == res,
@@ -556,6 +556,14 @@
         rule && f(params)
       }
 
+      function syncLayoutSchemeAndInit() {
+        setLayoutScheme(params.layout.scheme, params)
+        const is_custom = params.layout.scheme == 'custom'
+        findFolders(findFolder(gui, 'left'), 'layout', true).map(f => f.show(is_custom))
+        findFolders(findFolder(gui, 'right'), 'layout', true).map(f => f.show(is_custom))
+        initObj()
+      }
+
       // child mat/matmul state change 
 
       const childMat = (p, depth, left_child) => {
@@ -572,8 +580,8 @@
         }
       }
 
-      const left_leaf = p => p.left.matmul ? left_leaf(p.left) : p.left
-      const right_leaf = p => p.right.matmul ? right_leaf(p.right) : p.right
+      const leftLeaf = p => p.left.matmul ? leftLeaf(p.left) : p.left
+      const rightLeaf = p => p.right.matmul ? rightLeaf(p.right) : p.right
 
       function syncChildParams(g, path, ancestors) {
         const height = p => p.matmul ? height(p.left) : p.h
@@ -601,8 +609,8 @@
           util.updateProps(p, {
             h: height(p.left),
             w: width(p.right),
-            init: p === pp.left ? left_leaf(p).init : right_leaf(p).init,
-            url: p === pp.left ? left_leaf(p).url : right_leaf(p).url,
+            init: p === pp.left ? leftLeaf(p).init : rightLeaf(p).init,
+            url: p === pp.left ? leftLeaf(p).url : rightLeaf(p).url,
             min: -1,
             max: 1,
             dropout: 0,
@@ -613,7 +621,7 @@
       }
 
       // adjust surroundings to match a param node h/w
-      const fix_shape = (h, w, p, anc, root) => {
+      const fixShape = (h, w, p, anc, root) => {
         const height = p => p.left ? height(p.left) : p.h
         const width = p => p.right ? width(p.right) : p.w
 
@@ -622,7 +630,7 @@
 
         const pp = anc[0](root)
         p === pp.left ? seth(pp.right, w) : setw(pp.left, h)
-        anc.length > 1 && fix_shape(height(pp.left), width(pp.right), pp, anc.slice(1), root)
+        anc.length > 1 && fixShape(height(pp.left), width(pp.right), pp, anc.slice(1), root)
       }
 
       // addMatParams
@@ -633,21 +641,20 @@
         addParam(g, 'name', x => {
           path(getObj()).setName(x)
           updateTitle()
-        }, path, path)
+        }, path, path).enable(false)
 
         addParam(g, 'matmul', v => {
           syncChildParams(g, path, ancestors)
           syncLayoutSchemeAndInit()
-          // initObj()
         }, path, path)
 
         addIntParam(g, 'h', 1, 256, x => {
-          fix_shape(p.h, p.w, p, ancestors, params)
+          fixShape(p.h, p.w, p, ancestors, params)
           initObj()
         }, path, path).listen()
 
         addIntParam(g, 'w', 1, 256, x => {
-          fix_shape(p.h, p.w, p, ancestors, params)
+          fixShape(p.h, p.w, p, ancestors, params)
           initObj()
         }, path, path).listen()
 
@@ -676,10 +683,14 @@
         const p = path(params)
         const is_root = ancestors.length == 0
 
+        if (is_root) {
+          addParam(g, 'expr').onFinishChange(evalExpr).listen()
+        }
+
         addParam(g, 'name', x => {
           path(getObj()).setName(x)
           updateTitle()
-        }, path, path)
+        }, path, path).enable(false)
 
         if (!is_root) {
           addParam(g, 'matmul', v => {
@@ -739,133 +750,129 @@
         add_right(gui_right, x => path(x).right, [path].concat(ancestors), 'open')
       }
 
-      // ---
+      // expr eval
 
-      const t = title(params)
-      const ex = { expr: t, prev: t }
+      function parseExpr(s) {
+        try {
+          const node = spec => typeof spec == 'string' ? { name: spec } : make(spec)
+          const make = spec => {
+            const i = spec[1] == '=' ? 2 : 0
+            const rname = r => /\s+/.test(r.name) ? '(' + r.name + ')' : r.name
+            const f = (left, x) => {
+              const right = node(x)
+              return { left, right, name: left.name + ' @ ' + rname(right) }
+            }
+            const p = spec.slice(i + 1).reduce(f, node(spec[i]))
+            p.name = i == 0 ? p.left.name + ' @ ' + p.right.name : spec[0]
+            return p
+          }
+          s = '[' + s.replace(/\s+/g, '').
+            replace(/(\w+[\w\.\-\!\#\$\%\^\&\/\[\]]*)/g, '"$1"').
+            replaceAll('@', ',').
+            replaceAll('(', '[').
+            replaceAll(')', ']').
+            replaceAll('=', ',"=",') + ']'
+          let spec = eval?.(s)
+          while (spec.length == 1) {
+            spec = spec[0]
+          }
+          return make(spec)
+        } catch (e) {
+          console.log(`error evaluating '${s}': ${e.message}`)
+        }
+      }
+
+      let prev_expr = params.expr
 
       function evalExpr(e) {
 
-        function parseExpr(s) {
-          try {
-            const node = spec => typeof spec == 'string' ? { name: spec } : make(spec)
-            const make = spec => {
-              const i = spec[1] == '=' ? 2 : 0
-              const rname = r => /\s+/.test(r.name) ? '(' + r.name + ')' : r.name
-              const f = (left, x) => {
-                const right = node(x)
-                return { left, right, name: left.name + ' @ ' + rname(right) }
-              }
-              const p = spec.slice(i + 1).reduce(f, node(spec[i]))
-              p.name = i == 0 ? p.left.name + ' @ ' + p.right.name : spec[0]
-              return p
-            }
-            s = '[' + s.replace(/\s+/g, '').
-              replace(/(\w+[\w\.\-\!\#\$\%\^\&\/\[\]]*)/g, '"$1"').
-              replaceAll('@', ',').
-              replaceAll('(', '[').
-              replaceAll(')', ']').
-              replaceAll('=', ',"=",') + ']'
-            let spec = eval?.(s)
-            while (spec.length == 1) {
-              spec = spec[0]
-            }
-            return make(spec)
-          } catch (e) {
-            console.log(`error evaluating '${s}': ${e.message}`)
-          }
-        }
+        const findParams = (p, n) => p.name == n ? p :
+          (p.left && findParams(p.left, n)) ||
+          (p.right && findParams(p.right, n)) ||
+          undefined
 
-        const p = parseExpr(e)
-        if (p) {
-          ex.prev = ex.expr // already e
-
-          const findParams = (p, n) => p.name == n ? p :
-            (p.left && findParams(p.left, n)) ||
-            (p.right && findParams(p.right, n)) ||
-            undefined
-
-          const childParams = (p, is_left) => {
-            const found = findParams(params, p.name)
-            if (p.left && p.right) {
-              if (found && found.left && found.right) {
-                return {
-                  ...found,
-                  left: childParams(p.left, true),
-                  right: childParams(p.right, false),
-                  matmul: true,
-                }
-              } else {
-                const cp = {
-                  epilog: default_epilog,
-                  anim: defaultAnim(),
-                  layout: defaultLayout(),
-                  left: childParams(p.left, true),
-                  right: childParams(p.right, false),
-                  name: p.name,
-                  matmul: true,
-                }
-                if (found) {
-                  left_leaf(cp).h = found.h
-                  right_leaf(cp).w = found.w
-                }
-                return cp
+        const childParams = (p, is_left) => {
+          const found = findParams(params, p.name)
+          if (p.left && p.right) {
+            if (found && found.left && found.right) {
+              return {
+                ...found,
+                left: childParams(p.left, true),
+                right: childParams(p.right, false),
+                matmul: true,
               }
             } else {
-              if (found) {
-                return !(found.left && found.right) ? found : {
-                  ...left_leaf(found),
-                  w: right_leaf(found).w,
-                  name: p.name,
-                  matmul: false,
-                }
+              const cp = {
+                epilog: default_epilog,
+                anim: defaultAnim(),
+                layout: defaultLayout(),
+                left: childParams(p.left, true),
+                right: childParams(p.right, false),
+                name: p.name,
+                matmul: true,
               }
-              return {
-                ...(is_left ? defaultLeft() : defaultRight()),
+              if (found) {
+                leftLeaf(cp).h = found.h
+                rightLeaf(cp).w = found.w
+              }
+              return cp
+            }
+          } else {
+            if (found) {
+              return !(found.left && found.right) ? found : {
+                ...leftLeaf(found),
+                w: rightLeaf(found).w,
                 name: p.name,
                 matmul: false,
               }
             }
-          }
-
-          const new_params = {
-            name: p.name,
-            left: childParams(p.left, true),
-            right: childParams(p.right, false)
-          }
-
-          const fix_tree = (p, anc = [p => p]) => {
-            if (p.left && p.right) {
-              const path = anc[0]
-              fix_tree(p.left, [p => path(p).left].concat(anc))
-              fix_tree(p.right, [p => path(p).right].concat(anc))
-            } else {
-              fix_shape(p.h, p.w, p, anc.slice(1), new_params)
+            return {
+              ...(is_left ? defaultLeft() : defaultRight()),
+              name: p.name,
+              matmul: false,
             }
           }
-
-          fix_tree(new_params)
-          util.updateProps(params, new_params)
-
-          // @@@ TODO fix_shape @@@
-
-          const gui_left = findFolder(gui, 'left')
-          clearFolder(gui_left)
-          const add_left = params.left.matmul ? addMatmulParams : addMatParams
-          add_left(gui_left, x => x.left, [x => x])
-
-          const gui_right = findFolder(gui, 'right')
-          clearFolder(gui_right)
-          const add_right = params.right.matmul ? addMatmulParams : addMatParams
-          add_right(gui_right, x => x.right, [x => x])
-
-          syncLayoutSchemeAndInit()
-        } else {
-          ex.expr = ex.prev
         }
-      }
 
-      // ---
+        const fixShapes = (p, anc = [p => p]) => {
+          if (p.left && p.right) {
+            const path = anc[0]
+            fixShapes(p.left, [p => path(p).left].concat(anc))
+            fixShapes(p.right, [p => path(p).right].concat(anc))
+          } else {
+            fixShape(p.h, p.w, p, anc.slice(1), new_params)
+          }
+        }
+
+        const p = parseExpr(e)
+        if (!p) {
+          params.expr = prev_expr
+          return
+        }
+
+        prev_expr = params.expr = e
+
+        const new_params = {
+          name: p.name,
+          left: childParams(p.left, true),
+          right: childParams(p.right, false)
+        }
+
+        fixShapes(new_params)
+        util.updateProps(params, new_params)
+
+        const gui_left = findFolder(gui, 'left')
+        clearFolder(gui_left)
+        const add_left = params.left.matmul ? addMatmulParams : addMatParams
+        add_left(gui_left, x => x.left, [x => x])
+
+        const gui_right = findFolder(gui, 'right')
+        clearFolder(gui_right)
+        const add_right = params.right.matmul ? addMatmulParams : addMatParams
+        add_right(gui_right, x => x.right, [x => x])
+
+        syncLayoutSchemeAndInit()
+      }
 
       function addDecoParams(g) {
         const gui_deco = addFolder(g, 'deco', params.deco, 'open')
@@ -878,7 +885,7 @@
       }
 
       function addVizParams(g) {
-        const gui_viz = addFolder(gui, 'colors and sizes', params.viz, 'open')
+        const gui_viz = addFolder(g, 'colors and sizes', params.viz, 'open')
         addChoiceParam(gui_viz, 'sensitivity', viz.SENSITIVITIES, initObj, p => p.viz)
         addNumParam(gui_viz, 'min size', 0.0, 1.0, initObj, p => p.viz)
         addNumParam(gui_viz, 'min light', 0.0, 1.0, initObj, p => p.viz)
@@ -888,26 +895,20 @@
         addNumParam(gui_viz, 'hue spread', 0.0, 1.0, initObj, p => p.viz)
       }
 
+      function addDiagParams(g) {
+        const gui_diag = g.addFolder('diag').close()
+        gui_diag.add(render_info, 'geometries').listen()
+        gui_diag.add(render_info, 'textures').listen()
+      }
+
       // --- 
 
       const gui = new GUI({ title: 'mm' })
 
-      function syncLayoutSchemeAndInit() {
-        setLayoutScheme(params.layout.scheme, params)
-        const is_custom = params.layout.scheme == 'custom'
-        findFolders(findFolder(gui, 'left'), 'layout', true).map(f => f.show(is_custom))
-        findFolders(findFolder(gui, 'right'), 'layout', true).map(f => f.show(is_custom))
-        initObj()
-      }
-
-      gui.add(ex, 'expr').onFinishChange(evalExpr).listen()
       addMatmulParams(gui)
       addDecoParams(gui)
       addVizParams(gui)
-
-      const gui_diag = gui.addFolder('diag').close()
-      gui_diag.add(render_info, 'geometries').listen()
-      gui_diag.add(render_info, 'textures').listen()
+      addDiagParams(gui)
 
       gui.onFinishChange(saveParams)
 

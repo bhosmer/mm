@@ -65,7 +65,7 @@ export const INIT_FUNCS = {
   rows: (i, j, h) => h > 1 ? i / (h - 1) : 0,
   cols: (i, j, h, w) => w > 1 ? j / (w - 1) : 0,
   'row major': (i, j, h, w) => h * w > 1 ? (i * w + j) / (h * w - 1) : 0,
-  'col major': (i, j, h, w) => h * w > 1 ? (j * h + i) / (h * w) : 0,
+  'col major': (i, j, h, w) => h * w > 1 ? (j * h + i) / (h * w - 1) : 0,
   'pt linear': (i, j, h, w) => (2 * Math.random() - 1) / Math.sqrt(w),
   uniform: () => Math.random(),
   gaussian: () => gaussianRandom(0.5, 0.5),
@@ -711,7 +711,7 @@ export class Mat {
 // MatMul
 //
 
-export const SCHEMES = ['blocks', 'zigzag', 'circle', 'custom']
+export const SCHEMES = ['blocks', 'zigzag', 'wheel', 'custom']
 export const POLARITIES = ['negative', 'positive']
 export const LEFT_PLACEMENTS = ['left', 'right']
 export const RIGHT_PLACEMENTS = ['top', 'bottom']
