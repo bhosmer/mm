@@ -1292,7 +1292,7 @@ export class MatMul {
       }
 
       // end of cycle
-      if (curi == isize && curk == sweep ? ksize : 0) {
+      if (curi == isize) {
         this.onAnimDone()
         return
       }
@@ -1381,7 +1381,7 @@ export class MatMul {
       }
 
       // end of cycle
-      if (curk == ksize && curi == sweep ? isize : 0) {
+      if (curk == ksize) {
         this.onAnimDone()
         return
       }
