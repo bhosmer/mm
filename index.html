@@ -192,6 +192,7 @@
     }
 
     function saveParams() {
+      console.log(`HEY saveParams`)
       const search_params = util.makeSearchParams(params)
       const url = window.location.pathname + '?' + search_params
       window.history.pushState({}, '', url)
@@ -641,7 +642,7 @@
         addParam(g, 'name', x => {
           path(getObj()).setName(x)
           updateTitle()
-        }, path, path).enable(false)
+        }, path, path).enable(false).listen()
 
         addParam(g, 'matmul', v => {
           syncChildParams(g, path, ancestors)
@@ -690,7 +691,7 @@
         addParam(g, 'name', x => {
           path(getObj()).setName(x)
           updateTitle()
-        }, path, path).enable(false)
+        }, path, path).enable(false).listen()
 
         if (!is_root) {
           addParam(g, 'matmul', v => {
@@ -786,7 +787,10 @@
 
       function evalExpr(e) {
 
-        const findParams = (p, n) => p.name == n ? p :
+        const foundParams = {}
+
+        const findParams = (p, n) => p.name == n ?
+          (foundParams[p.name] = p) :
           (p.left && findParams(p.left, n)) ||
           (p.right && findParams(p.right, n)) ||
           undefined
@@ -837,8 +841,13 @@
         const fixShapes = (p, anc = [p => p]) => {
           if (p.left && p.right) {
             const path = anc[0]
-            fixShapes(p.left, [p => path(p).left].concat(anc))
-            fixShapes(p.right, [p => path(p).right].concat(anc))
+            if (!foundParams[p.right.name]) {
+              fixShapes(p.left, [p => path(p).left].concat(anc))
+              fixShapes(p.right, [p => path(p).right].concat(anc))
+            } else {
+              fixShapes(p.right, [p => path(p).right].concat(anc))
+              fixShapes(p.left, [p => path(p).left].concat(anc))
+            }
           } else {
             fixShape(p.h, p.w, p, anc.slice(1), new_params)
           }
@@ -847,6 +856,7 @@
         const p = parseExpr(e)
         if (!p) {
           params.expr = prev_expr
+          saveParams()  // global onFinishChange front-runs
           return
         }
 
@@ -872,6 +882,7 @@
         add_right(gui_right, x => x.right, [x => x])
 
         syncLayoutSchemeAndInit()
+        saveParams()  // global onFinishChange front-runs
       }
 
       function addDecoParams(g) {
