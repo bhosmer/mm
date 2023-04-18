@@ -192,7 +192,6 @@
     }
 
     function saveParams() {
-      console.log(`HEY saveParams`)
       const search_params = util.makeSearchParams(params)
       const url = window.location.pathname + '?' + search_params
       window.history.pushState({}, '', url)
@@ -639,10 +638,7 @@
       function addMatParams(g, path, ancestors, folder_init) {
         const p = path(params)
 
-        addParam(g, 'name', x => {
-          path(getObj()).setName(x)
-          updateTitle()
-        }, path, path).enable(false).listen()
+        g.add(p, 'name').enable(false).listen()
 
         addParam(g, 'matmul', v => {
           syncChildParams(g, path, ancestors)
@@ -669,7 +665,6 @@
 
         p.url ||= '' // temp
         g.add(p, 'url').onFinishChange(url => {
-          console.log(`HEY url onFinishChange`)
           p.url = url
           initObj()
         }).show(p.init == 'url')
@@ -685,13 +680,10 @@
         const is_root = ancestors.length == 0
 
         if (is_root) {
-          addParam(g, 'expr').onFinishChange(evalExpr).listen()
+          g.add(p, 'expr').onFinishChange(evalExpr).listen()
         }
 
-        addParam(g, 'name', x => {
-          path(getObj()).setName(x)
-          updateTitle()
-        }, path, path).enable(false).listen()
+        g.add(p, 'name').enable(false).listen()
 
         if (!is_root) {
           addParam(g, 'matmul', v => {
@@ -800,7 +792,7 @@
           if (p.left && p.right) {
             if (found && found.left && found.right) {
               return {
-                ...found,
+                ...util.copyTree(found),
                 left: childParams(p.left, true),
                 right: childParams(p.right, false),
                 matmul: true,
@@ -823,7 +815,7 @@
             }
           } else {
             if (found) {
-              return !(found.left && found.right) ? found : {
+              return !(found.left && found.right) ? util.copyTree(found) : {
                 ...leftLeaf(found),
                 w: rightLeaf(found).w,
                 name: p.name,
