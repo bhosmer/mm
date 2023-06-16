@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <title>mm</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
+  <style>
+    body {
+      margin: 0;
+      background-color: #000;
+      color: #fff;
+      font-family: Monospace;
+      font-size: 13px;
+      line-height: 24px;
+      overscroll-behavior: none;
+    }
+
+    canvas {
+      display: block;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+
+    #info {
+      position: absolute;
+      top: 0px;
+      width: 100%;
+      padding: 10px;
+      box-sizing: border-box;
+      text-align: center;
+      font-size: 15px;
+      -moz-user-select: none;
+      -webkit-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .lil-gui {
+      --folder-indent: 12px;
+      --title-background-color: #555;
+    }
+
+    .lil-gui.autoPlace {
+      right: 0;
+    }
+
+    .lil-gui .title {
+      background-color: #555;
+    }
+
+    .lil-gui .lil-gui>.children {
+      margin-left: var(--folder-indent);
+    }
+
+    .lil-gui .allow-touch-styles {
+      border-left: 1px solid var(--widget-color);
+    }
+
+    .lil-gui .lil-gui .lil-gui>.children {
+      margin-left: var(--folder-indent);
+      border-left: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="info">loading</div>
+  <div id="container"></div>
+
+  <!-- Import maps polyfill -->
+  <!-- Remove this when import maps will be widely supported -->
+  <script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script>
+
+  <script type="importmap">
+			{
+        "imports": {
+          "three": "https://unpkg.com/three@v0.152.2/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@v0.152.2/examples/jsm/",
+          "lil-gui": "https://cdn.jsdelivr.net/npm/lil-gui@0.18.1/+esm"
+        }
+      }
+  </script>
+
+  <script type="module">
+    "use strict"
+
+    import * as THREE from 'three'
+
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
+
+    import * as viz from './viz.js'
+    import * as util from './util.js'
+    import * as gui from './gui.js'
+
+    //
+    // params start with single-mm default, get updated from url params
+    //
+
+    const params = {
+      expr: 'L @ R',
+      name: 'L @ R',
+      epilog: viz.default_epilog,
+      left: viz.defaultLeft(),
+      right: viz.defaultRight(),
+      anim: {
+        fuse: 'none',
+        speed: 20,
+        'hide inputs': false,
+        alg: 'none',
+        spin: 0,
+      },
+      block: {
+        'i blocks': 1,
+        'j blocks': 1,
+        ...viz.defaultBlock(),
+      },
+      layout: {
+        scheme: 'blocks',
+        gap: 4,
+        scatter: 0,
+        molecule: 1,
+        blast: 0,
+        ...viz.defaultLayout(),
+      },
+      deco: {
+        legends: 6,
+        shape: true,
+        spotlight: 2,
+        'row guides': 0.6,
+        'flow guides': 0.5,
+        'lens size': 0.5,
+        'magnification': 10,
+        'interior spotlight': false,
+        axes: false,
+      },
+      viz: {
+        sensitivity: 'global',
+        'min size': 0.2,
+        'min light': 0.4,
+        'max light': 0.7,
+        'elem scale': 1.25,
+        'zero hue': 0.77,
+        'hue gap': 0.74,
+        'hue spread': 0.04,
+      },
+      diag: {
+        url: '',
+      },
+      cam: {
+        // set from orbit control
+        x: -viz.default_dims.i * 1.5,
+        y: viz.default_dims.j * 1.5,
+        z: viz.default_dims.k * 1.5,
+      }
+    }
+
+    // we use this when resetting via message passing
+    const default_params = (() => {
+      const p = util.copyTree(params)
+      delete p.cam // interferes with camera placement
+      return p
+    })()
+
+    function updateTitle() {
+      document.getElementById('info').innerHTML = viz.genExpr(params)
+    }
+
+    const url_info = { json: '', url: '', compressed: '' }
+
+    function saveURLInfo() {
+      url_info.json = JSON.stringify(params)
+      const prefix = window.location.origin + window.location.pathname
+      let params_sp = util.makeSearchParams(params)
+      // not the cleanest place to do it, but - turn compression on when params get big
+      if (!params.compress && params_sp.toString().length > 2048) {
+        params.compress = true
+        params_sp = util.makeSearchParams(params)
+      }
+      // url is whatever we're putting in history, compressed is always compressed
+      url_info.url = prefix + '?' + params_sp
+      url_info.compressed = prefix + '?' + util.makeSearchParams({ ...params, compress: true })
+    }
+
+    function saveUrl() {
+      saveURLInfo()
+      window.history.pushState({}, '', url_info.url)
+    }
+
+    // obj
+
+    let obj
+
+    const getObj = () => obj
+
+    function initObj() {
+
+      let oldmag
+      if (obj) {
+        const oldsz = util.bbhwd(obj.getBoundingBox())
+        oldmag = oldsz.h + oldsz.w + oldsz.d
+        scene.remove(obj.group)
+        obj.disposeAll()
+      }
+
+      obj = new viz.MatMul(params, getContext())
+      obj.group.rotation.x = Math.PI
+      obj.center()
+
+      if (oldmag) {
+        const newsz = util.bbhwd(obj.getBoundingBox())
+        const newmag = newsz.h + newsz.w + newsz.d
+        const ratio = (newmag / oldmag) ** .95
+        camera.position.set(camera.position.x * ratio, camera.position.y * ratio, camera.position.z * ratio)
+        orbit.update()
+      }
+
+      obj.setLegends()
+      obj.initAnimation()
+      scene.add(obj.group)
+
+      updateTitle()
+    }
+
+    //
+    // three.js scene hookup
+    //
+
+    const aspect = () => window.innerWidth / window.innerHeight
+    const fov = () => 45 / Math.min(1, aspect())
+
+    const camera = new THREE.PerspectiveCamera(fov(), aspect(), 5, 10000)
+    const pointer = new THREE.Vector2(-1, -1)
+    const raycaster = new THREE.Raycaster()
+    // raycaster.far = 100
+    raycaster.params.Points.threshold = 0
+    raycaster.setFromCamera(pointer, camera)
+
+    const scene = new THREE.Scene()
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true })
+    renderer.setPixelRatio(window.devicePixelRatio)
+    renderer.setSize(window.innerWidth, window.innerHeight)
+    document.getElementById('container').appendChild(renderer.domElement)
+
+    // diag info updated on render
+    const render_info = renderer.info.memory
+
+    // object params plus env stuff for text, spotlight, isFacing etc
+    function getContext() {
+      return {
+        raycaster: raycaster,
+        camera: camera,
+        pointer: pointer,
+      }
+    }
+
+    // orbit control
+
+    const orbit = new OrbitControls(camera, renderer.domElement)
+    orbit.keys = { LEFT: orbit.keys.LEFT, RIGHT: orbit.keys.RIGHT }
+    orbit.zoomSpeed = 0.2
+    orbit.listenToKeyEvents(window)
+
+    const viewState = () => ({
+      ...camera.position,
+      target: { ...orbit.target }
+    })
+
+    let cam_changing = false
+
+    let spin_stash = 0
+    let view_stash
+    orbit.addEventListener('start', () => {
+      spin_stash = params.anim.spin
+      view_stash = viewState()
+      params.anim.spin = 0
+      cam_changing = true
+    })
+
+    orbit.addEventListener('change', () => {
+      params.cam = viewState()
+    }, false)
+
+    // update object labels from view changes
+    // throttle a little
+
+    let mag
+
+    const updateSpotlight = () => {
+      if (mag) {
+        const mag_pointer = pointer.clone()
+        mag_pointer.y += params.deco['lens size'] / params.deco.magnification
+        raycaster.setFromCamera(mag_pointer, camera)
+        raycaster.far = Infinity
+      } else {
+        raycaster.far = 0
+      }
+      obj.updateLabels()
+    }
+
+    let label_update_pending = false
+    const requestLabelUpdate = (legends_only = false) => {
+      if (!label_update_pending) {
+        label_update_pending = true
+        setTimeout(() => {
+          label_update_pending = false
+          raycaster.setFromCamera(pointer, camera)
+          obj.setLegends()
+          if (!legends_only) {
+            updateSpotlight()
+          }
+        }, 10)
+      }
+    }
+
+    // update params from camera changes
+    // zooms can blast these
+
+    let camera_save_pending = false
+    let last_camera_save_request = 0
+    const requestCameraPositionSave = () => {
+      last_camera_save_request = performance.now()
+      if (!camera_save_pending) {
+        camera_save_pending = true
+        setTimeout(() => {
+          camera_save_pending = false
+          const t = performance.now()
+          if (t - last_camera_save_request > 250) {
+            saveUrl()
+          } else {
+            requestCameraPositionSave()
+          }
+        }, 250)
+      }
+    }
+
+    orbit.addEventListener('end', () => {
+      params.anim.spin = spin_stash
+      // these happen only at the end of drags, but multiple times per zoom
+      cam_changing = false
+      requestLabelUpdate()
+      if (JSON.stringify(view_stash) != JSON.stringify(viewState())) {
+        requestCameraPositionSave()
+      }
+    })
+
+    //
+    // browser hookups
+    //
+
+    function initFromParams() {
+      saveURLInfo()
+      camera.position.set(params.cam.x, params.cam.y, params.cam.z)
+      params.cam.target && util.updateProps(orbit.target, params.cam.target)
+      orbit.update()
+      initAxes(params.deco.axes)
+      initObj()
+
+      // gui setup happens here but probably shouldn't
+      const callbacks = { initObj, getObj, saveUrl, updateTitle, animPause, animStep }
+      const info = { url_info, render_info }
+      gui.initGui(params, callbacks, info)
+    }
+
+    function initFromSearchParams() {
+      util.updateObjectFromSearchParams(params, new URL(window.location).searchParams)
+      if (params.sync_expr !== undefined) {
+        console.log(`HEY found sync_expr in search params, ignoring`)
+        delete params.sync_expr
+      }
+      params.expr = viz.genExpr(params)
+      initFromParams()
+    }
+
+    window.addEventListener('popstate', initFromSearchParams, false)
+
+    window.addEventListener('resize', () => {
+      camera.fov = fov()
+      camera.aspect = aspect()
+      camera.updateProjectionMatrix()
+      renderer.setSize(window.innerWidth, window.innerHeight)
+      syncVizToRenderer(true)
+    })
+
+    let pointer_start
+    let pointer_moved
+    let pointer_move_timeout
+
+    let clientX = 0
+    let clientY = 0
+    window.addEventListener('pointermove', e => {
+      clientX = e.clientX
+      clientY = e.clientY
+      pointer.x = e.clientX / window.innerWidth * 2 - 1
+      pointer.y = -(e.clientY / window.innerHeight * 2 - 1)
+      pointer_moved = true
+      if (!cam_changing) {
+        requestLabelUpdate()
+      }
+    })
+
+    window.addEventListener('pointerdown', e => {
+      clientX = e.clientX
+      clientY = e.clientY
+      pointer.x = e.clientX / window.innerWidth * 2 - 1
+      pointer.y = -(e.clientY / window.innerHeight * 2 - 1)
+      pointer_moved = false
+      pointer_start = Date.now()
+      pointer_move_timeout = setTimeout(() => {
+        if (!pointer_moved && e.target === renderer.domElement) {
+          mag = true
+          orbit.enabled = false
+          cam_changing = false
+          updateSpotlight()
+        }
+      }, 500)
+    })
+
+    window.addEventListener('pointerup', e => {
+      clearTimeout(pointer_move_timeout)
+      mag = false
+      orbit.enabled = true
+      updateSpotlight()
+    })
+
+    const key_funcs = {
+      'Space': () => {
+        let init = false
+        if (params.anim.alg == 'none') {
+          params.anim.alg = last_anim_alg
+          init = true
+        } else if (anim_pause) {
+          animPause(false)
+        } else {
+          last_anim_alg = params.anim.alg
+          params.anim.alg = 'none'
+          init = true
+        }
+        if (params.anim.spin == 0) {
+          params.anim.spin = last_anim_spin
+          init = true
+        } else {
+          last_anim_spin = params.anim.spin
+          params.anim.spin = 0
+          init = true
+        }
+        init && initObj()
+      },
+      'ArrowUp': () => {
+        const e = new WheelEvent('wheel', { deltaY: 1 })
+        orbit.domElement.dispatchEvent(e)
+      },
+      'ArrowDown': () => {
+        const e = new WheelEvent('wheel', { deltaY: -1 })
+        orbit.domElement.dispatchEvent(e)
+      },
+      'KeyP': () => { // p
+        if (params.anim.alg != 'none') {
+          animPause(!anim_pause)
+        }
+      },
+      'KeyS': () => { // s
+        if (params.anim.alg != 'none') {
+          animPause(true)
+          animStep()
+        }
+      },
+    }
+
+    window.addEventListener('keydown', e => {
+      if (e.ctrlKey) {
+        mag = true
+        updateSpotlight()
+        return
+      }
+      const kf = key_funcs[e.code]
+      kf && kf(e)
+    })
+
+    window.addEventListener('keyup', e => {
+      if (mag) {
+        mag = false
+        updateSpotlight()
+      }
+    })
+
+    // comms w/outside world (we're in an iframe, e.g.)
+
+    const RESPONDERS = {
+      getUrlInfo: () => {
+        // console.log(`HEY getUrlInfo called`)
+        event.source.postMessage(url_info, event.origin)
+      },
+      getParams: () => {
+        // console.log(`HEY getParams called`)
+        event.source.postMessage(params, event.origin)
+      },
+      setParams: ({ props = {}, reset = false }) => {
+        // console.log(`HEY setParams called props ${JSON.stringify(props)} reset ${reset}`)
+        reset && Object.entries(util.copyTree(default_params)).forEach(([k, v]) => params[k] = v)
+
+        if (props.sync_expr) {
+          params.expr = props.expr
+          viz.syncExpr(params)
+          delete props.sync_expr
+        }
+        util.updatePropsRec(params, props)
+        params.expr = viz.genExpr(params)
+        if (props.layout?.scheme) {
+          viz.setLayoutScheme(params)
+        }
+        initFromParams()
+      }
+    }
+
+    window.addEventListener('message', event => {
+      Object.entries(event.data).forEach(([k, v]) => RESPONDERS[k](v))
+    })
+
+    // diag info updated on resize
+    const display_info = { x: 0, y: 0, z: 0, devicePixelRatio: 0 }
+
+    function syncVizToRenderer(reinit = false) {
+      renderer.setPixelRatio(window.devicePixelRatio)
+      const size = renderer.getSize(new THREE.Vector3())
+      viz.setElemSize(size, window.devicePixelRatio)
+      util.updateProps(display_info, size)
+      display_info.devicePixelRatio = window.devicePixelRatio
+      reinit && initObj()
+    }
+
+    syncVizToRenderer() // first time thru
+
+    const pixel_ratio_watcher = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`)
+    pixel_ratio_watcher.addEventListener('change', _ => syncVizToRenderer(true))
+
+    //
+    // animation
+    //
+
+    // for spacebar control
+    let last_anim_alg = params.anim.alg
+    let last_anim_spin = params.anim.spin
+
+    // animation loop circuit breaker
+    let anim_pause = false
+    function animPause(p) {
+      anim_pause = p
+    }
+
+    let anim_step = false
+    function animStep() {
+      if (anim_pause) {
+        anim_step = true
+      }
+    }
+
+    // axes
+    const axes = util.axes()
+    function initAxes(enabled) {
+      if (enabled) {
+        scene.add(axes)
+      } else {
+        scene.remove(axes)
+      }
+    }
+
+    let last_render = 0, last_anim = 0
+
+    function animate() {
+      const t = performance.now()
+      if (params.anim.alg != 'none' &&
+        (anim_step || !anim_pause) &&
+        (t - last_render) > (1000 / params.anim.speed)) {
+        obj.bump()
+        last_render = t
+        anim_step = false
+      }
+
+      if (params.anim.spin != 0) {
+        const rad = (last_anim - t) * params.anim.spin / 20000
+        const [cos, sin] = [Math.cos(rad), Math.sin(rad)]
+        const { x, z } = camera.position
+        util.updateProps(camera.position, { x: cos * x + sin * z, z: cos * z - sin * x })
+        camera.lookAt(orbit.target.x, orbit.target.y, orbit.target.z)
+        requestLabelUpdate(true)
+      }
+
+      last_anim = t
+
+      util.updateProps(render_info, renderer.info.memory)
+      renderer.setViewport(0, 0, window.innerWidth, window.innerHeight)
+      renderer.render(scene, camera)
+
+      if (mag) {
+        const m = params.deco.magnification
+        const size = window.innerHeight * params.deco['lens size']
+        const x = clientX - size / 2
+        const y = window.innerHeight - clientY
+        const offsetX = clientX - size / 2 / m
+        const offsetY = clientY - size / m
+
+        const mag_camera = camera.clone()
+        mag_camera.setViewOffset(
+          window.innerWidth,
+          window.innerHeight,
+          offsetX,
+          offsetY,
+          size / m,
+          size / m
+        )
+
+        renderer.setViewport(x, y, size, size)
+        renderer.setScissorTest(true)
+        renderer.setScissor(x, y, size, size)
+
+        viz.MATERIAL.uniforms.mag.value = m
+        renderer.render(scene, mag_camera)
+        viz.MATERIAL.uniforms.mag.value = 1.0
+
+        renderer.setScissorTest(false)
+      }
+
+      requestAnimationFrame(animate)
+    }
+
+    initFromSearchParams()
+    animate()
+
+  </script>
+</body>
+
+</html>

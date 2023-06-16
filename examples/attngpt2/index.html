@@ -1,0 +1,455 @@
+<html>
+
+<head>
+  <meta charset="UTF-8" />
+  <title>NanoGPT GPT2 attention heads</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+
+    #header {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 0;
+      align-items: center;
+      height: 50px;
+      background-color: #f0f0f0;
+    }
+
+    #header label {
+      display: inline-block;
+      font-style: italic;
+      width: auto;
+      margin: 0 10px;
+    }
+
+    #header select {
+      width: 50px;
+      margin: 0 10px;
+    }
+
+    #header input {
+      margin: 0 10px;
+    }
+
+    #mm {
+      width: 100%;
+      height: calc(100% - 50px);
+      border: none;
+    }
+
+    .upper-right {
+      position: absolute;
+      top: 10px;
+      right: 20px;
+    }
+  </style>
+</head>
+
+<body>
+  <form id="header">
+    <label for="input">Sample Input</label>
+    <select id="input" required></select>
+    <label for="layer">Layer</label>
+    <select id="layer" required></select>
+    <label for="head">Attention head</label>
+    <select id="head" required></select>
+    <label for="anim">Animate</label>
+    <select id="anim" style="min-width: 140px;" required>
+      <option value="none">none</option>
+      <option value="attn @ V @ wO">attn @ V @ wO</option>
+      <option value="Q @ K @ V @ wO">Q @ K @ V @ wO</option>
+      <option value="input @ wQ @ K @ V @ wO">input @ wQ @ K @ V @ wO</option>
+    </select>
+    <label for="path">Data path</label>
+    <input type="text" id="path" name="path"
+      value="https://raw.githubusercontent.com/bhosmer/testdata/main/weights/gpt2/" />
+    <a href="javascript:popout();" class="upper-right">open&#x2197;</a>
+  </form>
+  <iframe id="mm" src="../../index.html"></iframe>
+
+  <script>
+    function initOption(elem, n) {
+      for (let i = 0; i < n; i++) {
+        const option = document.createElement('option')
+        option.value = option.text = i
+        elem.add(option)
+      }
+    }
+
+    const input_elem = document.getElementById('input');
+    const n_inputs = 12
+    initOption(input_elem, n_inputs)
+
+    const layer_elem = document.getElementById('layer');
+    const n_layers = 12
+    initOption(layer_elem, n_layers)
+
+    const head_elem = document.getElementById('head');
+    const n_heads = 12
+    initOption(head_elem, n_heads)
+
+    const anim_elem = document.getElementById('anim');
+    const path_elem = document.getElementById('path');
+
+    const params = {
+      "folder": "closed",
+      "expr": "out = ((attn = (Q = input @ wQ) @ (K_t = wK_t @ input_t)) @ (V = input @ wV)) @ wO",
+      "name": "out",
+      "epilog": "none",
+      "left": {
+        "epilog": "none",
+        "anim": {
+          "alg": "vmprod",
+        },
+        "block": {
+          "j blocks": 1
+        },
+        "layout": {
+          "polarity": "positive",
+          "left placement": "left",
+          "right placement": "bottom",
+          "result placement": "back"
+        },
+        "left": {
+          "name": "attn",
+          "matmul": true,
+          "epilog": "softmax(tril(x/sqrt(k)))",
+          "left": {
+            "name": "Q",
+            "matmul": true,
+            "epilog": "none",
+            "left": {
+              "name": "input",
+              "matmul": false,
+              "h": 256,
+              "w": 768,
+              "init": "url",
+              "min": -1,
+              "max": 1,
+              "dropout": 0,
+              "url": ""
+            },
+            "right": {
+              "name": "wQ",
+              "matmul": false,
+              "h": 768,
+              "w": 64,
+              "init": "url",
+              "min": -1,
+              "max": 1,
+              "dropout": 0,
+              "url": ""
+            },
+            "anim": {
+              "alg": "none",
+            },
+            "block": {
+              "j blocks": 1,
+            },
+            "layout": {
+              "polarity": "positive",
+              "left placement": "left",
+              "right placement": "bottom",
+              "result placement": "back"
+            }
+          },
+          "right": {
+            "epilog": "none",
+            "anim": {
+              "alg": "none",
+            },
+            "block": {
+              "j blocks": 1,
+            },
+            "layout": {
+              "polarity": "positive",
+              "left placement": "right",
+              "right placement": "top",
+              "result placement": "back"
+            },
+            "left": {
+              "name": "wK_t",
+              "matmul": false,
+              "h": 64,
+              "w": 768,
+              "init": "url",
+              "url": "",
+              "min": -1,
+              "max": 1,
+              "dropout": 0,
+            },
+            "right": {
+              "name": "input_t",
+              "matmul": false,
+              "h": 768,
+              "w": 256,
+              "init": "url",
+              "url": "",
+              "min": -1,
+              "max": 1,
+              "dropout": 0,
+            },
+            "name": "K_t",
+            "matmul": true,
+          },
+          "anim": {
+            "alg": "none",
+          },
+          "block": {
+            "j blocks": 1,
+          },
+          "layout": {
+            "polarity": "negative",
+            "left placement": "left",
+            "right placement": "top",
+            "result placement": "front"
+          }
+        },
+        "right": {
+          "name": "V",
+          "matmul": true,
+          "epilog": "none",
+          "left": {
+            "name": "input",
+            "matmul": false,
+            "h": 256,
+            "w": 768,
+            "init": "url",
+            "min": -1,
+            "max": 1,
+            "dropout": 0,
+            "url": ""
+          },
+          "right": {
+            "name": "wV",
+            "matmul": false,
+            "h": 768,
+            "w": 64,
+            "init": "url",
+            "min": -1,
+            "max": 1,
+            "dropout": 0,
+            "url": ""
+          },
+          "anim": {
+            "alg": "none",
+          },
+          "block": {
+            "j blocks": 1,
+          },
+          "layout": {
+            "polarity": "negative",
+            "left placement": "right",
+            "right placement": "top",
+            "result placement": "back"
+          }
+        },
+        "name": "attn @ V",
+        "matmul": true
+      },
+      "right": {
+        "name": "wO",
+        "matmul": false,
+        "h": 64,
+        "w": 768,
+        "init": "url",
+        "url": "",
+        "min": -1,
+        "max": 1,
+        "dropout": 0,
+      },
+      "anim": {
+        "alg": "none",
+        "speed": 16,
+        "fuse": "sync",
+        "hide inputs": false,
+        "spin": 0,
+      },
+      "block": {
+        "i blocks": 1,
+        "k blocks": 1,
+        "j blocks": 1,
+      },
+      "layout": {
+        "scheme": "blocks",
+        "gap": 24,
+        "scatter": 0,
+        "molecule": 1,
+        "blast": 0,
+        "polarity": "negative",
+        "left placement": "left",
+        "right placement": "top",
+        "result placement": "front",
+      },
+      "deco": {
+        "legends": 6,
+        "shape": true,
+        "spotlight": 4,
+        "row guides": 0.1,
+        "flow guides": 0,
+        'lens size': 0.5,
+        'magnification': 12,
+        "interior spotlight": false,
+        "axes": false,
+      },
+      "viz": {
+        "sensitivity": "local",
+        "min size": 0.05,
+        "min light": 0.2,
+        "max light": 0.9,
+        "elem scale": 2,
+        "zero hue": 0.75,
+        "hue gap": 0.75,
+        "hue spread": 0.03,
+      },
+      "cam": {
+        "x": -400,
+        "y": 400,
+        "z": 400
+      },
+    }
+
+    function withResponse(msg, f) {
+      const handler = event => {
+        f(event.data)
+        clearTimeout(timeout)
+        cleanup()
+      }
+      const cleanup = () => {
+        window.removeEventListener('message', handler)
+      }
+      const timeout = setTimeout(cleanup, 1000)
+      window.addEventListener('message', handler)
+      mm.contentWindow.postMessage(msg)
+    }
+
+    function popout() {
+      withResponse({ getUrlInfo: undefined }, info => window.open(info.url, '_blank'))
+    }
+
+    function set(props = {}, reset = false, focus = true) {
+      mm.contentWindow.postMessage({ setParams: { props, reset: false } })
+    }
+
+    const values = () => ({
+      input: input_elem.value,
+      layer: layer_elem.value,
+      head: head_elem.value,
+      anim: anim_elem.value,
+      path: path_elem.value,
+    })
+
+    function props() {
+      const { input, layer, head, path } = values()
+      return {
+        input_name: `input_${input}_${layer}`,
+        input_url: `${path}layer${layer}_input${input}_256_768.csv`,
+        input_t_name: `input_t_${input}_${layer}`,
+        input_t_url: `${path}layer${layer}_input_t${input}_768_256.csv`,
+        wk_t_name: `wK_t_${layer}_${head}`,
+        wk_t_url: `${path}layer${layer}_wk_t${head}_64_768.csv`,
+        wo_name: `wO_${layer}_${head}`,
+        wo_url: `${path}layer${layer}_wo${head}_64_768.csv`,
+        wq_name: `wQ_${layer}_${head}`,
+        wq_url: `${path}layer${layer}_wq${head}_768_64.csv`,
+        wv_name: `wV_${layer}_${head}`,
+        wv_url: `${path}layer${layer}_wv${head}_768_64.csv`,
+      }
+    }
+
+    function init() {
+      const p = props()
+      params.left.left.left.left.name = p.input_name
+      params.left.left.left.left.url = p.input_url
+      params.left.left.left.right.name = p.wq_name
+      params.left.left.left.right.url = p.wq_url
+      params.left.left.right.left.name = p.wk_t_name
+      params.left.left.right.left.url = p.wk_t_url
+      params.left.left.right.right.name = p.input_t_name
+      params.left.left.right.right.url = p.input_t_url
+      params.left.right.left.name = p.input_name
+      params.left.right.left.url = p.input_url
+      params.left.right.right.name = p.wv_name
+      params.left.right.right.url = p.wv_url
+      params.right.name = p.wo_name
+      params.right.url = p.wo_url
+      mm.src += '?params=' + JSON.stringify(params)
+    }
+
+    function updateData() {
+      const p = props()
+      set({
+        left: {
+          left: {
+            left: {
+              left: { name: p.input_name, url: p.input_url },
+              right: { name: p.wq_name, url: p.wq_url }
+            },
+            right: {
+              left: { name: p.wk_t_name, url: p.wk_t_url },
+              right: { name: p.input_t_name, url: p.input_t_url }
+            },
+          },
+          right: {
+            left: { name: p.input_name, url: p.input_url },
+            right: { name: p.wv_name, url: p.wv_url }
+          },
+        },
+        right: { name: p.wo_name, url: p.wo_url },
+      })
+      mm.focus()
+    }
+
+    const anim_params = {
+      'attn @ V @ wO': {
+        anim: { alg: 'vmprod', fuse: 'sync' },
+        left: {
+          anim: { alg: 'vmprod' },
+          left: {
+            anim: { alg: 'none' },
+            left: { anim: { alg: 'none' } }
+          }
+        }
+      },
+      'Q @ K @ V @ wO': {
+        anim: { alg: 'vmprod', fuse: 'sync' },
+        left: {
+          anim: { alg: 'vmprod' },
+          left: {
+            anim: { alg: 'vmprod' },
+            left: { anim: { alg: 'none' } }
+          }
+        }
+      },
+      'input @ wQ @ K @ V @ wO': {
+        anim: { alg: 'vmprod', fuse: 'sync' },
+        left: {
+          anim: { alg: 'vmprod' },
+          left: {
+            anim: { alg: 'vmprod' },
+            left: { anim: { alg: 'vmprod' } }
+          }
+        }
+      },
+    }
+
+    function updateAnim() {
+      const { anim } = values()
+      set(anim_params[anim] || { anim: { alg: 'none' } })
+    }
+
+    input_elem.addEventListener('change', updateData)
+    layer_elem.addEventListener('change', updateData)
+    head_elem.addEventListener('change', updateData)
+    anim_elem.addEventListener('change', updateAnim)
+    path_elem.addEventListener('change', updateData)
+
+    init()
+  </script>
+</body>
+
+</html>

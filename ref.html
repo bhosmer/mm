@@ -1,0 +1,1466 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>mm ref</title>
+  <style>
+    body,
+    html {
+      touch-action: none;
+      font-family: Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.5;
+      margin: 0px;
+      height: 100vh;
+      width: 100vw;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .viz {
+      position: relative;
+      height: 50%;
+      width: 100%;
+    }
+
+    .doc {
+      margin-top: 12px;
+      margin-bottom: 0px;
+      margin-left: 16px;
+      padding-right: 10px;
+      height: 50%;
+      overflow-y: auto;
+    }
+
+    .mm_container {
+      height: 100%;
+      width: 100%;
+    }
+
+    .mm {
+      border: 0px;
+      height: 100%;
+      width: 100%;
+    }
+
+    #popout {
+      text-decoration: none;
+      position: absolute;
+      right: 10px;
+      bottom: 0;
+      font-style: italic;
+      text-align: right;
+      color: #fff;
+    }
+
+    #sep {
+      position: relative;
+      display: flex;
+      height: 8px;
+      width: 100%;
+      background-color: #ccc;
+      cursor: ew-resize;
+    }
+
+    #sep::before {
+      content: "";
+      width: 30px;
+      height: 100%;
+      background: linear-gradient(to right, #666 50%, transparent 50%);
+      background-size: 10px 10px;
+      position: absolute;
+      left: calc(50% - 15px);
+      top: 0;
+    }
+
+    @media (orientation: portrait) {
+      body {
+        flex-direction: column;
+      }
+
+      #sep::before {
+        width: 30px;
+        height: 100%;
+        background: linear-gradient(to right, #666 50%, transparent 50%);
+        background-size: 10px 10px;
+        left: calc(50% - 15px);
+        top: 0;
+      }
+
+      #sep {
+        height: 8px;
+        width: 100%;
+        cursor: ns-resize;
+      }
+
+      .viz {
+        height: 50%;
+        width: 100%;
+      }
+
+      .doc {
+        height: 50%;
+      }
+    }
+
+    @media (orientation: landscape) {
+      body {
+        flex-direction: row;
+      }
+
+      #sep::before {
+        width: 100%;
+        height: 30px;
+        background: linear-gradient(to bottom, #666 50%, transparent 50%);
+        background-size: 10px 10px;
+        top: calc(50% - 15px);
+        left: 0;
+      }
+
+      #sep {
+        width: 8px;
+        height: 100%;
+        cursor: ew-resize;
+      }
+
+      .viz {
+        height: 100%;
+        width: 54%;
+      }
+
+      .doc {
+        height: 100%;
+        width: 50%;
+      }
+    }
+  </style>
+</head>
+
+<script type="module" src="https://cdn.jsdelivr.net/gh/zerodevx/zero-md@1/src/zero-md.min.js"></script>
+<!-- <script type="module" src="https://cdn.jsdelivr.net/gh/zerodevx/zero-md@2/dist/zero-md.min.js"></script> -->
+
+<script>
+  function withResponse(msg, f) {
+    const handler = event => {
+      f(event.data)
+      clearTimeout(timeout)
+      cleanup()
+    }
+    const cleanup = () => {
+      window.removeEventListener('message', handler)
+    }
+    const timeout = setTimeout(cleanup, 1000)
+    window.addEventListener('message', handler)
+    mm.contentWindow.postMessage(msg)
+  }
+
+  function popout() {
+    withResponse({ getUrlInfo: undefined }, info => window.open(info.url, '_blank'))
+  }
+
+  function update(f, clear = false, focus = true) {
+    withResponse({ getParams: undefined }, params => set(f(params), clear))
+  }
+
+  function set(props = {}, reset = false, focus = true) {
+    mm.contentWindow.postMessage({ setParams: { props, reset } })
+    focus && mm.focus()
+  }
+
+  function openFolders(names = []) {
+    return {
+      folder: "open",
+      anim: { folder: "closed" },
+      block: { folder: "closed" },
+      layout: { folder: "closed" },
+      left: { folder: "closed" },
+      right: { folder: "closed" },
+      deco: { folder: "closed" },
+      viz: { folder: "closed" },
+      diag: { folder: "closed" },
+      ...names.reduce((acc, f) => ({ ...acc, [f]: { folder: "open" } }), {})
+    }
+  }
+
+  const openFolder = name => openFolders([name])
+
+  function jumpTo(id) {
+    const dest = document.getElementById(id)
+    dest && (dest.parentNode.scrollTop = dest.offsetTop - dest.parentNode.offsetTop)
+  }
+
+  const matmap = (p, lf, rf = undefined) => ({
+    ...p,
+    left: p.left.matmul ? matmap(p.left, lf, rf) : lf(p.left),
+    right: p.right.matmul ? matmap(p.right, lf, rf) : (rf || lf)(p.right),
+  })
+
+  const mmsiz = p => {
+    const info = p => {
+      const lf = p.left.matmul ? info(p.left) : { h: p.left.h, n: p.left.h * p.left.w }
+      const rt = p.right.matmul ? info(p.right) : { w: p.right.w, n: p.right.h * p.right.w }
+      return { h: lf.h, w: rt.w, n: lf.n + rt.n + lf.h * rt.w }
+    }
+    return info(p).n
+  }
+
+  const faster = p => ({ anim: { speed: p.anim.speed * 2 } })
+  const slower = p => ({ anim: { speed: p.anim.speed / 2 } })
+
+  const up = n => Math.round(n * 2)
+  const bigger = p => mmsiz(p) > 49152 ? {} : matmap(p, m => ({ h: up(m.h), w: up(m.w) }))
+
+  const dn = n => Math.round(n / 2)
+  const smaller = p => matmap(p, m => ({ h: dn(m.h), w: dn(m.w) }))
+
+  const uniform = p => matmap(p, _ => ({ init: 'uniform' }))
+  const rowcol = p => matmap(p, _ => ({ init: 'rows' }), _ => ({ init: 'cols' }))
+
+  const mlp = {
+    expr: 'batch @ w0 @ w1 @ w2',
+    sync_expr: true,
+    epilog: 'softmax',
+    viz: { sensitivity: 'global' },
+    left: {
+      epilog: 'relu',
+      left: {
+        epilog: 'relu',
+        left: { h: 64, w: 32 },
+        right: { h: 32, w: 64, init: 'pt linear' }
+      },
+      right: { h: 64, w: 64, init: 'pt linear' }
+    },
+    right: { h: 64, w: 32, init: 'pt linear' }
+  }
+
+  const mlp_named = {
+    ...mlp,
+    expr: 'out = (x1 = (x0 = batch @ w0) @ w1) @ w2'
+  }
+
+  const mlp_lr = {
+    expr: 'out = batch @ (w0 = w0_L @ w0_R) @ (w1 = w1_L @ w1_R) @ (w2 = w2_L @ w2_R)',
+    sync_expr: true,
+    epilog: 'softmax',
+    viz: { sensitivity: 'global' },
+    left: {
+      'epilog': 'relu',
+      left: {
+        epilog: 'relu',
+        left: { h: 64, w: 32 },
+        right: {
+          left: { h: 32, w: 8, init: 'pt linear' },
+          right: { h: 8, w: 64, init: 'pt linear' }
+        }
+      },
+      right: {
+        left: { h: 64, w: 8, init: 'pt linear' },
+        right: { h: 8, w: 64, init: 'pt linear' }
+      }
+    },
+    right: {
+      left: { h: 64, w: 8, init: 'pt linear' },
+      right: { h: 8, w: 32, init: 'pt linear' }
+    }
+  }
+
+  const mlp_lr_named = {
+    ...mlp_lr,
+    expr: 'out = (x1 = (x0 = batch @ (w0 = w0_L @ w0_R)) @ (w1 = w1_L @ w1_R)) @ (w2 = w2_L @ w2_R)'
+  }
+
+  const attn = {
+    expr: 'out = (attn = Q @ K) @ V',
+    sync_expr: true,
+    epilog: 'none',
+    left: {
+      epilog: 'softmax(tril(x/sqrt(k)))',
+      left: { h: 64, w: 16, init: 'gaussian' },
+      right: { h: 16, w: 64, init: 'gaussian' }
+    },
+    right: { 'h': 64, 'w': 16, 'init': 'gaussian' },
+    viz: { sensitivity: 'local' }
+  }
+
+  const attn_proj = {
+    expr: 'out = (attn = (Q = input @ wQ) @ (K = wK @ input_t)) @ (V = input @ wV) @ wO',
+    sync_expr: true,
+    epilog: 'none',
+    left: {
+      left: {
+        epilog: 'softmax(tril(x/sqrt(k)))',
+        left: {
+          left: { h: 64, w: 64, init: 'gaussian' },
+          right: { h: 64, w: 16, init: 'gaussian' },
+        },
+        right: {
+          left: { h: 16, w: 64, init: 'gaussian' },
+          right: { h: 64, w: 64, init: 'gaussian' },
+        }
+      },
+      right: {
+        left: { h: 64, w: 64, init: 'gaussian' },
+        right: { h: 64, w: 16, init: 'gaussian' },
+      },
+    },
+    right: { h: 16, w: 64, init: 'gaussian' },
+    viz: { sensitivity: 'local' }
+  }
+
+  const legends_only = { deco: { shape: true, legends: 6, 'row guides': 0, 'flow guides': 0 } }
+  const guides_only = { deco: { shape: false, legends: 0, 'row guides': 0.5, 'flow guides': 0.5 } }
+  const undeco = { deco: { shape: false, legends: 0, 'row guides': 0, 'flow guides': 0 } }
+  const default_deco = { deco: { shape: true, legends: 6, 'row guides': 0.5, 'flow guides': 0.5 } }
+</script>
+
+<body>
+  <div id="upper" class="viz">
+    <iframe class="mm" id="mm" src="index.html"></iframe>
+    <a id="popout" href="javascript:popout();">open&#x2197;</a>
+  </div>
+
+  <div id="sep"></div>
+
+  <div id="lower" class="doc">
+
+    <zero-md src="">
+      <script type="text/markdown">
+        # mm - 3D matmul visualizer
+
+        Example pane is interactive. Open the current visualization in its own page at any time with the 
+        <a href="javascript:popout();" style="font-style: italic;">open&#x2197;</a> caption link.
+
+        ## Interaction
+        |   | Laptop | Mobile |
+        | - | ------ | ------ |
+        | Zoom | Two finger vertical drag, up/down arrows | Pinch |
+        | Spin | Click and drag, shift-left/right arrows | Tap and drag |
+        | Pan | Command-click and drag, left/right arrows | Two-finger drag |
+        | Magnify/reveal | Long click or ctrl-click | Long tap |
+        
+        ## Saving/Sharing
+        * URL is a complete, sharable configuration
+          * note: Safari address bar truncates very long URLs - full URL is also available in the **diag** submenu
+        * JSON for the corresponding `parameters` configuration object also available in **diag**
+        
+        ## Undo
+        * Nontrivial changes are recorded in browser history, so back/forward is usable for undo/redo
+    
+        ## Start state
+    
+        The <a href="javascript:set({}, true);">default visualization</a> 
+        (no saved URL params) visualizes a single matmul `L @ R` of two 32x32 matrices:
+        * Left argument `L` is initialized in *row major* order. Evenly spaced values 
+        range from `-1` (red) at top left to `1` (blue) at bottom right.
+        * Right argument `R` is initialized in *column major* order with the same range of values.
+        * The result matrix (labeled `L @ R`) contains the result of the matmul. 
+        * Guide lines run parallel to matrix rows, with a triangle at the `(0, 0)` corner. 
+        * The guide arrow in the cube's interior points to the result matrix. 
+        The ***R***ed vane points to the ***R***ight argument and the blue vane 
+        points to the left argument.
+        
+        This is just a starting point. We can 
+        * visualize compound expressions
+        * model any valid argument shapes and sizes up to practical limits
+        * specify values using preset initializers, custom expressions or loaded data
+        * animate a variety of algorithms
+        * visualize block partitioning and fusion
+        * customize more or less everything about the visualization itself.
+
+        ## Quick intuition refresher
+        
+        * rotate, zoom, and inspect values (see **Interaction**, above)
+        * animate 
+          <a href="javascript:set({anim:{alg:'dotprod (row major)'}})">pairwise dot product</a>, 
+          <a href="javascript:set({anim:{alg:'mvprod'}})">matrix-vector product</a>, 
+          <a href="javascript:set({anim:{alg:'vmprod'}})">vector-matrix product</a>, 
+          <a href="javascript:set({anim:{alg:'vvprod'}})">summed outer products</a> 
+          (<a href="javascript:update(faster)">faster</a>, 
+          <a href="javascript:update(slower)">slower</a>, 
+          <a href="javascript:set({anim:{alg:'none'}})">stop</a>)
+        * <a href="javascript:update(uniform)">initialize with random values</a> (<a href="javascript:update(rowcol)">back to rows and columns</a>)
+        * some common shapes: 
+          <a href="javascript:set({expr:'L @ R', sync_expr:true, left:{h:32,w:48}, right:{h:48,w:12}})">wide to narrow</a> (e.g. q/k/v projection), 
+          <a href="javascript:set({expr:'L @ R', sync_expr:true, left:{h:32,w:12}, right:{h:12,w:48}})">narrow to wide</a> (e.g. low rank factorization), 
+          <a href="javascript:set({expr:'L @ R', sync_expr:true, left:{h:48,w:32}, right:{h:32,w:32}})">big batch</a>, 
+          <a href="javascript:set({expr:'L @ R', sync_expr:true, left:{h:16,w:32}, right:{h:32,w:32}})">little batch</a> 
+          (<a href="javascript:set({expr:'L @ R', sync_expr:true, left:{h:32,w:32}, right:{h:32,w:32}})">back to cube</a>)
+        * <a href="javascript:update(bigger)">bigger</a>, <a href="javascript:update(smaller)">smaller</a> 
+        * split matmul <a href="javascript:set({block:{'i blocks':2}})">along i</a>,
+          <a href="javascript:set({block:{'j blocks':2}})">along j</a>,
+          <a href="javascript:set({block:{'k blocks':2}})">along k</a>
+          (<a href="javascript:set({block:{'i blocks':1, 'k blocks':1, 'j blocks': 1}})">unsplit</a>)
+        * visualize values with <a href="javascript:set({viz: { sensitivity: 'local' }})">local sensitivity</a> - sizes and colors 
+          normalized per-matrix rather than across the entire visualization
+          (<a href="javascript:set({viz: { sensitivity: 'global' }})">back to global sensitivity</a>)
+        * <a href="javascript:set(legends_only)">hide guides</a>, <a href="javascript:set(undeco)">hide all deco</a> (<a href="javascript:set(default_deco)">back to default deco</a>)
+
+        A handful of slightly less basic examples, built in a few steps using the menu options described 
+        in the rest of this guide (links above work on these examples as well, except the shape resets):
+        * double matmul a la attention: <a href="javascript:set(attn)">out = (attn = Q @ K) @ V</a>
+        * attention with input/output projections:
+          <a href="javascript:set(attn_proj)">out = (attn = (Q = input @ wQ) @ (K = wK @ input_t)) @ (V = input @ wV) @ wO</a>
+        * left-associative chain a la MLP: 
+          <a href="javascript:set(mlp_named)">out = (x1 = (x0 = batch @ w0) @ w1) @ w2</a>
+        * MLP with low rank decompositions for weights:
+          <a href="javascript:set(mlp_lr_named)">out = (x1 = (x0 = batch @ (w0 = w0_L @ w0_R)) @ (w1 = w1_L @ w1_R)) @ (w2 = w2_L @ w2_R)</a>
+
+        # mm Menu
+
+        Configuration is specified interactively via the **mm** menu at upper right. 
+        All options map directly to properties encoded in the URL.
+    
+        * <a href="javascript: set(openFolders()); jumpTo('toplevel-submenu')">**top level** options</a> 
+          configure global properties, mainly the structure of the matmul expression itself
+        * <a href="javascript: set(openFolders(['left', 'right'])); jumpTo('lr-submenu')">**left** and **right** submenus</a> 
+          configure the left and right arguments of the top level matmul, including initialization and shape
+          * If either argument is a subexpression, the corresponding submenu will have its own left and right submenus
+        * <a href="javascript: set(openFolders(['anim'])); jumpTo('animation-submenu')">**animation** submenu</a> 
+          controls how the matmul computation is animated
+        * <a href="javascript: set(openFolders(['block'])); jumpTo('blocking-submenu')">**blocking** submenu</a> 
+          configures how the expression is partitioned into blocks
+        * <a href="javascript: set(openFolders(['layout'])); jumpTo('layout-submenu')">**layout** submenu</a> 
+          controls the orientation and spacing of the expression in 3D space
+        * <a href="javascript: set(openFolders(['deco'])); jumpTo('deco-submenu')">**deco** submenu</a> 
+          configures decorations like legends and orientation guides, and options for showing numerical values
+        * <a href="javascript: set(openFolders(['viz'])); jumpTo('cs-submenu')">**colors and sizes** submenu</a> 
+          configures the color and brightness details of how values are mapped
+        * <a href="javascript: set(openFolders(['diag'])); jumpTo('diag-submenu')">**diag** submenu</a> 
+          contains stats and data, e.g. the current URL, JSON config object, etc.
+      </script>
+    </zero-md>
+
+    <script>
+      const deep_binary = { expr: '(L = (LL = LLL @ LLR) @ (LR = LRL @ LRR)) @ (R = (RL = RLL @ RLR) @ (RR = (RRL @ RRR)))', sync_expr: true, folder: 'open' }
+    </script>
+
+    <zero-md src="" id="toplevel-submenu">
+      <script type="text/markdown">
+        #  
+        # <a href="javascript:set(openFolders())">Top Level</a>
+
+        ## expr
+  
+        **expr** can be edited directly to specify the structure of the matmul being visualized.
+        (Alternatively, the structure can be built interactively via the **left** and **right** 
+        submenus, which configure the properties of the matmul's constituents in any case.)
+
+        An expression is of the form `left @ right` or `result = left @ right`, where
+        * `left` and `right` can be subexpressions
+        * `result` names the visualized result matrix (if not provided, the expression itself is used)
+        * parens are used to group right-associative subexpressions and subexpression assignments
+
+        When **expr** is edited, existing settings are preserved on a best-efforts basis - in particular when names are reused.
+
+        These examples show the effect of simply editing the **expr** of the current visualization, with no other modifications:
+        * double matmul a la attention: <a href="javascript:set({expr:'out = (attn = Q @ K) @ V', sync_expr:true, folder:'open'})">out = (attn = Q @ K) @ V</a>
+        * left-associative chain: <a href="javascript:set({expr:'A @ B @ C @ D', sync_expr:true, folder:'open'})">A @ B @ C @ D</a>
+          * with named results: <a href="javascript:set({expr:'X = (ABC = (AB = A @ B) @ C) @ D', sync_expr:true, folder:'open'})">X = (ABC = (AB = A @ B) @ C) @ D</a>
+        * right-associative chain: <a href="javascript:set({ expr:'A @ (B @ (C @ D))', sync_expr:true, folder:'open'})">X = A @ (B @ (C @ D))</a>
+          * with named results: <a href="javascript:set({ expr:'X = A @ (BCD = B @ (CD = C @ D))', sync_expr:true, folder:'open'})">X = A @ (BCD = B @ (CD = C @ D))</a>
+        * left and right subexpressions: <a href="javascript:set({ expr:'(L = LL @ LR) @ (R = RL @ RR)', sync_expr:true, folder:'open'})">(L = LL @ LR) @ (R = RL @ RR)</a> 
+          * children beget grandchildren: <a href="javascript:set(deep_binary)">(L = (LL = LLL @ LLR) @ (LR = LRL @ LRR)) @ (R = (RL = RLL @ RLR) @ (RR = (RRL @ RRR)))</a> 
+          * note: the <a href="javascript:jumpTo('layout-submenu')">**layout**</a> submenu contains various options
+            that can be used to let some air into visualizations of deeply nested saturated expressions like this one -
+            for example <a href="javascript:update(scatter(10))">adding space</a> between subexpressions and their parents, 
+            using <a href="javascript:set({layout:{gap:8,molecule:1,folder:'open'}})">scattered</a>
+            or <a href="javascript:set({layout:{gap:1,molecule:3,folder:'open'}})">dense</a> subexpression layouts.
+            (<a href="javascript:set({layout:{gap:4,scatter:0,molecule:1,folder:'open'}})">back to default</a>)
+          * also, for expressions like this one which contain both very small and very large values, it can be useful to set
+            sensitivity to <a href="javascript:set({viz:{sensitivity:'local'}})">local</a> in the
+            <a href="javascript:jumpTo('viz-submenu')">**visualization**</a> submenu. This normalizes
+            element color and size within each matrix, rather than across the entire expression. 
+            (<a href="javascript:set({viz:{sensitivity:'global'}})">back to global</a>)
+      
+        ## name
+        
+        Names the result matrix of the matmul being computed. Can be edited directly,
+        and/or is synchronized with **expr**.
+
+        ## epilog
+
+        Specifies a function to run on the result matrix after the top level matmul has been calculated.
+
+        (Child matmuls will have their own choice of epilogs, in the **left** and **right** submenus.)        
+
+        * <a href="javascript:set({epilog:'none',folder:'open'})">none</a>: no epilog, result values are unmodified
+        * <a href="javascript:set({epilog:'relu',folder:'open'})">relu</a>: relu is applied to result values
+        * <a href="javascript:set({epilog:'gelu',folder:'open'})">gelu</a>: <a href="https://arxiv.org/pdf/1606.08415.pdf">gelu</a> is applied to result values
+        * <a href="javascript:set({epilog:'sigmoid',folder:'open'})">sigmoid</a>: <a href="https://paperswithcode.com/method/sigmoid-activation">sigmoid</a> is applied to result values
+        * <a href="javascript:set({epilog:'silu',folder:'open'})">silu</a>: <a href="https://arxiv.org/pdf/1702.03118v3.pdf">silu</a> is applied to result values
+        * <a href="javascript:set({epilog:'tanh',folder:'open'})">tanh</a>: tanh is applied to result values 
+        * <a href="javascript:set({epilog:'layernorm',folder:'open'})">layernorm</a>: matrix-wide layernorm is applied to result values
+        * <a href="javascript:set({epilog:'softmax',folder:'open'})">softmax</a>: values are softmaxed by row
+        * <a href="javascript:set({epilog:'softmax(x/sqrt(k))',folder:'open'})">softmax(x/sqrt(k))</a>: values are scaled by the square root of matmul depth, 
+          then softmaxed by row (a la scaled dot product attention)
+        * <a href="javascript:set({epilog:'softmax(tril(x/sqrt(k)))',folder:'open'})">softmax(tril(x/sqrt(k)))</a>: values are scaled by the square root of depth, 
+          then the upper triangle is masked, then softmax is applied by row (causal SDPA)
+      </script>
+    </zero-md>
+
+    <script>
+      const matmap_openf = (p, lf, rf = undefined) => ({
+        ...p,
+        folder: 'open',
+        left: p.left.matmul ? matmap_openf(p.left, lf, rf) : { folder: 'open', ...lf(p.left) },
+        right: p.right.matmul ? matmap_openf(p.right, lf, rf) : { folder: 'open', ...(rf || lf)(p.right) },
+      })
+
+      const leftinit = init => p => matmap_openf(p, _ => ({ init }), _ => ({}))
+      const rightinit = init => p => matmap_openf(p, _ => ({}), _ => ({ init }))
+      const bothinit = init => p => matmap_openf(p, _ => ({ init }))
+      const lrinit = (linit, rinit) => p => matmap_openf(p, _ => ({ init: linit }), _ => ({ init: rinit }))
+      const urlinit = (l, r) => p => matmap_openf(p, _ => ({ init: 'url', url: l }), _ => ({ init: 'url', url: r }))
+      const dropout = dropout => p => matmap_openf(p, _ => ({ dropout }))
+    </script>
+
+    <zero-md src="" id="lr-submenu">
+      <script type="text/markdown">
+        #  
+        # <a href="javascript:set(openFolders(['left', 'right']))">Left and Right</a>
+
+        Left and right submenus configure the left and right arguments of the matmul 
+        being visualized. 
+        
+        Menu options vary depending on whether the argument is itself a matmul, as described below:
+        subexpressions can nest to arbitrary depth, and left and right submenus will nest accordingly.
+
+        ## name
+        
+        Names this argument. Can be edited directly, and/or is synchronized with **expr**.
+
+        ## matmul
+
+        This checkbox specifies whether the argument is itself a matmul, or just a matrix. 
+        Subsequent options in the menu depend on the value of this option.
+        
+        ## *Left/Right matrix options (matmul unchecked)*
+
+        ## h, w
+
+        Matrix height and width. The width of the left argument and height of the right argument 
+        are synchronized. 
+
+        ## init
+
+        Specifies how the values of the matrix are initialized. Various init functions are available,
+        or you can load external data from CSV files. 
+
+        #### Position-based
+
+        * **rows**: elements in each row are initialized to the same value, with values spread evenly across a range specified 
+          by **min** and **max** options. <a href="javascript:update(leftinit('rows'))">Set left init to rows</a>
+        * **cols**: elements in each column are initialized to the same value, with values spread evenly across a range specified 
+          by **min** and **max** options. <a href="javascript:update(rightinit('cols'))">Set right init to cols</a>
+        * **row major**: elements are initialized from top left to bottom right in row major order, with values spread evenly across 
+          a range specified by **min** and **max** options. <a href="javascript:update(leftinit('row major'))">Set left init to row major</a>
+        * **col major**: elements are initialized from top left to bottom right in column major order, with values spread evenly across 
+          a range specified by **min** and **max** options. <a href="javascript:update(rightinit('col major'))">Set right init to col major</a>
+
+        #### Random
+
+        * **pt linear**: elements are drawn from a shape-dependent uniform distribution as described 
+          [here](https://pytorch.org/docs/stable/generated/torch.nn.Linear.html).
+          <a href="javascript:update(bothinit('pt linear'))">Set left and right init to pt linear</a>
+        * **uniform**: elements are drawn from a uniform distribution as specified by **min** and **max** options.
+          <a href="javascript:update(bothinit('uniform'))">Set left and right init to uniform</a>
+        * **gaussian**: elements are drawn from a gaussian distribution as specified by **min** and **max** options.
+          <a href="javascript:update(bothinit('gaussian'))">Set left and right init to gaussian</a>
+
+        #### Algebraic
+        
+        * **tril mask**: lower triangular elements are initialized to one, others are initialized to zero.
+          <a href="javascript:update(leftinit('tril mask'))">Set left init to tril mask</a>
+        * **triu mask**: upper triangular elements are initialized to one, others are initialized to zero.
+          <a href="javascript:update(leftinit('triu mask'))">Set left init to triu mask</a>
+        * **eye**: elements on the diagonal are initialized to one, others are initialized to zero.
+          <a href="javascript:update(leftinit('eye'))">Set left init to eye</a>
+        * **diff**: elements on the diagonal are initialized to one; elements immediately left of the diagonal are initialized to -1, 
+          all others are initialized to zero. <a href="javascript:update(leftinit('diff'))">Set left init to diff</a>
+
+        #### Custom
+
+        * **url**: shows a **url** field which can be used to specify a URL pointing to CSV
+          initialization data. Loaded data is consumed row by row, rolling over both columnwise and rowwise if
+          matrix shape exceeds available data.
+          <a href="javascript:update(urlinit(
+            'https://raw.githubusercontent.com/bhosmer/testdata/main/weights/gpt2/layer0_wq0_768_64.csv', 
+            'https://raw.githubusercontent.com/bhosmer/testdata/main/weights/gpt2/layer0_wk_t0_64_768.csv'
+          ))">Set left and right init to sample loaded weights</a>
+        * **expr**: show an **expr** field which can be used to specify a Javascript initialization expression.
+          Available variables are `i` (row index), `j` (column index), `h` (matrix height) and `w` (matrix width).
+
+        ## dropout
+
+        Specifies a level of sparsity between 0 (0%) and 1 (100%) for row/col and random initializations. 
+        * <a href="javascript:update(dropout(0.5))">Set left and right dropout to 0.5</a> (if applicable to current init choices)
+
+        ## *Left/Right matmul options (matmul checked)*
+
+        When the **matmul** option is checked in the **left** and/or **right** submenu, the matrix options 
+        (h/w, init, etc.) are removed and matmul options are added: left/right sub-submenus, epilog, animation
+        and (depending on global options) layout.
+      </script>
+    </zero-md>
+
+    <script>
+      //
+      const left_chain_vmprod_fuse = {
+        expr: 'X = A @ B @ C @ D @ E', sync_expr: true, folder: 'open',
+        anim: { fuse: 'sync', alg: 'vmprod', folder: 'open' },
+        left: {
+          anim: { alg: 'inherit' },
+          left: {
+            anim: { alg: 'inherit' },
+            left: {
+              anim: { alg: 'inherit' },
+            },
+          },
+        },
+      }
+
+      const right_chain_mvprod_fuse = {
+        expr: 'X = A @ (B @ (C @ (D @ E)))', sync_expr: true, folder: 'open',
+        anim: { fuse: 'sync', alg: 'mvprod', folder: 'open' },
+        right: {
+          anim: { alg: 'inherit' },
+          right: {
+            anim: { alg: 'inherit' },
+            right: {
+              anim: { alg: 'inherit' },
+            }
+          }
+        }
+      }
+
+      const binary_fuse = {
+        expr: 'X = (A @ B) @ (C @ D)', sync_expr: true, folder: 'open',
+        anim: { fuse: 'sync', 'alg': 'vvprod', 'folder': 'open' },
+        left: { anim: { alg: 'mvprod', 'folder': 'open' }, },
+        right: { anim: { alg: 'vmprod', 'folder': 'open' }, }
+      }
+
+      const left_right_chain_fuse = {
+        expr: 'X = (A @ (B @ C)) @ ((D @ E) @ F)', sync_expr: true, folder: 'open',
+        anim: { fuse: 'sync', 'alg': 'vvprod', 'folder': 'open' },
+        left: {
+          folder: 'open',
+          anim: { alg: 'mvprod', 'folder': 'open' },
+          right: { anim: { alg: 'inherit' } },
+        },
+        right: {
+          folder: 'open',
+          anim: { alg: 'vmprod', 'folder': 'open' },
+          left: { anim: { alg: 'inherit' } },
+        }
+      }
+
+    </script>
+
+    <zero-md src="" id="animation-submenu">
+      <script type="text/markdown">
+        #  
+        #  <a href="javascript:set(openFolders(['anim']))">Animation</a>
+
+        Various matmul algorithms can be animated. In a compound expression 
+        animation proceeds leaf-to-root in dependency order, with mutually independent
+        subexpressions proceeding in parallel. 
+
+        Algorithms are also parallelized within <a href="javascript:jumpTo('blocking-submenu')">blocking</a> 
+        partitions.
+        
+        Fusion across matmuls occurs automatically as geometry permits - see the **fuse**
+        option below for details.
+
+        ## alg
+
+        Specifies the matmul algorithm to be animated.
+
+        When a compound expression is animated, each child matmul chooses its own animation
+        algorithm - or chooses to inherit that of its parent - via an **animation** submenu. 
+        
+        When a matmul specifies algorithm `none`, the expression tree rooted at that matmul 
+        is not animated: a choice of `none` at the top level disables animation globally, 
+        whereas `none` in a child disables animation of that subexpression.
+        
+        * <a href="javascript:set({anim:{alg:'none'}})">none</a>: no animation of this matmul or its children
+        * <a href="javascript:set({anim:{alg:'dotprod (row major)'}})">dotprod (row major)</a>: elements of the result matrix are computed in **row major order** via **pairwise dot product**
+        * <a href="javascript:set({anim:{alg:'dotprod (col major)'}})">dotprod (col major)</a>: elements of the result matrix are computed in **column major order** via **pairwise dot product**
+        * <a href="javascript:set({anim:{alg:'axpy'}})">axpy</a>: columns of the result matrix are computed are computed by depthwise accumulation of **vector-scalar products**
+        * <a href="javascript:set({anim:{alg:'vmprod'}})">vmprod</a>: rows of the result matrix are computed via **vector-matrix products** over rows of the left argument
+        * <a href="javascript:set({anim:{alg:'mvprod'}})">mvprod</a>: columns of the result matrix are computed via **matrix-vector products** over columns of the right argument
+        * <a href="javascript:set({anim:{alg:'vvprod'}})">vvprod</a>: the result matrix is computed via depthwise accumulation of **vector-vector outer products**
+        * **inherit** (child matmuls only): inherits the algorithm of its parent. This is the default setting for
+          newly created child matmuls
+
+        ## speed
+
+        Specifies animation speed. Values of this setting are not calibrated precisely: 1 is very slow and 100 
+        is essentally as fast as the browser can animate frames (for complicated visualizations, animation speed
+        will top out well before 100).
+
+        Note that animation speed is *not* calibrated to reflect the relative amounts of work performed: each
+        frame advances a single step, regardless of algorithm or argument shapes.
+
+        Choose an algorithm above and run it <a href="javascript:update(faster)">faster</a> or <a href="javascript:update(slower)">slower</a>. 
+
+        ## pause
+
+        Pauses animation when checked.
+
+        ## step
+
+        Advances paused animation one step. Useful for inspecting intermediate values in conjunction with
+        **interior spotlight** (see <a href="javascript:jumpTo('deco-submenu')">deco</a> menu).
+
+        ## fuse
+
+        In compound matmul expressions, particular combinations of adjacent planar algorithms 
+        (<a href="javascript:set({anim:{alg:'vmprod'}})">vector-matrix</a>,
+        <a href="javascript:set({anim:{alg:'mvprod'}})">matrix-vector</a>,
+        <a href="javascript:set({anim:{alg:'vvprod'}})">vector-vector</a>)
+        can be **fused** when they generate parallel planes. 
+
+        Parallel planes visually indicate a shared *sweep axis* along which 
+        the data dependency between adjacent matmuls can be partitioned,
+        meaning the coplanar algorithms can be fused and parallelized.
+
+        (Partitions can be also visualized explicitly, irrespective of fusion, in the <a href="javascript:jumpTo('blocking-submenu')">**blocking**</a> submenu.)
+
+        ### Fused pairs
+
+        The following combinations of two-matmul expression shape and algorithm generate parallel planes:
+
+        #### Left-associative: `A @ B @ C`
+        
+        | `A @ B` (left child) | `_ @ C` (top level) | |
+        | - | - | - |
+        | vector-matrix product (fusion along **i**) | vector-matrix product (fusion along **i**) | <a href="javascript:set({ expr: 'A @ B @ C', sync_expr: true, folder: 'open', anim: { alg: 'vmprod', fuse: 'sync', folder: 'open' }, left: { folder: 'open', anim: { alg: 'inherit', folder: 'open' } } })">Show</a> |
+        | matrix-vector product (fusion along **k**) | vector-vector product (fusion along **j**) | <a href="javascript:set({ expr: 'A @ B @ C', sync_expr: true, folder: 'open', anim: { alg: 'vvprod', fuse: 'sync', folder: 'open' }, left: { folder: 'open', anim: { alg: 'mvprod', folder: 'open' } } })">Show</a> |
+
+        #### Right-associative: `A @ (B @ C)`
+
+        | `B @ C` (right child) | `A @ _` (top level) | |
+        | - | - | - |
+        | vector-matrix product (fusion along **i**) | vector-vector product (fusion along **j**) | <a href="javascript:set({ expr: 'A @ (B @ C)', sync_expr: true, folder: 'open', anim: { alg: 'vvprod', fuse: 'sync', folder: 'open' }, right: { folder: 'open', anim: { alg: 'vmprod', folder: 'open' } } })">Show</a> |
+        | matrix-vector product (fusion along **k**) | matrix-vector product (fusion along **k**) | <a href="javascript:set({ expr: 'A @ (B @ C)', sync_expr: true, folder: 'open', anim: { alg: 'mvprod', fuse: 'sync', folder: 'open' }, right: { folder: 'open', anim: { alg: 'inherit', folder: 'open' } } })">Show</a> |
+
+        ### Fused chains
+
+        We can adjoin multiple pairs with common parallel planes to create extended fusions. Some examples:
+
+        * **`A @ B @ C @ ...`**: Generalizing the first left-associative pattern above, 
+        left-associative chains of any length can be fused along **i** (**vector-matrix** product).
+        Here the plane slicing through the compound corresponds to e.g. the path of computation for a single
+        batch item as it travels through an <a href="https://pytorch.org/docs/stable/generated/torch.nn.Linear.html">MLP</a>. 
+        This laminar geometry underlies <a href="https://pytorch.org/docs/stable/generated/torch.nn.DataParallel.html">data parallelism</a>
+        (splitting a batch across multiple nodes):
+          * Example: <a href="javascript:set(left_chain_vmprod_fuse)">`X = A @ B @ C @ D @ E`</a>
+        * **`A @ (B @ (C @ (...)))`**: Similarly, the second right-associative pattern above generalizes
+        to right-associative chains of any length fused along **k** (**matrix-vector** product). 
+          * Example: <a href="javascript:set(right_chain_mvprod_fuse)">`X = A @ (B @ (C @ (D @ E)))`</a>
+        * **`(A @ B) @ (C @ D)`**: Binary expressions may be fused by computing the left subexpression along **k** 
+        (**matrix-vector** product) and the right subexpression along **i** (**vector-matrix** product), and joining them
+        along **j** (**vector-vector** product).
+          * Example: <a href="javascript:set(binary_fuse)">`X = (A @ B) @ (C @ D)`</a>
+        * **`(A @ (...)) @ ((...) @ Z)`**: More generally, binary expressions with a *right*-associative chain of arbitrary
+        length on the *left*, and a *left*-associative chain of arbitrary length on the *right*, may be fused into a single
+        unit by fusing the chained subexpressions as in the preceding examples, then joining them along **j** 
+        (**vector-vector** product) at the root.
+          * Example: <a href="javascript:set(left_right_chain_fuse)">`X = (A @ (B @ C)) @ ((D @ E) @ F)`</a>
+
+        ### *sync vs async*
+
+        Options for **fuse** are `none` (no fusion), `sync` and `async`. The difference between `sync` and `async` is
+        subtle, and only apparent when large compound matmuls are animated. When **fuse** is set to `sync`, animations
+        are only fused when all participants begin can computation simultaneously (i.e., are not waiting for subcomputations 
+        to complete), whereas `async` animations will fuse even when participants begin at different times, dependency
+        order permitting.
+
+        For most expressions, `sync` and `async` will behave identically.
+
+        ## hide inputs
+
+        Hiding inputs during animation can make it easier to inspect visualizations of intermediate results
+        rendered in the matmul cube's interior, in particular when **deco** menu options are adjusted to
+        minimize decoration and enable interior spotlighting (the latter reveals values in intermediate
+        visualizations - see **deco** for details).
+
+        ## spin
+
+        Spinning a visualization can be useful in developing geometric intuition for the operations being visualized. 
+        * <a href="javascript:set({anim:{spin:-1, folder:'open'}, folder:'open'})">spin clockwise</a>,
+          <a href="javascript:set({anim:{spin:1, folder:'open'}, folder:'open'})">spin counterclockwise</a> 
+        * <a href="javascript:update(spin_faster)">faster</a>,
+          <a href="javascript:update(spin_slower)">slower</a>,
+          <a href="javascript:set({anim:{spin:0, folder:'open'}, folder:'open'})">stop</a>
+      </script>
+    </zero-md>
+
+    <script>
+      const spin_faster = p => ({ anim: { spin: Math.sign(p.anim.spin) * Math.min(10, Math.abs(p.anim.spin) * 2) } })
+      const spin_slower = p => ({ anim: { spin: Math.sign(p.anim.spin) * Math.max(0, Math.abs(p.anim.spin) / 2) } })
+
+      const blocks = (expr, n) => ({
+        expr, sync_expr: true, folder: 'open',
+        block: { 'i blocks': n[0], 'k blocks': n[1], 'j blocks': n[2], folder: 'open' },
+        anim: { alg: 'none', fuse: 'none' }
+      })
+      const i_blocks = (expr, n) => blocks(expr, [n, 1, 1])
+      const k_blocks = (expr, n) => blocks(expr, [1, n, 1])
+      const j_blocks = (expr, n) => blocks(expr, [1, 1, n])
+
+      const add_k_child_blocks = n =>
+        p => ({
+          ...(p.left.matmul ? { left: { folder: 'open', block: { 'k blocks': n } } } : {}),
+          ...(p.right.matmul ? { right: { folder: 'open', block: { 'k blocks': n } } } : {})
+        })
+
+      const kids = (la, ra) => ({
+        ...(la ? { left: { folder: la == 'inherit' ? 'closed' : 'open', anim: { folder: 'open', alg: la } } } : {}),
+        ...(ra ? { right: { folder: ra == 'inherit' ? 'closed' : 'open', anim: { folder: 'open', alg: ra } } } : {})
+      })
+
+      const dp = (fuse = 'none', la, ra) => ({ anim: { folder: 'open', alg: 'dotprod (row major)', fuse }, ...kids(la, ra) })
+      const mvp = (fuse = 'none', la, ra) => ({ anim: { folder: 'open', alg: 'mvprod', fuse }, ...kids(la, ra) })
+      const vmp = (fuse = 'none', la, ra) => ({ anim: { folder: 'open', alg: 'vmprod', fuse }, ...kids(la, ra) })
+      const vvp = (fuse = 'none', la, ra) => ({ anim: { folder: 'open', alg: 'vvprod', fuse }, ...kids(la, ra) })
+      const stop = { anim: { folder: 'closed', alg: 'none' } }
+    </script>
+
+    <zero-md src="" id="blocking-submenu">
+      <script type="text/markdown">
+        #  
+        #  <a href="javascript:set(openFolders(['block']))">Blocking</a>
+
+        Both simple and compound expressions can be partitioned into blocks in 3 dimensions. 
+        Partitions are *global*, in the sense that planes of partition cut across subexpressions,
+        representing parallelization of the entire compound expression.
+        Partitions in all dimensions can be freely mixed. 
+        
+        Partitioning in each dimension corresponds to a different parallelization approach, with 
+        distinctive geometric properties. 
+        Animations are parallelized within the currently configured partitions.
+
+        Blocks are equal sized, with a short final block if the number of blocks is not an even divisor. 
+
+
+        ## i blocks
+
+        Partitions the expression into the specified number of blocks along the **i** axis. 
+
+        **i** is the height dimension (rows) of the root matmul and its chain 
+        of left descendants. Partitioning it cuts the expression into horizontal slices within the
+        height bounds of the root matmul: i.e., the root matmul and its left descendants are 
+        partitioned, but not any matmul rooted in a right descendant.
+
+        Examples partitioned into 4 blocks along **i** 
+        (<a href="javascript:set({block:{'i blocks':1}})">back to 1</a>):
+        * <a href="javascript:set(i_blocks('X = A @ B', 4))">X = A @ B</a> (animate: 
+          <a href="javascript:set({...i_blocks('X = A @ B', 4), ...dp()})">dotprod</a>, 
+          <a href="javascript:set({...i_blocks('X = A @ B', 4), ...mvp()})">mvprod</a>, 
+          <a href="javascript:set({...i_blocks('X = A @ B', 4), ...vmp()})">vmprod</a>, 
+          <a href="javascript:set({...i_blocks('X = A @ B', 4), ...vvp()})">vvprod</a> -
+          <a href="javascript:update(faster)">faster</a>, <a href="javascript:update(slower)">slower</a>, <a href="javascript:set(stop)">stop</a>)
+        * <a href="javascript:set(i_blocks('X = A @ B @ C', 4))">X = A @ B @ C</a> (animate: 
+          <a href="javascript:set({...i_blocks('X = A @ B @ C', 4), ...dp()})">dotprod</a>, 
+          <a href="javascript:set({...i_blocks('X = A @ B @ C', 4), ...mvp('none', 'inherit')})">mvprod</a>, 
+          <a href="javascript:set({...i_blocks('X = A @ B @ C', 4), ...vmp('none', 'inherit')})">vmprod</a>, 
+          <a href="javascript:set({...i_blocks('X = A @ B @ C', 4), ...vvp('none', 'inherit')})">vvprod</a>, 
+          <a href="javascript:set({...i_blocks('X = A @ B @ C', 4), ...vmp('sync', 'inherit')})">fused vmprod</a>, 
+          <a href="javascript:set({...i_blocks('X = A @ B @ C', 4), ...vvp('sync', 'mvprod')})">fused left mvprod/parent vvprod</a> -
+          <a href="javascript:update(faster)">faster</a>, <a href="javascript:update(slower)">slower</a>, <a href="javascript:set(stop)">stop</a>)
+        * <a href="javascript:set(i_blocks('X = A @ (B @ C)', 4))">X = A @ (B @ C)</a> (animate: 
+          <a href="javascript:set({...i_blocks('X = A @ (B @ C)', 4), ...dp()})">dotprod</a>, 
+          <a href="javascript:set({...i_blocks('X = A @ (B @ C)', 4), ...mvp('none', undefined, 'inherit')})">mvprod</a>, 
+          <a href="javascript:set({...i_blocks('X = A @ (B @ C)', 4), ...vmp('none', undefined, 'inherit')})">vmprod</a>, 
+          <a href="javascript:set({...i_blocks('X = A @ (B @ C)', 4), ...vvp('none', undefined, 'inherit')})">vvprod</a>, 
+          <a href="javascript:set({...i_blocks('X = A @ (B @ C)', 4), ...mvp('sync', undefined, 'inherit')})">fused mvprod</a>, 
+          <a href="javascript:set({...i_blocks('X = A @ (B @ C)', 4), ...vvp('sync', undefined, 'vmprod')})">fused right vmprod/parent vvprod</a> -
+          <a href="javascript:update(faster)">faster</a>, <a href="javascript:update(slower)">slower</a>, <a href="javascript:set(stop)">stop</a>)
+        * <a href="javascript:set(i_blocks('X = (A @ B) @ (C @ D)', 4))">X = (A @ B) @ (C @ D)</a> (animate: 
+          <a href="javascript:set({...i_blocks('X = (A @ B) @ (C @ D)', 4), ...dp()})">dotprod</a>, 
+          <a href="javascript:set({...i_blocks('X = (A @ B) @ (C @ D)', 4), ...mvp('none', 'inherit', 'inherit')})">mvprod</a>, 
+          <a href="javascript:set({...i_blocks('X = (A @ B) @ (C @ D)', 4), ...vmp('none', 'inherit', 'inherit')})">vmprod</a>, 
+          <a href="javascript:set({...i_blocks('X = (A @ B) @ (C @ D)', 4), ...vvp('none', 'inherit', 'inherit')})">vvprod</a>, 
+          <a href="javascript:set({...i_blocks('X = (A @ B) @ (C @ D)', 4), ...vvp('sync', 'mvprod', 'vmprod')})">fused left mvprod/right vmprod/parent vvprod</a> -
+          <a href="javascript:update(faster)">faster</a>, <a href="javascript:update(slower)">slower</a>, <a href="javascript:set(stop)">stop</a>)
+
+        ## k blocks
+
+        Partitions the expression into the specified number of blocks along the **k** axis. 
+
+        **k** is the matmul's "reduction" dimension, shared by the width of the left argument 
+        and height of the right argument.
+        Although not left- or right-transitive like partitions along **i** or **j** axes (respectively),
+        the geometry of partitioning along **k** is unique in extending to *both* left and right child 
+        matmuls via rotation:
+        * a partition along **k** in a parent becomes a partition along **j** in a left child
+        * a partition along **k** in a parent becomes a partition along **i** in a right child
+
+        Examples partitioned into 4 blocks along **j**
+        (<a href="javascript:set({block:{'k blocks':1}})">back to 1</a>):
+        * <a href="javascript:set(k_blocks('X = A @ B', 4))">X = A @ B</a> (animate: 
+          <a href="javascript:set({...k_blocks('X = A @ B', 4), ...dp()})">dotprod</a>, 
+          <a href="javascript:set({...k_blocks('X = A @ B', 4), ...mvp()})">mvprod</a>, 
+          <a href="javascript:set({...k_blocks('X = A @ B', 4), ...vmp()})">vmprod</a>, 
+          <a href="javascript:set({...k_blocks('X = A @ B', 4), ...vvp()})">vvprod</a> -
+          <a href="javascript:update(faster)">faster</a>, <a href="javascript:update(slower)">slower</a>, <a href="javascript:set(stop)">stop</a>)
+        * <a href="javascript:set(k_blocks('X = A @ B @ C', 4))">X = A @ B @ C</a> (animate: 
+          <a href="javascript:set({...k_blocks('X = A @ B @ C', 4), ...dp()})">dotprod</a>, 
+          <a href="javascript:set({...k_blocks('X = A @ B @ C', 4), ...mvp('none', 'inherit')})">mvprod</a>, 
+          <a href="javascript:set({...k_blocks('X = A @ B @ C', 4), ...vmp('none', 'inherit')})">vmprod</a>, 
+          <a href="javascript:set({...k_blocks('X = A @ B @ C', 4), ...vvp('none', 'inherit')})">vvprod</a>, 
+          <a href="javascript:set({...k_blocks('X = A @ B @ C', 4), ...vmp('sync', 'inherit')})">fused vmprod</a>, 
+          <a href="javascript:set({...k_blocks('X = A @ B @ C', 4), ...vvp('sync', 'mvprod')})">fused left mvprod/parent vvprod</a> -
+          <a href="javascript:update(faster)">faster</a>, <a href="javascript:update(slower)">slower</a>, <a href="javascript:set(stop)">stop</a>)
+        * <a href="javascript:set(k_blocks('X = A @ (B @ C)', 4))">X = A @ (B @ C)</a> (animate: 
+          <a href="javascript:set({...k_blocks('X = A @ (B @ C)', 4), ...dp()})">dotprod</a>, 
+          <a href="javascript:set({...k_blocks('X = A @ (B @ C)', 4), ...mvp('none', undefined, 'inherit')})">mvprod</a>, 
+          <a href="javascript:set({...k_blocks('X = A @ (B @ C)', 4), ...vmp('none', undefined, 'inherit')})">vmprod</a>, 
+          <a href="javascript:set({...k_blocks('X = A @ (B @ C)', 4), ...vvp('none', undefined, 'inherit')})">vvprod</a>, 
+          <a href="javascript:set({...k_blocks('X = A @ (B @ C)', 4), ...mvp('sync', undefined, 'inherit')})">fused mvprod</a>, 
+          <a href="javascript:set({...k_blocks('X = A @ (B @ C)', 4), ...vvp('sync', undefined, 'vmprod')})">fused right vmprod/parent vvprod</a> -
+          <a href="javascript:update(faster)">faster</a>, <a href="javascript:update(slower)">slower</a>, <a href="javascript:set(stop)">stop</a>)
+        * <a href="javascript:set(k_blocks('X = (A @ B) @ (C @ D)', 4))">X = (A @ B) @ (C @ D)</a> (animate: 
+          <a href="javascript:set({...k_blocks('X = (A @ B) @ (C @ D)', 4), ...dp()})">dotprod</a>, 
+          <a href="javascript:set({...k_blocks('X = (A @ B) @ (C @ D)', 4), ...mvp('none', 'inherit', 'inherit')})">mvprod</a>, 
+          <a href="javascript:set({...k_blocks('X = (A @ B) @ (C @ D)', 4), ...vmp('none', 'inherit', 'inherit')})">vmprod</a>, 
+          <a href="javascript:set({...k_blocks('X = (A @ B) @ (C @ D)', 4), ...vvp('none', 'inherit', 'inherit')})">vvprod</a>, 
+          <a href="javascript:set({...k_blocks('X = (A @ B) @ (C @ D)', 4), ...vvp('sync', 'mvprod', 'vmprod')})">fused left mvprod/right vmprod/parent vvprod</a> -
+          <a href="javascript:update(faster)">faster</a>, <a href="javascript:update(slower)">slower</a>, <a href="javascript:set(stop)">stop</a>)
+
+        Child matmuls are free to add subpartitions **only** along their own **k** axes, since
+        a left child's (**i**, **j**) partitions are determined by its parent's (**i**, **k**) partitions, and
+        a right child's (**i**, **j**) partitions are determined by its parent's (**k**, **j**) partitions.
+        
+        Accordingly, child matmuls have only a `k blocks` option in their **blocking** submenu
+        (<a href="javascript:update(add_k_child_blocks(4))">partition children along k in the current visualization</a>, 
+         <a href="javascript:update(add_k_child_blocks(1))">unpartition</a>).
+
+        ## j blocks
+
+        Partitions the expression into the specified number of blocks along the **j** axis. 
+
+        **j** is the width dimension (columns) of the root matmul and its chain 
+        of right descendants. Partitioning it cuts the expression into vertical slices within the
+        width bounds of the root matmul: i.e., the root matmul and its right descendants are 
+        partitioned, but not any matmul rooted in a left descendant.
+        
+        Examples partitioned into 4 blocks along **j**
+        (<a href="javascript:set({block:{'j blocks':1}})">back to 1</a>):
+        * <a href="javascript:set(j_blocks('X = A @ B', 4))">X = A @ B</a> (animate: 
+          <a href="javascript:set({...j_blocks('X = A @ B', 4), ...dp()})">dotprod</a>, 
+          <a href="javascript:set({...j_blocks('X = A @ B', 4), ...mvp()})">mvprod</a>, 
+          <a href="javascript:set({...j_blocks('X = A @ B', 4), ...vmp()})">vmprod</a>, 
+          <a href="javascript:set({...j_blocks('X = A @ B', 4), ...vvp()})">vvprod</a> -
+          <a href="javascript:update(faster)">faster</a>, <a href="javascript:update(slower)">slower</a>, <a href="javascript:set(stop)">stop</a>)
+        * <a href="javascript:set(j_blocks('X = A @ B @ C', 4))">X = A @ B @ C</a> (animate: 
+          <a href="javascript:set({...j_blocks('X = A @ B @ C', 4), ...dp()})">dotprod</a>, 
+          <a href="javascript:set({...j_blocks('X = A @ B @ C', 4), ...mvp('none', 'inherit')})">mvprod</a>, 
+          <a href="javascript:set({...j_blocks('X = A @ B @ C', 4), ...vmp('none', 'inherit')})">vmprod</a>, 
+          <a href="javascript:set({...j_blocks('X = A @ B @ C', 4), ...vvp('none', 'inherit')})">vvprod</a>, 
+          <a href="javascript:set({...j_blocks('X = A @ B @ C', 4), ...vmp('sync', 'inherit')})">fused vmprod</a>, 
+          <a href="javascript:set({...j_blocks('X = A @ B @ C', 4), ...vvp('sync', 'mvprod')})">fused left mvprod/parent vvprod</a> -
+          <a href="javascript:update(faster)">faster</a>, <a href="javascript:update(slower)">slower</a>, <a href="javascript:set(stop)">stop</a>)
+        * <a href="javascript:set(j_blocks('X = A @ (B @ C)', 4))">X = A @ (B @ C)</a> (animate: 
+          <a href="javascript:set({...j_blocks('X = A @ (B @ C)', 4), ...dp()})">dotprod</a>, 
+          <a href="javascript:set({...j_blocks('X = A @ (B @ C)', 4), ...mvp('none', undefined, 'inherit')})">mvprod</a>, 
+          <a href="javascript:set({...j_blocks('X = A @ (B @ C)', 4), ...vmp('none', undefined, 'inherit')})">vmprod</a>, 
+          <a href="javascript:set({...j_blocks('X = A @ (B @ C)', 4), ...vvp('none', undefined, 'inherit')})">vvprod</a>, 
+          <a href="javascript:set({...j_blocks('X = A @ (B @ C)', 4), ...mvp('sync', undefined, 'inherit')})">fused mvprod</a>, 
+          <a href="javascript:set({...j_blocks('X = A @ (B @ C)', 4), ...vvp('sync', undefined, 'vmprod')})">fused right vmprod/parent vvprod</a> -
+          <a href="javascript:update(faster)">faster</a>, <a href="javascript:update(slower)">slower</a>, <a href="javascript:set(stop)">stop</a>)
+        * <a href="javascript:set(j_blocks('X = (A @ B) @ (C @ D)', 4))">X = (A @ B) @ (C @ D)</a> (animate: 
+          <a href="javascript:set({...j_blocks('X = (A @ B) @ (C @ D)', 4), ...dp()})">dotprod</a>, 
+          <a href="javascript:set({...j_blocks('X = (A @ B) @ (C @ D)', 4), ...mvp('none', 'inherit', 'inherit')})">mvprod</a>, 
+          <a href="javascript:set({...j_blocks('X = (A @ B) @ (C @ D)', 4), ...vmp('none', 'inherit', 'inherit')})">vmprod</a>, 
+          <a href="javascript:set({...j_blocks('X = (A @ B) @ (C @ D)', 4), ...vvp('none', 'inherit', 'inherit')})">vvprod</a>, 
+          <a href="javascript:set({...j_blocks('X = (A @ B) @ (C @ D)', 4), ...vvp('sync', 'mvprod', 'vmprod')})">fused left mvprod/right vmprod/parent vvprod</a> -
+          <a href="javascript:update(faster)">faster</a>, <a href="javascript:update(slower)">slower</a>, <a href="javascript:set(stop)">stop</a>)
+
+      </script>
+    </zero-md>
+
+    <script>
+      const gap = x => p => ({ folder: 'open', layout: { folder: 'open', gap: Math.max(1, p.layout.gap + x) } })
+      const scatter = x => p => ({ folder: 'open', layout: { folder: 'open', scatter: Math.max(1, p.layout.scatter + x) } })
+      const molecule = x => p => ({ folder: 'open', layout: { folder: 'open', molecule: Math.max(1, p.layout.molecule + x) } })
+      const binary = {
+        folder: 'open',
+        expr: 'X = A @ B @ (C @ D) @ (E @ F @ (G @ H))',
+        sync_expr: true,
+        layout: { folder: 'open', scatter: 0, molecule: 1, blast: 0 }
+      }
+      const super_binary = {
+        folder: 'open',
+        expr: '(L = (LL = (LLL = LLLL @LLLR) @ (LLR = LLRL @LLRR)) @ (LR = (LRL = LRLL @LRLR) @ (LRR = LRRL @LRRR))) @ (R = (RL = (RLL = RLLL @RLLR) @ (RLR = RLRL @RLRR)) @ (RR = (RRL = RRLL @RRLR) @ (RRR = RRRL @RRRR)))',
+        sync_expr: true,
+        layout: { folder: 'open', scatter: 50, molecule: 7, blast: 0 },
+      }
+      const blast = x => p => ({ folder: 'open', layout: { folder: 'open', blast: Math.max(-1, Math.min(1, p.layout.blast + x)) } })
+
+      const blocks_layout = { folder: 'open', layout: { folder: 'open', scheme: 'blocks' } }
+      const zigzag_layout = { folder: 'open', layout: { folder: 'open', scheme: 'zigzag' } }
+      const wheel_layout = { folder: 'open', layout: { folder: 'open', scheme: 'wheel' } }
+      const custom_layout = { folder: 'open', layout: { folder: 'open', scheme: 'custom' } }
+
+      const lp_left = { folder: 'open', layout: { folder: 'open', 'left placement': 'left' } }
+      const lp_right = { folder: 'open', layout: { folder: 'open', 'left placement': 'right' } }
+      const rp_top = { folder: 'open', layout: { folder: 'open', 'right placement': 'top' } }
+      const rp_bottom = { folder: 'open', layout: { folder: 'open', 'right placement': 'bottom' } }
+      const rp_front = { folder: 'open', layout: { folder: 'open', 'result placement': 'front' } }
+      const rp_back = { folder: 'open', layout: { folder: 'open', 'result placement': 'back' } }
+
+      const scheme_ex = {
+        folder: 'open', expr: 'A @ B @ C @ D', sync_expr: true,
+        left: { left: { left: { h: 16, w: 32 }, right: { h: 32, w: 64 } }, right: { h: 64, w: 64 } },
+        right: { h: 64, w: 32 }
+      }
+
+      const block_ex = {
+        ...scheme_ex,
+        layout: { folder: 'open', scheme: 'blocks', polarity: 'negative', 'left placement': 'left', 'right placement': 'top', 'result placement': 'front' }
+      }
+
+      const zigzag_ex = {
+        ...scheme_ex,
+        layout: { folder: 'open', scheme: 'zigzag', polarity: 'negative', 'left placement': 'left', 'right placement': 'bottom', 'result placement': 'front' }
+      }
+
+      const wheel_ex = {
+        ...scheme_ex,
+        layout: { folder: 'open', scheme: 'wheel', polarity: 'negative', 'left placement': 'left', 'right placement': 'bottom', 'result placement': 'back' }
+      }
+    </script>
+
+    <zero-md src="" id="layout-submenu">
+      <script type="text/markdown">
+        #  
+        # <a href="javascript:set(openFolders(['layout']))">Layout</a>
+
+        The layout submenu controls the arrangement of matmuls and their arguments in 3D space. 
+        Configuration options fall into two categories: **spacing** and **orientation**.
+
+        **Spacing** options influence the distance between elements in various ways. ``
+        The spacing options are **gap**, **scatter**, **molecule** and **blast**.
+
+        For many visualizations the default spacing settings will be fine, but for very deeply 
+        nested expressions - especially those saturated with both left and right subexpressions - 
+        tweaking these paramters can clarify the visualization and lead to new insights.
+
+        **Orientation** options control the placement of matmul arguments and result on the cube. 
+        **Polarity**, **left placement**, **right placement**
+        and **result placement** control the placement of parts of the root matmul, and **scheme**
+        controls how the placements of subexpressions evolve from the placement of their parents.
+        
+        Here again, default settings are usually fine, but switching between different schemes 
+        can sometimes be quite useful in gaining intuition.
+        
+        ### *Spacing options*
+
+        ## gap
+
+        The gap between the constituents of the matmul (left argument, right argument, result) along 
+        their shared edges. Unit distance is roughly the same as a single row or column. 
+        * <a href="javascript:update(gap(1))">increase gap</a>, <a href="javascript:update(gap(-1))">decrease gap</a>
+
+        ## scatter
+
+        Defines a fixed distance between child *matmuls* and their parents. (Simple child matrices are not scattered.)
+        
+        Used in conjunction with **molecule** and **blast** to compute actual distances
+        used in visualizations; see below.
+        * example: using <a href="javascript:set(binary)">X = A @ B @ (C @ D) @ (E @ F @ (G @ H))</a> (or current visualization) 
+        <a href="javascript:update(scatter(10))">increase scatter</a>, <a href="javascript:update(scatter(-10))">decrease scatter</a>
+
+        ## molecule
+
+        A molecule is a child subexpression too large to bind tightly to its parent - i.e., the size at 
+        which **scatter** begins to apply (where a subexpression's size is the number of matmuls it contains).
+        * <a href="javascript:set(super_binary)">example</a> using a combination of 
+          large molecules and scatter to compactly visualize a deep, fully saturated expression
+          without spatial collisions.
+
+        ## blast
+
+        An exponential scaling term applied to **scatter** based on subexpression size (matmul count).
+
+        A blast value of zero leaves scatter constant; a positive value scatters larger subexpressions 
+        farther away from their parents - e.g., a blast of one multiplies scatter by subexpression size.
+        A negative blast value scatters smaller subexpressions farther away from their parents.
+
+        Positive blast can be useful for visualizing deep satarated trees, where it has 
+        an effect analogous to a 2D visualization in which lower levels of the tree
+        cluster together more closely.
+        
+        * example: an <a href="javascript:set({...super_binary, ...{ layout: { folder: 'open', scatter: 10, molecule: 1, blast: 1 }}})">alternate layout</a> 
+          for the **molecule** example above using less scatter, smaller molecules and a positive **blast** value.
+
+        Negative blast doesn't work that well with saturated, arboreal expressions but can be useful 
+        in visualizing mostly or entirely linear expressions using a layout with circular geometry 
+        (for example **wheel**, below). In those cases any nonzero blast value turns circles into 
+        spirals, with positive blast spiraling outward to the root matmul and negative blast spiraling 
+        inward.
+
+        ### *Orientation options*
+
+        Before we get to the options themselves, some context:
+
+        #### Constraints on arrangement
+
+        Arranging a matmul (left argument, right argument, result) 
+        on 3 faces of a cube is subject to the following constraints (note: using "cube" 
+        here to mean "rectangular prism"):
+
+        * adjunction constraints:
+          * left and right arguments must share a common edge, establishing the `k` axis in `i, k, j`
+          * the result matrix must share an edge with the left argument, establishing the `i` axis
+          * the result matrix must share an edge with the right argument, establishing the `j` axis
+        * orientation constraints:
+          * the left argument's rows must run **parallel** to the `k` edge
+          * the right argument's rows must run **perpendicular** to the `k` edge
+          * the result matrix's rows must be coplanar with the rows of the left argument, 
+            making its columns coplanar with the columns of the right argument
+
+        Visually this means we always cover 3 faces of the cube, contiguous around a
+        shared corner, with the row/column orientation of the faces subject to the above 
+        constraints.
+
+        We add an additional constraint here for familiarity: the left argument always 
+        occupies a vertical face of the cube representing the root matmul.
+        As a consequence, the right argument will always occupy a horizontal face, 
+        and the result matrix will also occupy a vertical face.
+
+        These constraints still leave room to maneuver. The space of valid arrangements 
+        can be parameterized by four orthogonal binary 
+        properties:  **polarity** (positive/negative), **left placement** (left/right), 
+        **right placement** (top/bottome) and **result placement** (front/back).
+        Details on each are below.
+
+        #### Subexpressions
+
+        The constraints and parameters described above are enough to visualize a single 
+        matmul, where the left and right arguments are matrices.
+        To visualize compound expressions, where arguments can themselves be matmuls,
+        we first need to adjoin child matmul cubes to their parents, then we need to
+        decide what the parameterization of the child cubes should be.
+
+        We have a natural constraint on how children are adjoined to parents: 
+        the face representing the child argument on the parent cube must also be the *result*
+        face of the child cube. 
+        Modulo this constraint, each child cube is free to choose a valid layout paramaterization.
+        Defining a rule for generating a child parameterization based on that of its parent
+        spares us having to hand-parameterize each matmul in a compound expression -
+        these rules are *schemes*.
+
+        ## scheme
+
+        A *scheme* is a rule for choosing a child's layout based on the layout of its parent. 
+        Dfferent schemes produce distinctively different visualizations when iterated over the 
+        matmuls in a compound expression. 
+
+        Choose a compound matmul from elsewhere in this guide and then click on the links below 
+        to try alternate schemes. Remember that the final visualization depends heavily on
+        choice of initial placements - use links in those options below to try different
+        combinations.
+
+        * **blocks</a>: the default scheme, which unfolds 
+        expressions as alternating convex and concave cubes. These visualizations are generally 
+        easy to interpret and robust to collisions up to quite large and saturated expressions. 
+        All visualizations in this guide default to the **blocks** scheme.
+          * <a href="javascript:set(block_ex)">A @ B @ C @ D</a> using block scheme and default placements
+          (<a href="javascript:set({anim:{alg:'mvprod'}})">animate matrix-vector product</a>, <a href="javascript:set({anim:{alg:'none'}})">stop</a>)
+        * **zigzag**: like the **blocks** scheme, this scheme 
+        uses alternation, but does not use alternating convexity and concavity. This can simplify
+        the flow of some visualizations, at the expense of greater occlusion:
+          * <a href="javascript:set(zigzag_ex)">A @ B @ C @ D</a> using zigzag scheme and right placement at bottom
+          (<a href="javascript:set({anim:{alg:'mvprod'}})">animate matrix-vector product</a>, <a href="javascript:set({anim:{alg:'none'}})">stop</a>)
+        * **wheel**: simply rotates each child 90
+        degrees, which can produce intuitive circular visualizations for simple (sub)expressions 
+        but can be prone to spatial collisions (fixable with spacing). 
+          * <a href="javascript:set(wheel_ex)">A @ B @ C @ D</a> using wheel scheme with right placement at bottom
+          (<a href="javascript:set({anim:{alg:'mvprod'}})">animate matrix-vector product</a>, <a href="javascript:set({anim:{alg:'none'}})">stop</a>)
+        * <a href="javascript:set(custom_layout)">custom</a>: when this choice is selected
+        we apply no generative rule at all, but make layout parameters available
+        in all child submenus.
+
+        *(Note that spatial collisions are unavoidable in the general 
+        case, although schemes vary in their vulnerability to collisions and what expression
+        shapes produce them: in particular, the default **blocks** scheme doesn't normally 
+        produce collisions for expressions unless they are both saturated and more than 
+        3 generations deep. In any case, the spacing options above can be used to resolve 
+        collisions when they occur.)*
+
+        ## polarity
+
+        Controls orientation of left and right arguments relative to the result matrix:
+        arguments have positive polarity when their normals point in the direction of
+        increase for their coplanar counterparts (rows for left, columns for right) 
+        in the result, and negative polarity when the normals point in the 
+        direction of decrease. 
+
+        E.g. When left and right arguments are placed as in the standard cube (left argument
+        on the left, right argument on top), negative polarity corresponds to the argument
+        faces "pointing outward," with their values reading left to right and top to bottom
+        in the usual way from a position outside the cube.
+        
+        This orientation is visually indicated by the corner triangle in the *row guide*, 
+        positioned on the (0, 0) corner of the matrix.
+
+        ## left placement
+
+        Controls whether the left argument is placed on the left or right face of the cube.        
+
+        ## right placement
+
+        Controls whether the right argument is placed on the top or bottom face of the cube.        
+
+        ## result placement
+
+        Controls whether the result matrix is placed on the front or back face of the cube.        
+
+      </script>
+    </zero-md>
+
+    <script>
+      const legends = n => p => ({ folder: 'open', deco: { folder: 'open', legends: Math.max(0, p.deco.legends + n) } })
+      const shape = shape => ({ folder: 'open', deco: { folder: 'open', shape } })
+      const rowguides = n => p => ({ folder: 'open', deco: { folder: 'open', 'row guides': Math.min(1, Math.max(0, p.deco['row guides'] + n)) } })
+      const flowguides = n => p => ({ folder: 'open', deco: { folder: 'open', 'flow guides': Math.min(1, Math.max(0, p.deco['flow guides'] + n)) } })
+      const spotlight = n => p => ({ folder: 'open', deco: { folder: 'open', spotlight: Math.max(0, p.deco.spotlight + n) } })
+      const lens = n => p => ({ folder: 'open', deco: { folder: 'open', 'lens size': Math.min(1, Math.max(0, p.deco['lens size'] + n)) } })
+      const mag = n => p => ({ folder: 'open', deco: { folder: 'open', magnification: Math.max(0, p.deco.magnification + n) } })
+      const interior_spot = b => ({ folder: 'open', deco: { folder: 'open', 'interior spotlight': b } })
+    </script>
+
+    <zero-md src="" id="deco-submenu">
+      <script type="text/markdown">
+        #  
+        # <a href="javascript:set(openFolders(['deco']))">Deco</a>
+
+        ## legends
+
+        Controls the size of name/shape legends. (Also scaled by text and matrix size.) 0 removes them. 
+        * <a href="javascript:update(legends(1))">make legends bigger</a>, <a href="javascript:update(legends(-1))">smaller</a>
+
+        ## shape
+
+        When checked, shape legends are shown along the edges of input matrices. When unchecked, only name legends are shown. 
+        (When legends size is 0, neither are shown.)
+        * <a href="javascript:set(shape(true))">turn shapes on</a>, <a href="javascript:set(shape(false))">off</a>
+
+        ## row guides
+
+        Controls the brightness of row guides superimposed over matrix values. 1 is maximum; 0 removes. 
+        * <a href="javascript:update(rowguides(0.1))">make row guides brighter</a>, <a href="javascript:update(rowguides(-0.1))">dimmer</a>
+
+        ## flow guides
+
+        Controls the brightness and size of flow guide arrows. 1 is maximum; 0 removes.
+        * <a href="javascript:update(flowguides(0.1))">make flow guides bigger and brighter</a>, <a href="javascript:update(flowguides(-0.1))">smaller and dimmer</a>
+
+        ## spotlight
+
+        Controls the size of the spotlight region in which matrix values are shown during **magnification** (see below).
+        * <a href="javascript:update(spotlight(1))">increase spotlight size</a>, <a href="javascript:update(spotlight(-1))">decrease it</a>
+
+        ## lens size
+
+        Controls the size of the **magnification** region (see below).
+        * <a href="javascript:update(lens(0.1))">increase lens size</a>, <a href="javascript:update(lens(-0.1))">decrease it</a>
+
+        ## magnification
+
+        Controls the magnification factor used when control-click, long click or long tap is used to display matrix values.
+        * <a href="javascript:update(mag(1))">increase magnification</a>, <a href="javascript:update(mag(-1))">decrease it</a>
+
+        ## interior spotlight
+
+        When checked, values are shown on the intermediate results in cube interiors during magnification.
+        * <a href="javascript:set(interior_spot(true))">turn interior spotlight on</a>, <a href="javascript:set(interior_spot(false))">off</a>
+
+      </script>
+    </zero-md>
+
+    <script>
+      const sens = sensitivity => ({ folder: 'open', viz: { folder: 'open', sensitivity } })
+      const minsize = n => p => ({ folder: 'open', viz: { folder: 'open', 'min size': Math.min(1, Math.max(0, p.viz['min size'] + n)) } })
+      const minlight = n => p => ({ folder: 'open', viz: { folder: 'open', 'min light': Math.min(1, Math.max(0, p.viz['min light'] + n)) } })
+      const maxlight = n => p => ({ folder: 'open', viz: { folder: 'open', 'max light': Math.min(1, Math.max(0, p.viz['max light'] + n)) } })
+      const elemscale = n => p => ({ folder: 'open', viz: { folder: 'open', 'elem scale': Math.min(2, Math.max(1, p.viz['elem scale'] + n)) } })
+      const zerohue = n => p => ({ folder: 'open', viz: { folder: 'open', 'zero hue': Math.min(1, Math.max(0, p.viz['zero hue'] + n)) } })
+      const huegap = n => p => ({ folder: 'open', viz: { folder: 'open', 'hue gap': Math.min(1, Math.max(0, p.viz['hue gap'] + n)) } })
+      const huespread = n => p => ({ folder: 'open', viz: { folder: 'open', 'hue spread': Math.min(1, Math.max(0, p.viz['hue spread'] + n)) } })
+    </script>
+
+    <zero-md src="" id="cs-submenu">
+      <script type="text/markdown">
+        #  
+        # <a href="javascript:set(openFolders(['viz']))">Colors and Sizes</a>
+
+        ## sensitivity
+
+        The size, brightness and color of a visualized matrix element depends on where its absolute value falls within a certain range.
+        Sensitivity controls how the range used for each value is constructed.
+
+        <a href="javascript:set(sens('global'))">global</a> sensitivity uses a single range for all values, from zero to
+        the global maximum absolute value present in the visualization. This produces a visualization in which value sizes,
+        brightnesses and colors are visually consistent, but small values can be faint in visualizations of data with 
+        high variance.
+
+        <a href="javascript:set(sens('local'))">local</a> sensitivity uses a separate comparison range for each matrix,
+        from zero to the maximum value present in that matrix. 
+        This increases the amount of visual information conveyed by visualizations with high variance, at the cost of global 
+        consistency.
+
+        <a href="javascript:set(sens('superlocal'))">superlocal</a> goes one step further and instead of zero uses the 
+        minimum absolute value in the local matrix as its minimum. This can enhance visualizations of matrices whose values all lie within
+        a narrow band, far from zero.
+
+        <a href="javascript:set(sens('semilocal'))">semilocal</a> uses a range from zero to the geomean of global and local
+        absolute maximum values.
+
+        ## min size
+
+        The minimmum rendered size. (Values exactly equal to zero are not rendered.)
+        * <a href="javascript:update(minsize(0.1))">increase minimum size</a>, <a href="javascript:update(minsize(-0.1))">decrease minimum size</a>
+
+        ## min light
+
+        Minimum rendered brightness.
+        * <a href="javascript:update(minlight(0.1))">increase minimum light</a>, <a href="javascript:update(minlight(-0.1))">decrease minimum light</a>
+
+        ## max light
+
+        Maximum rendered brightness. 
+        (Note that values are rendered using the HSL color model, where hue converges to white as lightness approaches the maximum value of 1.)
+        * <a href="javascript:update(maxlight(0.1))">increase maximum light</a>, <a href="javascript:update(maxlight(-0.1))">decrease maximum light</a>
+
+        ## elem scale
+
+        Constant scaling factor applied to all elements.
+        * <a href="javascript:update(elemscale(0.1))">increase element scale</a>, <a href="javascript:update(elemscale(-0.1))">decrease element scale</a>
+
+        ## zero hue
+
+        Hue for zero values. Positive values have a higher hue value, negatives lower. (Note that hue values wrap around in the HSL model.)
+        * <a href="javascript:update(zerohue(0.05))">increase zero hue</a>, <a href="javascript:update(zerohue(-0.05))">decrease zero hue</a>
+
+        ## hue gap
+
+        Distance from zero hue at which value hues begin. A larger hue gap increases the color difference between positive and negative
+        values.
+        * <a href="javascript:update(huegap(0.05))">increase hue gap</a>, <a href="javascript:update(huegap(-0.05))">decrease hue gap</a>
+
+        ## hue spread
+
+        Rate at which hue changes based on value magnitude. 
+        * a hue spread of zero produces visualizations in which the same hue is used
+        for all positive and negative values respectively
+        * a small spread introduces small changes in hue based on magnitude, but keeps
+        positive and negative values distinguishable from each other 
+        * a large hue spread causes hue to change entirely as a function of
+        magnitude, and at the extreme (a spread value of 1) both positive and negative magnitude changes traverse the entire spectrum,
+        albeit from different directions        
+        * <a href="javascript:update(huespread(0.02))">increase hue spread</a>, <a href="javascript:update(huespread(-0.02))">decrease hue spread</a>
+
+      </script>
+    </zero-md>
+
+    <zero-md src="" id="diag-submenu">
+      <script type="text/markdown">
+        #  
+        # <a href="javascript:set(openFolders(['diag']))">Diag</a>
+    
+        ## json
+    
+        The parameters configuration object in JSON format.
+
+        ## url
+    
+        The URL containing the current configuration. This may be in compressed or uncompressed
+        form based on the `compressed` parameter property: uncompressed form is stringified JSON;
+        compressed is an internal representation.
+
+        ## compressed
+
+        URL in unconditionally compressed form.
+    
+        ## geometries
+
+        three.js diagnostic: number of geometries currently in use.
+      </script>
+    </zero-md>
+
+  </div>
+
+  <script>
+    // drag resize
+    let dragging = false
+
+    sep.addEventListener('pointerdown', e => {
+      dragging = true
+    })
+
+    document.addEventListener('pointerup', e => {
+      dragging = false
+    })
+
+    document.addEventListener('pointermove', e => {
+      const dir = getComputedStyle(document.querySelector('body')).flexDirection;
+      if (dragging) {
+        if (dir == 'row') {
+          const [uw, lw] = [upper.offsetWidth, lower.offsetWidth]
+          const w = uw + lw
+          const dx = e.clientX - sep.offsetLeft
+          upper.style.width = `${100 * (uw + dx) / w}` + '%'
+          lower.style.width = `${100 * (lw - dx) / w}` + '%'
+          upper.style.height = '100%'
+          lower.style.height = '100%'
+        } else { // column
+          const [uh, lh] = [upper.offsetHeight, lower.offsetHeight]
+          const h = uh + lh
+          const dy = e.clientY - sep.offsetTop
+          upper.style.height = `${100 * (uh + dy) / h}` + '%'
+          lower.style.height = `${100 * (lh - dy) / h}` + '%'
+          upper.style.width = '100%'
+          lower.style.width = '100%'
+        }
+        e.preventDefault()
+      }
+    })
+
+    // portrait/landscape
+
+    const isLandscape = () => window.matchMedia("(orientation: landscape)").matches
+
+    function arrange() {
+      // viz needs to be in upper pane vert or *right* pane horiz
+      if (upper.className == 'viz' && isLandscape()) {
+        upper.style.height = upper.style.width = lower.style.height = lower.style.width = ''
+        const temp_html = upper.innerHTML
+        upper.innerHTML = lower.innerHTML
+        upper.className = 'doc'
+        lower.innerHTML = temp_html
+        lower.className = 'viz'
+      } else if (upper.className == 'doc' && !isLandscape()) {
+        upper.style.height = upper.style.width = lower.style.height = lower.style.width = ''
+        const temp_html = upper.innerHTML
+        upper.innerHTML = lower.innerHTML
+        upper.className = 'viz'
+        lower.innerHTML = temp_html
+        lower.className = 'doc'
+      }
+    }
+
+    window.addEventListener('resize', arrange)
+    arrange()
+
+  </script>
+
+</body>
+
+</html>
