@@ -228,12 +228,14 @@ export function initGui(params, callbacks, info) {
     addChoiceParam(g, 'epilog', viz.EPILOGS, initObj, path, path)
 
     // left/right
-    const title = name => (is_root ? '' : `${g._title} / `) + name
-    const gui_left = addFolder(g, title('left'), p.left)
+    // const title = name => (is_root ? '' : `${g._title} / `) + name
+    // const gui_left = addFolder(g, title('left'), p.left)
+    const gui_left = addFolder(g, 'left', p.left)
     const add_left = p.left.matmul ? addMatmulParams : addMatParams
     add_left(gui_left, x => path(x).left, [path].concat(ancestors))
 
-    const gui_right = addFolder(g, title('right'), p.right)
+    // const gui_right = addFolder(g, title('right'), p.right)
+    const gui_right = addFolder(g, 'right', p.right)
     const add_right = p.right.matmul ? addMatmulParams : addMatParams
     add_right(gui_right, x => path(x).right, [path].concat(ancestors))
 
