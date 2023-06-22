@@ -228,13 +228,10 @@ export function initGui(params, callbacks, info) {
     addChoiceParam(g, 'epilog', viz.EPILOGS, initObj, path, path)
 
     // left/right
-    // const title = name => (is_root ? '' : `${g._title} / `) + name
-    // const gui_left = addFolder(g, title('left'), p.left)
     const gui_left = addFolder(g, 'left', p.left)
     const add_left = p.left.matmul ? addMatmulParams : addMatParams
     add_left(gui_left, x => path(x).left, [path].concat(ancestors))
 
-    // const gui_right = addFolder(g, title('right'), p.right)
     const gui_right = addFolder(g, 'right', p.right)
     const add_right = p.right.matmul ? addMatmulParams : addMatParams
     add_right(gui_right, x => path(x).right, [path].concat(ancestors))
@@ -257,17 +254,21 @@ export function initGui(params, callbacks, info) {
     // blocking
     p.block ||= viz.defaultBlock() // temp BC
     const gui_block = addFolder(g, 'blocking', p.block)
-    if (is_root) {
-      addIntParam(gui_block, 'i blocks', 1, 16, initObj, p => p.block)
-      addIntParam(gui_block, 'k blocks', 1, 16, initObj, p => p.block)
-      addIntParam(gui_block, 'j blocks', 1, 16, initObj, p => p.block)
-    } else {
-      if (p.block['j blocks']) { // temp BC
-        p.block['k blocks'] = p.block['j blocks']
-        delete p.block['j blocks']
-      }
-      addIntParam(gui_block, 'k blocks', 1, 32, initObj, p => path(p).block, path)
-    }
+
+    p.block['i blocks'] ||= 1 // temp BC
+    addIntParam(gui_block, 'i blocks', 1, 16, x => {
+      viz.fixBlocks(p, ancestors, params)
+      initObj()
+    }, p => path(p).block, path).listen()
+
+    p.block['k blocks'] ||= 1 // temp BC
+    addIntParam(gui_block, 'k blocks', 1, 16, initObj, p => path(p).block, path).listen()
+
+    p.block['j blocks'] ||= 1 // temp BC
+    addIntParam(gui_block, 'j blocks', 1, 16, x => {
+      viz.fixBlocks(p, ancestors, params)
+      initObj()
+    }, p => path(p).block, path).listen()
 
     // layout
     const gui_layout = addFolder(g, 'layout', p.layout)

@@ -1860,7 +1860,9 @@ export const defaultAnim = () => ({
 })
 
 export const defaultBlock = () => ({
+  'i blocks': 1,
   'k blocks': 1,
+  'j blocks': 1,
 })
 
 export const defaultLayout = () => ({
@@ -1870,7 +1872,59 @@ export const defaultLayout = () => ({
   'result placement': 'front',
 })
 
-// adjust surroundings to match a param node h/w
+// adjust tree to match a param node's i/k/j blocks
+export function fixBlocks(p, anc, root) {
+  const getInfo = (p, anc, root) => {
+    const is_root = anc.length == 0
+    const pp = !is_root && anc[0](root)
+    const panc = !is_root && anc.slice(1)
+    const is_left = pp && p == pp.left
+    const is_right = pp && p == pp.right
+    return { is_left, is_right, pp, panc }
+  }
+
+  // from a given p, set i all the way down
+  const setib = (i, p) => {
+    p.block['i blocks'] = i
+    p.left.block && setib(i, p.left)
+  }
+
+  // from a given p, set j all the way down
+  const setjb = (j, p) => {
+    p.block['j blocks'] = j
+    p.right.block && setjb(j, p.right)
+  }
+
+  // from a given p, set k all the way down
+  const setkb = (k, p) => {
+    p.block['k blocks'] = k
+    p.left.block && setjb(k, p.left)
+    p.right.block && setib(k, p.right)
+  }
+
+  // return p and setter for where your i starts
+  const iroot = (p, anc, root) => {
+    const { is_left, is_right, pp, panc } = getInfo(p, anc, root)
+    return is_left ? iroot(pp, panc, root) : is_right ? { p: pp, f: setkb } : { p, f: setib }
+  }
+
+  // return p and setter for where your j starts
+  const jroot = (p, anc, root) => {
+    const { is_left, is_right, pp, panc } = getInfo(p, anc, root)
+    return is_right ? jroot(pp, panc, root) : is_left ? { p: pp, f: setkb } : { p, f: setjb }
+  }
+
+  const ir = iroot(p, anc, root)
+  ir.f(p.block['i blocks'], ir.p)
+
+  const jr = jroot(p, anc, root)
+  jr.f(p.block['j blocks'], jr.p)
+
+  // k always starts here
+  setkb(p.block['k blocks'], p)
+}
+
+// adjust surroundings to match a param node's h/w
 export function fixShape(h, w, p, anc, root) {
   const height = p => p.left ? height(p.left) : p.h
   const width = p => p.right ? width(p.right) : p.w
