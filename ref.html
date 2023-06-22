@@ -838,6 +838,13 @@
         Both simple and compound expressions can be partitioned into blocks in 3 dimensions. 
         Partitions are *global*, in the sense that planes of partition cut across subexpressions,
         representing parallelization of the entire compound expression.
+
+        The rules of partition propagation are straightforward (but note the subtlety around `k`):
+        * a partition along the `i` axis extends along contiguous chains of left arguments
+        * a partition along the `j` axis extends along contiguous chains of right arguments
+        * a partition along the `k` axis becomes a partition along the `j` axis for its left child,
+          and a partition along the `i` axis for its right child (at which point it is subject to the `i`/`j` rules above)
+
         Partitions in all dimensions can be freely mixed. 
         
         Partitioning in each dimension corresponds to a different parallelization approach, with 
@@ -931,14 +938,6 @@
           <a href="javascript:set({...k_blocks('X = (A @ B) @ (C @ D)', 4), ...vvp('none', 'inherit', 'inherit')})">vvprod</a>, 
           <a href="javascript:set({...k_blocks('X = (A @ B) @ (C @ D)', 4), ...vvp('sync', 'mvprod', 'vmprod')})">fused left mvprod/right vmprod/parent vvprod</a> -
           <a href="javascript:update(faster)">faster</a>, <a href="javascript:update(slower)">slower</a>, <a href="javascript:set(stop)">stop</a>)
-
-        Child matmuls are free to add subpartitions **only** along their own **k** axes, since
-        a left child's (**i**, **j**) partitions are determined by its parent's (**i**, **k**) partitions, and
-        a right child's (**i**, **j**) partitions are determined by its parent's (**k**, **j**) partitions.
-        
-        Accordingly, child matmuls have only a `k blocks` option in their **blocking** submenu
-        (<a href="javascript:update(add_k_child_blocks(4))">partition children along k in the current visualization</a>, 
-         <a href="javascript:update(add_k_child_blocks(1))">unpartition</a>).
 
         ## j blocks
 
