@@ -10,7 +10,8 @@
       margin: 0;
       background-color: #000;
       color: #fff;
-      font-family: Monospace;
+      /* font-family: Monospace; */
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
       font-size: 13px;
       line-height: 24px;
       overscroll-behavior: none;
@@ -40,6 +41,8 @@
       z-index: 1;
     }
 
+    /* menu */
+
     .lil-gui {
       --folder-indent: 12px;
       --title-background-color: #555;
@@ -65,12 +68,149 @@
       margin-left: var(--folder-indent);
       border-left: none;
     }
+
+    /* instructions */
+
+    .instructions-modal {
+      display: none;
+      position: fixed;
+      z-index: 1;
+      left: 0;
+      top: 0;
+      padding: 10px;
+      background-color: rgb(0, 0, 0);
+      background-color: rgba(0, 0, 0, 0.3);
+    }
+
+    .instructions-content,
+    .minimized-content {
+      position: relative;
+      background-color: rgba(0, 0, 0, 0.3);
+      border: 1px solid #333;
+      box-sizing: border-box;
+      color: #ccc;
+    }
+
+    .instructions-content {
+      padding: 16px;
+      padding-top: 30px;
+      padding-bottom: 20px;
+      padding-right: 40px;
+    }
+
+    .minimized-content {
+      padding-left: 30px;
+      padding-bottom: 20px;
+      padding: 2px;
+      width: 36px;
+      height: 40px;
+    }
+
+    .control-btn {
+      position: absolute;
+      font-family: Monospaced;
+      color: #fff;
+      top: 4px;
+      right: 10px;
+      font-size: 24px;
+    }
+
+    .control-btn:hover,
+    .control-btn:focus {
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .leftcol {
+      color: #fff;
+    }
+
+    table,
+    th,
+    td {
+      border: 1px solid black;
+      padding: 6px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #f2f2f2;
+    }
+
+    #mobile-instructions {
+      display: none;
+    }
+
+    @media screen and (max-width: 600px) {
+      #laptop-instructions {
+        display: none;
+      }
+
+      #mobile-instructions {
+        display: block;
+      }
+    }
   </style>
 </head>
 
 <body>
   <div id="info">loading</div>
   <div id="container"></div>
+  <div id="instructions" class="instructions-modal">
+    <div id="minimized" class="minimized-content">
+      <span id="maximize" class="control-btn">&gt;</span>
+    </div>
+    <div id="instructions-content" class="instructions-content">
+      <span id="minimize" class="control-btn">&lt;</span>
+      <div id="laptop-instructions">
+        <table>
+          <tr>
+            <td class="leftcol">Zoom</td>
+            <td>Two finger swipe</td>
+          </tr>
+          <tr>
+            <td class="leftcol">Spin</td>
+            <td>Click + drag</td>
+          </tr>
+          <tr>
+            <td class="leftcol">Pan</td>
+            <td>Cmd-click + drag</td>
+          </tr>
+          <tr>
+            <td class="leftcol">Reveal</td>
+            <td>Long click + drag</td>
+          </tr>
+        </table>
+      </div>
+      <div id="mobile-instructions">
+        <table>
+          <tr>
+            <td class="leftcol">Zoom</td>
+            <td>Pinch</td>
+          </tr>
+          <tr>
+            <td class="leftcol">Spin</td>
+            <td>Tap and drag</td>
+          </tr>
+          <tr>
+            <td class="leftcol">Pan</td>
+            <td>Two-finger drag</td>
+          </tr>
+          <tr>
+            <td class="leftcol">Reveal</td>
+            <td>Long tap + drag</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-------------------------- code -------------------------->
 
   <!-- Import maps polyfill -->
   <!-- Remove this when import maps will be widely supported -->
@@ -624,6 +764,41 @@
 
       requestAnimationFrame(animate)
     }
+
+    // instructions hover
+
+    window.onload = () => {
+      const instr = document.getElementById('instructions')
+      const instr_content = document.getElementById('instructions-content')
+      const min_content = document.getElementById('minimized')
+      const min_button = document.getElementById('minimize')
+      const max_button = document.getElementById('maximize')
+
+      const show = () => {
+        instr_content.style.display = "block"
+        min_content.style.display = "none"
+        min_button.style.display = "block"
+        max_button.style.display = "none"
+      }
+
+      const hide = () => {
+        instr_content.style.display = "none"
+        min_content.style.display = "block"
+        min_button.style.display = "none"
+        max_button.style.display = "block"
+      }
+
+      min_button.onclick = hide
+      instr_content.onclick = hide
+      max_button.onclick = show
+
+      instr.style.display = "block"
+      show()
+    }
+
+    //
+    // run
+    //
 
     initFromSearchParams()
     animate()
