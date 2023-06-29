@@ -7,7 +7,7 @@ Matmul visualizations in 3D
 [Reference](https://bhosmer.github.io/mm/ref.html)
 
 Notes
-* [Visualization from matmuls to attention and beyond](https://bhosmer.github.io/mm/intro/)
+* [Inside the Matrix: Visualizing matrix multiplications, Transformer Attention and Beyond](https://bhosmer.github.io/mm/intro/)
 
 Examples
 * [GPT2 attention head explorer](https://bhosmer.github.io/mm/examples/attngpt2)
