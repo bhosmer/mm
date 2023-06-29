@@ -28,7 +28,8 @@
     #info {
       position: absolute;
       top: 0px;
-      width: 100%;
+      left: 25vw;
+      right: 25vw;
       padding: 10px;
       box-sizing: border-box;
       text-align: center;
@@ -270,7 +271,7 @@
         'row guides': 0.6,
         'flow guides': 0.5,
         'lens size': 0.5,
-        'magnification': 10,
+        'magnification': 7,
         'interior spotlight': false,
         axes: false,
       },
@@ -306,25 +307,30 @@
       document.getElementById('info').innerHTML = viz.genExpr(params)
     }
 
-    const url_info = { json: '', url: '', compressed: '' }
+    const url_info = { json: '', url: '', compressed: '', search_params: '' }
 
-    function saveURLInfo() {
+    function saveUrlInfo() {
       url_info.json = JSON.stringify(params)
       const prefix = window.location.origin + window.location.pathname
-      let params_sp = util.makeSearchParams(params)
+      let search_params = util.makeSearchParams(params)
       // not the cleanest place to do it, but - turn compression on when params get big
-      if (!params.compress && params_sp.toString().length > 2048) {
+      if (!params.compress && search_params.toString().length > 2048) {
         params.compress = true
-        params_sp = util.makeSearchParams(params)
+        search_params = util.makeSearchParams(params)
       }
       // url is whatever we're putting in history, compressed is always compressed
-      url_info.url = prefix + '?' + params_sp
+      url_info.url = prefix + '?' + search_params
       url_info.compressed = prefix + '?' + util.makeSearchParams({ ...params, compress: true })
+      url_info.search_params = '' + search_params
     }
 
     function saveUrl() {
-      saveURLInfo()
+      saveUrlInfo()
       window.history.pushState({}, '', url_info.url)
+      // send to parent if we're in an iframe
+      if (window.parent != window) {
+        window.parent.postMessage({ search_params: url_info.search_params }, parent.origin)
+      }
     }
 
     // obj
@@ -353,6 +359,7 @@
         const ratio = (newmag / oldmag) ** .95
         camera.position.set(camera.position.x * ratio, camera.position.y * ratio, camera.position.z * ratio)
         orbit.update()
+        requestCameraPositionSave()
       }
 
       obj.setLegends()
@@ -490,7 +497,7 @@
     //
 
     function initFromParams() {
-      saveURLInfo()
+      saveUrlInfo()
       camera.position.set(params.cam.x, params.cam.y, params.cam.z)
       params.cam.target && util.updateProps(orbit.target, params.cam.target)
       orbit.update()
@@ -630,14 +637,14 @@
     const RESPONDERS = {
       getUrlInfo: () => {
         // console.log(`HEY getUrlInfo called`)
-        event.source.postMessage(url_info, event.origin)
+        event.source.postMessage({ url_info }, event.origin)
       },
       getParams: () => {
         // console.log(`HEY getParams called`)
-        event.source.postMessage(params, event.origin)
+        event.source.postMessage({ params }, event.origin)
       },
       setParams: ({ props = {}, reset = false }) => {
-        // console.log(`HEY setParams called props ${JSON.stringify(props)} reset ${reset}`)
+        console.log(`HEY setParams called props ${JSON.stringify(props)} reset ${reset}`)
         reset && Object.entries(util.copyTree(default_params)).forEach(([k, v]) => params[k] = v)
 
         if (props.sync_expr) {

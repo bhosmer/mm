@@ -142,26 +142,52 @@
 <!-- <script type="module" src="https://cdn.jsdelivr.net/gh/zerodevx/zero-md@2/dist/zero-md.min.js"></script> -->
 
 <script>
-  function withResponse(msg, f) {
-    const handler = event => {
-      f(event.data)
+  "use strict"
+
+  const getDoc = () => document.querySelector('.doc')
+
+  let mmconfig
+
+  function setSearchParams() {
+    const prefix = window.location.origin + window.location.pathname
+    const params = {
+      ...(mmconfig ? { mm: mmconfig } : {}),
+      doc: JSON.stringify({ scroll: getDoc().scrollTop })
+    }
+    const search_params = new URLSearchParams(params)
+    window.history.pushState(params, '', prefix + '?' + search_params)
+  }
+
+  const RESPONDERS = {
+    search_params: search_params => {
+      mmconfig = search_params
+      setSearchParams()
+    }
+  }
+
+  window.addEventListener('message', event => {
+    Object.entries(event.data).forEach(([k, v]) => RESPONDERS[k](v))
+  })
+
+  function withResponse(msg, resp, f) {
+    const cleanup = () => {
+      delete RESPONDERS[resp]
+    }
+    const timeout = setTimeout(cleanup, 1000)
+    RESPONDERS[resp] = resp => {
+      f(resp)
       clearTimeout(timeout)
       cleanup()
     }
-    const cleanup = () => {
-      window.removeEventListener('message', handler)
-    }
-    const timeout = setTimeout(cleanup, 1000)
-    window.addEventListener('message', handler)
     mm.contentWindow.postMessage(msg)
   }
 
   function popout() {
-    withResponse({ getUrlInfo: undefined }, info => window.open(info.url, '_blank'))
+    withResponse({ getUrlInfo: undefined }, 'url_info', info => window.open(info.url, '_blank'))
   }
 
   function update(f, clear = false, focus = true) {
-    withResponse({ getParams: undefined }, params => set(f(params), clear))
+    withResponse({ getParams: undefined }, 'params', params => set(f(params), clear))
   }
 
   function set(props = {}, reset = false, focus = true) {
@@ -313,6 +339,10 @@
   const guides_only = { deco: { shape: false, legends: 0, 'row guides': 0.5, 'flow guides': 0.5 } }
   const undeco = { deco: { shape: false, legends: 0, 'row guides': 0, 'flow guides': 0 } }
   const default_deco = { deco: { shape: true, legends: 6, 'row guides': 0.5, 'flow guides': 0.5 } }
+
+  const reset = () => {
+    window.location.href = window.location.origin + window.location.pathname
+  }
 </script>
 
 <body>
@@ -329,7 +359,9 @@
       <script type="text/markdown">
         # mm - 3D matmul visualizer
 
-        Example pane is interactive. Open the current visualization in its own page at any time with the 
+        Example pane is interactive and session state is saved in URL (<a href="javascript:reset();">reset</a>)
+        
+        Open the current visualization in its own window at any time with the 
         <a href="javascript:popout();" style="font-style: italic;">open&#x2197;</a> caption link.
 
         ## Interaction
@@ -346,7 +378,9 @@
         * JSON for the corresponding `parameters` configuration object also available in **diag**
         
         ## Undo
-        * Nontrivial changes are recorded in browser history, so back/forward is usable for undo/redo
+        * **The tool** (use <a href="javascript:popout();" style="font-style: italic;">open&#x2197;</a> link)
+          records all changes in browser history, back/forward is usable for full undo/redo         
+        * **This reference** saves session state in the URL but undo capability is limited
     
         ## Start state
     
@@ -1436,6 +1470,12 @@
 
     const isLandscape = () => window.matchMedia("(orientation: landscape)").matches
 
+    function setDocScrollListener() {
+      getDoc().addEventListener('scrollend', () => {
+        setSearchParams()
+      })
+    }
+
     function arrange() {
       // viz needs to be in upper pane vert or *right* pane horiz
       if (upper.className == 'viz' && isLandscape()) {
@@ -1456,8 +1496,27 @@
     }
 
     window.addEventListener('resize', arrange)
-    arrange()
 
+    {
+      const searchParams = new URL(window.location).searchParams
+      mmconfig = searchParams.get('mm')
+      mmconfig && (mm.src = 'index.html?' + mmconfig)
+      const docstr = searchParams.get('doc')
+      console.log(`HEY docstr ${docstr}`)
+      if (docstr) {
+        const doc = JSON.parse(docstr)
+        const scroll = doc.scroll
+        console.log(`HEY scroll ${scroll}`)
+        if (scroll > 0) {
+          window.onload = () => {
+            getDoc().scrollTop = scroll
+          }
+        }
+      }
+    }
+
+    arrange()
+    setDocScrollListener()
   </script>
 
 </body>
