@@ -313,25 +313,30 @@
       },
     }
 
-    function withResponse(msg, f) {
-      const handler = event => {
-        f(event.data)
+    const RESPONDERS = {}
+
+    window.addEventListener('message', event => {
+      Object.entries(event.data).forEach(([k, v]) => RESPONDERS[k](v))
+    })
+
+    function withResponse(msg, resp, f) {
+      const cleanup = () => {
+        delete RESPONDERS[resp]
+      }
+      const timeout = setTimeout(cleanup, 1000)
+      RESPONDERS[resp] = resp => {
+        f(resp)
         clearTimeout(timeout)
         cleanup()
       }
-      const cleanup = () => {
-        window.removeEventListener('message', handler)
-      }
-      const timeout = setTimeout(cleanup, 1000)
-      window.addEventListener('message', handler)
       mm.contentWindow.postMessage(msg)
     }
 
     function popout() {
-      withResponse({ getUrlInfo: undefined }, info => window.open(info.url, '_blank'))
+      withResponse({ getUrlInfo: undefined }, 'url_info', info => window.open(info.url, '_blank'))
     }
 
-    function set(props = {}, reset = false, focus = true) {
+    function set(props) {
       mm.contentWindow.postMessage({ setParams: { props, reset: false } })
     }
 
