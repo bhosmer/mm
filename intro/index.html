@@ -41,17 +41,20 @@
       <script type="text/markdown">
 # Inside the Matrix: Visualizing matrix multiplications, Transformer Attention and Beyond
 
+Matrix multiplications (matmuls) are the building blocks of today's ML models. 
 This note presents [mm](https://bhosmer.github.io/mm/ref.html), a visualization tool for compositions of matmuls. 
 
-It uses a novel three-dimensional approach that conveys meaning more clearly and intuitively than the usual squares-on-paper idioms, especially (though not only) for visual/spatial thinkers. 
+mm uses a novel three-dimensional approach that conveys meaning more clearly and intuitively than the usual squares-on-paper idioms, especially (though not only) for visual/spatial thinkers. 
 
-And because 3D gives us enough space to *compose* matmuls in geometrically rigorous ways, we can visualize **big, compound expressions** - up to and including things like attention heads - as single composite objects, correct in their geometric relationships down to individual values.
+And because 3D gives us enough space to *compose* matmuls in geometrically rigorous ways, we can visualize 
+**big, compound expressions** - up to and including things like attention heads or even entire model layers - 
+as single composite objects, correct in their geometric relationships down to individual values.
 
 mm is fully interactive, runs [in the browser](https://bhosmer.github.io/mm/) or [notebook iframes](https://colab.research.google.com/drive/1wZIoU20eRWKtRNCW7e5Iugm3MhfaE1f7) and keeps its complete state in the URL, so links are shareable sessions (the screenshots and videos in this note all have links that open the visualizations in the tool). This [reference guide](https://bhosmer.github.io/mm/ref.html) describes all of the available functionality.
 
 We'll first introduce the visualization approach, build intuition by visualizing some simple matmuls and expressions, then dive into some more extended examples:
 
-1. [**Pitch**](#pitch) - motivating the approach
+1. [**Pitch**](#pitch) - why is this way of visualizing better?
 2. [**Warmup - animations**](#animations) - watching the canonical matmul decompositions in action
 3. [**Warmup - expressions**](#expressions) - a quick tour of some fundamental expression building blocks
 4. [**Inside an attention head**](#attnhead) - an in-depth look at the structure, values and computation behavior of a couple of attention heads from GPT2 via[ NanoGPT](https://github.com/karpathy/nanoGPT)
@@ -64,8 +67,9 @@ We'll first introduce the visualization approach, build intuition by visualizing
 <a id="pitch"></a>
 # **1 Pitch**
 
-[mm](https://bhosmer.github.io/mm/ref.html)'s visualization approach is based on the premise that **matrix
-multiplication is fundamentally a three-dimensional operation.**
+[mm](https://bhosmer.github.io/mm/ref.html)'s visualization approach is based on the premise that *matrix
+multiplication is fundamentally a three-dimensional operation.*
+
 In other words this:
 
 <img src='assets/matmul3.png' width='320'/>
@@ -79,7 +83,9 @@ is a sheet of paper trying to be this ([open in mm](https://bhosmer.github.io/mm
   <img src='assets/initial.png'/>
 </a>
 
-*The arrow in the cube's interior points towards the result matrix, with its blue vane coming from the left argument and red vane coming from the right argument. Also, white guidelines run parallel to the rows of each matrix - though they're faint in this screenshot.*
+*Orientation: the arrow in the cube's interior points towards the result matrix, with its blue vane coming 
+from the left argument and red vane coming from the right argument. Also, white guidelines run parallel to 
+the rows of each matrix, though they're faint in this screenshot.*
 
 When we wrap the matmul around a cube this way, the correct relationships between argument shapes, result shape and adjoined dimensions all fall into place.
 
@@ -92,9 +98,9 @@ This is the *intuitive* meaning of matrix multiplication:
 
 The layout constraints are straightforward:
 
-- left and right arguments must adjoin each other along their shared dimension (width of left argument, height of right argument), which becomes the depth (`k`) dimension of the matmul
-- left argument must adjoin the result along its height (`i`) dimension; right argument must adjoin the result along its width (`j`) dimension
-- left and right arguments must "read in the same direction", so that left columns are correctly aligned with right rows - i.e. for depth offset `k`, a plane that intersects `left[:, k]` will also intersect `right[k]`
+- left and right arguments adjoin each other along their shared dimension (width of left argument, height of right argument), which becomes the matmul's depth (`k`) dimension
+- left argument and result are adjoined along their shared height (`i`) dimension; right argument and result are adjoined along their shared width (`j`) dimension
+- left and right arguments "read in the same direction", so that left columns are correctly aligned with right rows - i.e. for depth offset `k`, a plane that intersects `left[:, k]` will also intersect `right[k]`
 
 This geometry gives us a solid foundation for visualizing all the standard matmul decompositions, and an intuitive basis for exploring nontrivially complex *compositions* of matmuls, as we'll see below.
 
@@ -109,7 +115,10 @@ things look and feel in this style of visualization.
 ## **2a Dot product**
 
 First, the canonical algorithm - computing each result element by taking the dot product of the corresponding left
-row and right column. Here, `L` has blocks of rows filled with 1 (blue) or -1 (red); `R` has column blocks filled
+row and right column. What we see in the animation is the sweep of multiplied value vectors through the cube's interior,
+each delivering a summed result at the corresponding position.
+
+Here, `L` has blocks of rows filled with 1 (blue) or -1 (red); `R` has column blocks filled
 similarly. `k` is 24 here, so the result matrix (`L @ R`) has blue values of 24 and red values of -24
 ([open in mm](https://bhosmer.github.io/mm/index.html?params=%7B%22expr%22%3A%22L%20%40%20R%22%2C%22name%22%3A%22L%20%40%20R%22%2C%22epilog%22%3A%22none%22%2C%22left%22%3A%7B%22name%22%3A%22L%22%2C%22matmul%22%3Afalse%2C%22h%22%3A32%2C%22w%22%3A24%2C%22init%22%3A%22expr%22%2C%22url%22%3A%22%22%2C%22min%22%3A-1%2C%22max%22%3A1%2C%22dropout%22%3A0%2C%22expr%22%3A%22-2%20*%20(Math.trunc(i%20%2F%208)%20%25%202)%20%2B%201%22%2C%22folder%22%3A%22open%22%7D%2C%22right%22%3A%7B%22name%22%3A%22R%22%2C%22matmul%22%3Afalse%2C%22h%22%3A24%2C%22w%22%3A32%2C%22init%22%3A%22expr%22%2C%22url%22%3A%22%22%2C%22min%22%3A-1%2C%22max%22%3A1%2C%22dropout%22%3A0%2C%22expr%22%3A%22-2%20*%20(Math.trunc(j%20%2F%208)%20%25%202)%20%2B%201%22%2C%22folder%22%3A%22open%22%7D%2C%22anim%22%3A%7B%22fuse%22%3A%22none%22%2C%22speed%22%3A48%2C%22hide%20inputs%22%3Afalse%2C%22alg%22%3A%22dotprod%20(row%20major)%22%2C%22spin%22%3A0%2C%22folder%22%3A%22open%22%7D%2C%22block%22%3A%7B%22i%20blocks%22%3A1%2C%22j%20blocks%22%3A1%2C%22k%20blocks%22%3A1%7D%2C%22layout%22%3A%7B%22scheme%22%3A%22blocks%22%2C%22gap%22%3A5%2C%22scatter%22%3A0%2C%22molecule%22%3A1%2C%22blast%22%3A0%2C%22polarity%22%3A%22negative%22%2C%22left%20placement%22%3A%22left%22%2C%22right%20placement%22%3A%22top%22%2C%22result%20placement%22%3A%22front%22%2C%22folder%22%3A%22open%22%7D%2C%22deco%22%3A%7B%22legends%22%3A6%2C%22shape%22%3Atrue%2C%22spotlight%22%3A2%2C%22row%20guides%22%3A1%2C%22flow%20guides%22%3A0.5%2C%22lens%20size%22%3A0.5%2C%22magnification%22%3A10%2C%22interior%20spotlight%22%3Afalse%2C%22axes%22%3Afalse%2C%22folder%22%3A%22closed%22%7D%2C%22viz%22%3A%7B%22sensitivity%22%3A%22semilocal%22%2C%22min%20size%22%3A0.196%2C%22min%20light%22%3A0.4%2C%22max%20light%22%3A0.6%2C%22elem%20scale%22%3A1%2C%22zero%20hue%22%3A0.77%2C%22hue%20gap%22%3A0.74%2C%22hue%20spread%22%3A0.04%2C%22folder%22%3A%22open%22%7D%2C%22diag%22%3A%7B%22url%22%3A%22%22%7D%2C%22cam%22%3A%7B%22x%22%3A-54.145594172414235%2C%22y%22%3A48.55110882721702%2C%22z%22%3A37.42031544768185%2C%22target%22%3A%7B%22x%22%3A0%2C%22y%22%3A0%2C%22z%22%3A0%7D%7D%2C%22folder%22%3A%22closed%22%2C%22compress%22%3Afalse%7D) - long click or control-click to inspect values):
 <video src='assets/dotprod1.mov' controls="controls" style="width: 60vw; height: 41vw;"/>
@@ -117,13 +126,15 @@ similarly. `k` is 24 here, so the result matrix (`L @ R`) has blue values of 24 
 # 
 ## **2b Matrix-vector products**
 
-A matmul decomposed into matrix-vector products looks like a vertical plane painting columns onto the result as it
+A matmul decomposed into matrix-vector products looks like a vertical plane (a product of the left argument with
+each column of the right argument) painting columns onto the result as it
 sweeps horizontally through the cube's interior ([open in mm](https://bhosmer.github.io/mm/index.html?params=%7B%22expr%22%3A%22L%20%40%20R%22%2C%22name%22%3A%22L%20%40%20R%22%2C%22epilog%22%3A%22none%22%2C%22left%22%3A%7B%22name%22%3A%22L%22%2C%22matmul%22%3Afalse%2C%22h%22%3A32%2C%22w%22%3A24%2C%22init%22%3A%22expr%22%2C%22url%22%3A%22%22%2C%22min%22%3A-1%2C%22max%22%3A1%2C%22dropout%22%3A0%2C%22expr%22%3A%22-2%20*%20(Math.trunc(i%20%2F%208)%20%25%202)%20%2B%201%22%2C%22folder%22%3A%22closed%22%7D%2C%22right%22%3A%7B%22name%22%3A%22R%22%2C%22matmul%22%3Afalse%2C%22h%22%3A24%2C%22w%22%3A32%2C%22init%22%3A%22expr%22%2C%22url%22%3A%22%22%2C%22min%22%3A-1%2C%22max%22%3A1%2C%22dropout%22%3A0%2C%22expr%22%3A%22-2%20*%20(Math.trunc(j%20%2F%208)%20%25%202)%20%2B%201%22%2C%22folder%22%3A%22closed%22%7D%2C%22anim%22%3A%7B%22fuse%22%3A%22none%22%2C%22speed%22%3A12%2C%22hide%20inputs%22%3Afalse%2C%22alg%22%3A%22mvprod%22%2C%22spin%22%3A0%2C%22folder%22%3A%22open%22%7D%2C%22block%22%3A%7B%22i%20blocks%22%3A1%2C%22j%20blocks%22%3A1%2C%22k%20blocks%22%3A1%7D%2C%22layout%22%3A%7B%22scheme%22%3A%22blocks%22%2C%22gap%22%3A5%2C%22scatter%22%3A0%2C%22molecule%22%3A1%2C%22blast%22%3A0%2C%22polarity%22%3A%22negative%22%2C%22left%20placement%22%3A%22left%22%2C%22right%20placement%22%3A%22top%22%2C%22result%20placement%22%3A%22front%22%2C%22folder%22%3A%22open%22%7D%2C%22deco%22%3A%7B%22legends%22%3A6%2C%22shape%22%3Atrue%2C%22spotlight%22%3A2%2C%22row%20guides%22%3A1%2C%22flow%20guides%22%3A0.5%2C%22lens%20size%22%3A0.5%2C%22magnification%22%3A10%2C%22interior%20spotlight%22%3Afalse%2C%22axes%22%3Afalse%2C%22folder%22%3A%22closed%22%7D%2C%22viz%22%3A%7B%22sensitivity%22%3A%22semilocal%22%2C%22min%20size%22%3A0.196%2C%22min%20light%22%3A0.4%2C%22max%20light%22%3A0.6%2C%22elem%20scale%22%3A1%2C%22zero%20hue%22%3A0.77%2C%22hue%20gap%22%3A0.74%2C%22hue%20spread%22%3A0.04%2C%22folder%22%3A%22open%22%7D%2C%22diag%22%3A%7B%22url%22%3A%22%22%7D%2C%22cam%22%3A%7B%22x%22%3A-54.145594172414235%2C%22y%22%3A48.55110882721702%2C%22z%22%3A37.42031544768185%2C%22target%22%3A%7B%22x%22%3A0%2C%22y%22%3A0%2C%22z%22%3A0%7D%7D%2C%22folder%22%3A%22closed%22%2C%22compress%22%3Afalse%7D)):
 <video src='assets/mvprod1.mov' controls="controls" style="width: 60vw; height: 41vw;"/>
 
 
-Observing the intermediate values of a decomposition can be quite interesting, even in simple examples. For
-instance, note the prominent vertical patterns in the intermediate matrix-vector products when we use randomly
+Observing the intermediate values of a decomposition can be quite interesting, even in simple examples. 
+
+For instance, note the prominent vertical patterns in the intermediate matrix-vector products when we use randomly
 initialized arguments- reflecting the fact that each intermediate is a column-scaled replica of the left argument
 ([open in mm](https://bhosmer.github.io/mm/index.html?params=%7B%22expr%22%3A%22L%20%40%20R%22%2C%22name%22%3A%22L%20%40%20R%22%2C%22epilog%22%3A%22none%22%2C%22left%22%3A%7B%22name%22%3A%22L%22%2C%22matmul%22%3Afalse%2C%22h%22%3A32%2C%22w%22%3A24%2C%22init%22%3A%22gaussian%22%2C%22url%22%3A%22%22%2C%22min%22%3A-1%2C%22max%22%3A1%2C%22dropout%22%3A0%2C%22expr%22%3A%22(-Math.trunc(i%20%2F%208)%20%25%202)%20%2B%20.5%22%2C%22folder%22%3A%22open%22%7D%2C%22right%22%3A%7B%22name%22%3A%22R%22%2C%22matmul%22%3Afalse%2C%22h%22%3A24%2C%22w%22%3A32%2C%22init%22%3A%22gaussian%22%2C%22url%22%3A%22%22%2C%22min%22%3A-1%2C%22max%22%3A1%2C%22dropout%22%3A0%2C%22expr%22%3A%22(-Math.trunc(j%20%2F%208)%20%25%202)%20%2B%20.5%22%2C%22folder%22%3A%22open%22%7D%2C%22anim%22%3A%7B%22fuse%22%3A%22none%22%2C%22speed%22%3A6%2C%22hide%20inputs%22%3Afalse%2C%22alg%22%3A%22mvprod%22%2C%22spin%22%3A0%2C%22folder%22%3A%22open%22%7D%2C%22block%22%3A%7B%22i%20blocks%22%3A1%2C%22j%20blocks%22%3A1%2C%22k%20blocks%22%3A1%7D%2C%22layout%22%3A%7B%22scheme%22%3A%22blocks%22%2C%22gap%22%3A5%2C%22scatter%22%3A0%2C%22molecule%22%3A1%2C%22blast%22%3A0%2C%22polarity%22%3A%22negative%22%2C%22left%20placement%22%3A%22left%22%2C%22right%20placement%22%3A%22top%22%2C%22result%20placement%22%3A%22front%22%2C%22folder%22%3A%22open%22%7D%2C%22deco%22%3A%7B%22legends%22%3A6%2C%22shape%22%3Atrue%2C%22spotlight%22%3A2%2C%22row%20guides%22%3A1%2C%22flow%20guides%22%3A0%2C%22lens%20size%22%3A0.5%2C%22magnification%22%3A10%2C%22interior%20spotlight%22%3Afalse%2C%22axes%22%3Afalse%2C%22folder%22%3A%22open%22%7D%2C%22viz%22%3A%7B%22sensitivity%22%3A%22local%22%2C%22min%20size%22%3A0.196%2C%22min%20light%22%3A0.4%2C%22max%20light%22%3A0.6%2C%22elem%20scale%22%3A1%2C%22zero%20hue%22%3A0.77%2C%22hue%20gap%22%3A0.74%2C%22hue%20spread%22%3A0.04%2C%22folder%22%3A%22open%22%7D%2C%22diag%22%3A%7B%22url%22%3A%22%22%7D%2C%22cam%22%3A%7B%22x%22%3A-54.14559417241423%2C%22y%22%3A48.55110882721702%2C%22z%22%3A37.42031544768186%2C%22target%22%3A%7B%22x%22%3A0%2C%22y%22%3A0%2C%22z%22%3A0%7D%7D%2C%22folder%22%3A%22closed%22%2C%22compress%22%3Afalse%7D)):
 <video src='assets/mvprod2.mov' controls="controls" style="width: 60vw; height: 41vw;"/>
@@ -132,14 +143,17 @@ initialized arguments- reflecting the fact that each intermediate is a column-sc
 # 
 ## **2c Vector-matrix products**
 
-A matmul decomposed into vector-matrix products looks like a horizontal plane painting rows onto the result as it
+A matmul decomposed into vector-matrix products looks like a horizontal plane (a product of the right argument 
+with each row of the left argument) painting rows onto the result as it
 descends through the cube's interior
 ([open in mm](https://bhosmer.github.io/mm/index.html?params=%7B%22expr%22%3A%22L%20%40%20R%22%2C%22name%22%3A%22L%20%40%20R%22%2C%22epilog%22%3A%22none%22%2C%22left%22%3A%7B%22name%22%3A%22L%22%2C%22matmul%22%3Afalse%2C%22h%22%3A32%2C%22w%22%3A24%2C%22init%22%3A%22expr%22%2C%22url%22%3A%22%22%2C%22min%22%3A-1%2C%22max%22%3A1%2C%22dropout%22%3A0%2C%22expr%22%3A%22-2%20*%20(Math.trunc(i%20%2F%208)%20%25%202)%20%2B%201%22%2C%22folder%22%3A%22closed%22%7D%2C%22right%22%3A%7B%22name%22%3A%22R%22%2C%22matmul%22%3Afalse%2C%22h%22%3A24%2C%22w%22%3A32%2C%22init%22%3A%22expr%22%2C%22url%22%3A%22%22%2C%22min%22%3A-1%2C%22max%22%3A1%2C%22dropout%22%3A0%2C%22expr%22%3A%22-2%20*%20(Math.trunc(j%20%2F%208)%20%25%202)%20%2B%201%22%2C%22folder%22%3A%22closed%22%7D%2C%22anim%22%3A%7B%22fuse%22%3A%22none%22%2C%22speed%22%3A12%2C%22hide%20inputs%22%3Afalse%2C%22alg%22%3A%22vmprod%22%2C%22spin%22%3A0%2C%22folder%22%3A%22open%22%7D%2C%22block%22%3A%7B%22i%20blocks%22%3A1%2C%22j%20blocks%22%3A1%2C%22k%20blocks%22%3A1%7D%2C%22layout%22%3A%7B%22scheme%22%3A%22blocks%22%2C%22gap%22%3A5%2C%22scatter%22%3A0%2C%22molecule%22%3A1%2C%22blast%22%3A0%2C%22polarity%22%3A%22negative%22%2C%22left%20placement%22%3A%22left%22%2C%22right%20placement%22%3A%22top%22%2C%22result%20placement%22%3A%22front%22%2C%22folder%22%3A%22open%22%7D%2C%22deco%22%3A%7B%22legends%22%3A6%2C%22shape%22%3Atrue%2C%22spotlight%22%3A2%2C%22row%20guides%22%3A1%2C%22flow%20guides%22%3A0.5%2C%22lens%20size%22%3A0.5%2C%22magnification%22%3A10%2C%22interior%20spotlight%22%3Afalse%2C%22axes%22%3Afalse%2C%22folder%22%3A%22closed%22%7D%2C%22viz%22%3A%7B%22sensitivity%22%3A%22semilocal%22%2C%22min%20size%22%3A0.196%2C%22min%20light%22%3A0.4%2C%22max%20light%22%3A0.6%2C%22elem%20scale%22%3A1%2C%22zero%20hue%22%3A0.77%2C%22hue%20gap%22%3A0.74%2C%22hue%20spread%22%3A0.04%2C%22folder%22%3A%22open%22%7D%2C%22diag%22%3A%7B%22url%22%3A%22%22%7D%2C%22cam%22%3A%7B%22x%22%3A-54.145594172414235%2C%22y%22%3A48.55110882721702%2C%22z%22%3A37.42031544768185%2C%22target%22%3A%7B%22x%22%3A0%2C%22y%22%3A0%2C%22z%22%3A0%7D%7D%2C%22folder%22%3A%22closed%22%2C%22compress%22%3Afalse%7D)):
 <video src='assets/vmprod_check.mov' controls="controls" style="width: 60vw; height: 41vw;"/>
 
 Switching to randomly initialized arguments, we see patterns analogous to those we saw with matrix-vector products -
 only this time the patterns are horizontal, corresponding to the fact that each intermediate vector-matrix product
-is a row-scaled replica of the right argument. When thinking about how matmuls express the rank and structure of
+is a row-scaled replica of the right argument. 
+
+When thinking about how matmuls express the rank and structure of
 their arguments, it's useful to envision both of these patterns happening simultaneously in the computation
 ([ppen in mm](https://bhosmer.github.io/mm/index.html?params=%7B%22expr%22%3A%22L%20%40%20R%22%2C%22name%22%3A%22L%20%40%20R%22%2C%22epilog%22%3A%22none%22%2C%22left%22%3A%7B%22name%22%3A%22L%22%2C%22matmul%22%3Afalse%2C%22h%22%3A32%2C%22w%22%3A24%2C%22init%22%3A%22gaussian%22%2C%22url%22%3A%22%22%2C%22min%22%3A-1%2C%22max%22%3A1%2C%22dropout%22%3A0%2C%22expr%22%3A%22(-Math.trunc(i%20%2F%208)%20%25%202)%20%2B%20.5%22%2C%22folder%22%3A%22open%22%7D%2C%22right%22%3A%7B%22name%22%3A%22R%22%2C%22matmul%22%3Afalse%2C%22h%22%3A24%2C%22w%22%3A32%2C%22init%22%3A%22gaussian%22%2C%22url%22%3A%22%22%2C%22min%22%3A-1%2C%22max%22%3A1%2C%22dropout%22%3A0%2C%22expr%22%3A%22(-Math.trunc(j%20%2F%208)%20%25%202)%20%2B%20.5%22%2C%22folder%22%3A%22open%22%7D%2C%22anim%22%3A%7B%22fuse%22%3A%22none%22%2C%22speed%22%3A6%2C%22hide%20inputs%22%3Afalse%2C%22alg%22%3A%22vmprod%22%2C%22spin%22%3A0%2C%22folder%22%3A%22open%22%7D%2C%22block%22%3A%7B%22i%20blocks%22%3A1%2C%22j%20blocks%22%3A1%2C%22k%20blocks%22%3A1%7D%2C%22layout%22%3A%7B%22scheme%22%3A%22blocks%22%2C%22gap%22%3A5%2C%22scatter%22%3A0%2C%22molecule%22%3A1%2C%22blast%22%3A0%2C%22polarity%22%3A%22negative%22%2C%22left%20placement%22%3A%22left%22%2C%22right%20placement%22%3A%22top%22%2C%22result%20placement%22%3A%22front%22%2C%22folder%22%3A%22open%22%7D%2C%22deco%22%3A%7B%22legends%22%3A6%2C%22shape%22%3Atrue%2C%22spotlight%22%3A2%2C%22row%20guides%22%3A1%2C%22flow%20guides%22%3A0%2C%22lens%20size%22%3A0.5%2C%22magnification%22%3A10%2C%22interior%20spotlight%22%3Afalse%2C%22axes%22%3Afalse%2C%22folder%22%3A%22open%22%7D%2C%22viz%22%3A%7B%22sensitivity%22%3A%22local%22%2C%22min%20size%22%3A0.196%2C%22min%20light%22%3A0.4%2C%22max%20light%22%3A0.6%2C%22elem%20scale%22%3A1%2C%22zero%20hue%22%3A0.77%2C%22hue%20gap%22%3A0.74%2C%22hue%20spread%22%3A0.04%2C%22folder%22%3A%22open%22%7D%2C%22diag%22%3A%7B%22url%22%3A%22%22%7D%2C%22cam%22%3A%7B%22x%22%3A-54.14559417241423%2C%22y%22%3A48.55110882721702%2C%22z%22%3A37.42031544768186%2C%22target%22%3A%7B%22x%22%3A0%2C%22y%22%3A0%2C%22z%22%3A0%7D%7D%2C%22folder%22%3A%22closed%22%2C%22compress%22%3Afalse%7D)):
 <video src='assets/vmprod3.mov' controls="controls" style="width: 60vw; height: 41vw;"/>
@@ -159,10 +173,13 @@ the result ([open in mm](https://bhosmer.github.io/mm/index.html?params=%7B%22ex
 <video src='assets/vvprod_check.mov' controls="controls" style="width: 60vw; height: 41vw;"/>
 
 
-Using randomly initialized matrices with this decomposition, we can see not just values but *rank* accumulate in the
-result, as each rank-1 outer product is added to it. Among other things this builds intuition for why a "low-rank
-factorization" is another name for the conversion of a matrix into a matmul whose arguments are small in the depth
-dimension - a topic we'll revisit later in this note in the context of [LoRA](https://arxiv.org/pdf/2106.09685.pdf)
+Using randomly initialized matrices with the outer product decomposition, we can see not just values but *rank* 
+accumulate in the result, as the highly structured pattern of each rank-1 outer product is superimposed on it.
+
+Among other things this builds intuition for why "low-rank factorization" - i.e. approximating a 
+matrix by constructing a matmul whose arguments are small in the depth dimension - works best when the 
+matrix being approximated is low rank. 
+We'll revisit this topic in the context of [LoRA](https://arxiv.org/pdf/2106.09685.pdf) in a later section 
 ([open in mm](https://bhosmer.github.io/mm/index.html?params=%7B%22expr%22%3A%22L%20%40%20R%22%2C%22name%22%3A%22L%20%40%20R%22%2C%22epilog%22%3A%22none%22%2C%22left%22%3A%7B%22name%22%3A%22L%22%2C%22matmul%22%3Afalse%2C%22h%22%3A32%2C%22w%22%3A24%2C%22init%22%3A%22gaussian%22%2C%22url%22%3A%22%22%2C%22min%22%3A-1%2C%22max%22%3A1%2C%22dropout%22%3A0%2C%22expr%22%3A%22(-Math.trunc(i%20%2F%208)%20%25%202)%20%2B%20.5%22%2C%22folder%22%3A%22closed%22%7D%2C%22right%22%3A%7B%22name%22%3A%22R%22%2C%22matmul%22%3Afalse%2C%22h%22%3A24%2C%22w%22%3A32%2C%22init%22%3A%22gaussian%22%2C%22url%22%3A%22%22%2C%22min%22%3A-1%2C%22max%22%3A1%2C%22dropout%22%3A0%2C%22expr%22%3A%22(-Math.trunc(j%20%2F%208)%20%25%202)%20%2B%20.5%22%2C%22folder%22%3A%22closed%22%7D%2C%22anim%22%3A%7B%22fuse%22%3A%22none%22%2C%22speed%22%3A6%2C%22hide%20inputs%22%3Afalse%2C%22alg%22%3A%22vvprod%22%2C%22spin%22%3A0%2C%22folder%22%3A%22open%22%7D%2C%22block%22%3A%7B%22i%20blocks%22%3A1%2C%22j%20blocks%22%3A1%2C%22k%20blocks%22%3A1%7D%2C%22layout%22%3A%7B%22scheme%22%3A%22blocks%22%2C%22gap%22%3A5%2C%22scatter%22%3A0%2C%22molecule%22%3A1%2C%22blast%22%3A0%2C%22polarity%22%3A%22negative%22%2C%22left%20placement%22%3A%22left%22%2C%22right%20placement%22%3A%22top%22%2C%22result%20placement%22%3A%22front%22%2C%22folder%22%3A%22open%22%7D%2C%22deco%22%3A%7B%22legends%22%3A6%2C%22shape%22%3Atrue%2C%22spotlight%22%3A2%2C%22row%20guides%22%3A1%2C%22flow%20guides%22%3A0%2C%22lens%20size%22%3A0.5%2C%22magnification%22%3A10%2C%22interior%20spotlight%22%3Afalse%2C%22axes%22%3Afalse%2C%22folder%22%3A%22open%22%7D%2C%22viz%22%3A%7B%22sensitivity%22%3A%22local%22%2C%22min%20size%22%3A0.196%2C%22min%20light%22%3A0.4%2C%22max%20light%22%3A0.6%2C%22elem%20scale%22%3A1%2C%22zero%20hue%22%3A0.77%2C%22hue%20gap%22%3A0.74%2C%22hue%20spread%22%3A0.04%2C%22folder%22%3A%22open%22%7D%2C%22diag%22%3A%7B%22url%22%3A%22%22%7D%2C%22cam%22%3A%7B%22x%22%3A-54.14559417241423%2C%22y%22%3A48.55110882721702%2C%22z%22%3A37.42031544768186%2C%22target%22%3A%7B%22x%22%3A0%2C%22y%22%3A0%2C%22z%22%3A0%7D%7D%2C%22folder%22%3A%22closed%22%2C%22compress%22%3Afalse%7D)):
 <video src='assets/vvprod_random_fast.mov' controls="controls" style="width: 60vw; height: 41vw;"/>
 
@@ -192,11 +209,12 @@ idiom and to see what intuitions even simple examples can give us.
 
 ## **3a Left-associative expressions**
 
-We'll look at two expressions of the form `A @ B @ C`, each with its own distinctive shape and character.
+We'll look at two expressions of the form `(A @ B) @ C`, each with its own distinctive shape and character.
+(Note: mm adheres to the convention that matrix multiplication is left-associative and writes this simply as `A @ B @ C`.)
 
 First we'll give `A @ B @ C` the characteristic FFN shape, in which the "hidden dimension" is wider than the "input"
-or "output" dimensions. (Concretely in the context of this example, this means that the width of `B` is greater than
-the widths of `A` or `C`.)
+or "output" dimensions - concretely in the context of this example, this means that the width of `B` is greater than
+the widths of `A` or `C`. 
 
 As in the single matmul examples, the floating arrows point towards the result matrix, blue vane coming from the
 left argument and red vane from right argument
