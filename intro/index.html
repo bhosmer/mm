@@ -58,6 +58,7 @@ We'll first introduce the visualization approach, build intuition by visualizing
 5. [**Parallelizing attention**](#attnpar) - visualizing attention head parallelization with examples from the recent[ Blockwise Parallel Transformer](https://arxiv.org/pdf/2305.19370.pdf) paper
 6. [**Sizes in an attention layer**](#attnsizes) - what do the MHA and FFA halves of an attention layer look like together, when we visualize a whole layer as a single structure? How does the picture change during autoregressive decoding?
 7. [**LoRA**](#lora) - a visual explanation of this elaboration of the attention head architecture
+8. [**Wrapup**](#wrapup) - next steps and call for feedback
 
 
 <a id="pitch"></a>
@@ -718,6 +719,28 @@ mm](https://bhosmer.github.io/mm/index.html?0=out%20%3D%20(attn%20%3D%20(Q%20%3D
 
 # 
 # 
+<a id="wrapup"></a>
+# 8 Wrapup
+
+## 8a Call for feedback
+I've found this way of visualizing matmul expressions extremely helpful for building intuition and reasoning about not just matrix multiplication itself, but also many aspects of ML models and their computation, from efficiency to interpretability.
+
+If you try it out and have suggestions or comments, I definitely want to hear, either in the comments here or in 
+[the repo](https://github.com/bhosmer/mm).
+
+## 8b Next steps
+* There's a [GPT2 attention head explorer](https://bhosmer.github.io/mm/examples/attngpt2/index.html) built on top of the tool 
+which I'm currently using to inventory and classify the attention heads found in that model. (This was the tool I used to find and explore the attention heads in this note.) 
+Once complete I'm planning to post a note with the inventory.
+* As mentioned up top, embedding these visualizations in Python notebooks is 
+[dead simple](https://colab.research.google.com/drive/1wZIoU20eRWKtRNCW7e5Iugm3MhfaE1f7?usp=sharing). 
+But session URLs can get... unwieldy, so it will be useful to have Python-side utilities for constructing them from 
+configuration objects, similar to the simple JavaScript helpers used in the 
+[reference guide](https://bhosmer.github.io/mm/ref.html).
+* If you've got a use case you think might benefit from visualizations like this but it's not obvious how to use the 
+tool to do it, get in touch! I'm not necessarily looking to expand its core visualization capabilities that much further 
+(right tool for the job, etc.), but e.g. the API for driving it programmatically is pretty basic, 
+there's plenty that can be done there.
 
     </script>
     </zero-md>
