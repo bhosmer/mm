@@ -83,13 +83,25 @@ is a sheet of paper trying to be this ([open in mm](https://bhosmer.github.io/mm
   <img src='assets/initial.png' style='width: 640px;'/>
 </a>
 
-*Orientation: the arrow in the cube's interior points towards the result matrix, with its blue vane coming 
-from the left argument and red vane coming from the right argument. Also, white guidelines run parallel to 
-the rows of each matrix, though they're faint in this screenshot.*
+To transform the flat picture into 3D, we've taken the two argument matrices and *folded them over*,
+so that all three participants - the two arguments and the result - are adjacent and orthogonal 
+to each other. 
 
-When we wrap the matmul around a cube this way, the correct relationships between argument shapes, result shape and adjoined dimensions all fall into place.
+Now we can locate a unique point in the cube's interior space for each scalar multiplication
+in the matmul - it's where lines projected from each pair of left and right elements intersect.
+(Picture grid formed by all of these lines.) 
+And once multiplication is done, we can sum along the line projected from each result location 
+to get the corresponding result value.
 
-And the computation makes  *geometric sense:* each result location `(i, j)` lies on the same line as the vector `(i, *k*, j)` of locations in the cube's interior, exactly where projections of the left row `i` and right column `j` intersect.
+For orientation, the tool displays an arrow in the cube's interior that points towards the result matrix,
+with a blue vane coming from the left argument and a red vane coming from the right argument. 
+The tool also displays white guidelines to indicate the row axis of each matrix, though they're 
+faint in this screenshot.
+
+When we wrap the matmul around a cube this way, the correct relationships between argument shapes, 
+result shape and adjoined dimensions all fall into place. And the computation makes  *geometric sense*,
+since each result location `(i, j)` lies on the same line as the vector `(i, *k*, j)` of locations in the 
+cube's interior, exactly where projections of the left row `i` and right column `j` intersect.
 
 This is the *intuitive* meaning of matrix multiplication:
 1. project two orthogonal matrices into the interior of a cube
