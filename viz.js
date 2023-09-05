@@ -118,9 +118,10 @@ function tryURLInit(url) {
 
 function tryEvalInitExpr(expr) {
   try {
-    return eval?.(`(i, j, h, w) => (${expr})`)
-  } catch (e) {
-    console.log(`error evaluating init expr '${expr}' message '${e.message}`)
+    return eval?.(`(i, j, h, w) => { try { return (${expr}) } catch (e) { return 0 } }`)
+  } catch ({ name, message }) {
+    console.log(`error ${name} evaluating init expr '${expr}' message '${message}'`)
+    return () => 0
   }
 }
 
@@ -282,6 +283,10 @@ function initArrayData_(data, h, w, init, epi = undefined, r = undefined, c = un
   applyInPlaceEpilog_(data, h, w, epi)
 }
 
+// i == j ? Math.sqrt((1 / {3:5, 11: 4, 20: 7, 28: 6}[j])) || 1 : 0
+
+// window.__viz__.right.data.slice().get(j, i)
+
 export class Array2D {
 
   static fromInit(h, w, init, epi = undefined) {
@@ -306,6 +311,13 @@ export class Array2D {
 
   get(i, j) {
     return this.data[this.addr(i, j)]
+  }
+
+  slice(i = undefined, j = undefined) {
+    const [istart, iend] = toRange(i, this.h)
+    const [jstart, jend] = toRange(j, this.w)
+    const init = (i, j, h, w) => this.get(istart + i, jstart + j)
+    return Array2D.fromInit(iend - istart, jend - jstart, init)
   }
 
   addr(i, j) {
