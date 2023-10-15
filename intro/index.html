@@ -47,15 +47,12 @@ Matrix multiplications (matmuls) are the building blocks of today's ML models. T
 [mm](https://bhosmer.github.io/mm/ref.html), a visualization tool for matmuls and compositions of 
 matmuls. 
 
-Because it uses all three spatial dimensions, it can convey meaning more clearly and intuitively than 
+Matrix multiplication is inherently a three-dimensional operation. Because mm uses all three spatial dimensions, it can convey meaning more clearly and intuitively than 
 the usual squares-on-paper idioms, especially (though not only) for visual/spatial thinkers.
 
-And because three dimensions give us enough space to *compose* matmuls in geometrically rigorous ways, 
-we can visualize big, compound expressions - up to and including things like attention heads or even 
-entire model layers.
+We also have room to _compose_ matmuls in geometrically consistent ways - so we can visualize big, compound structures like attention heads and MLP layers using the same rules as simple expressions. And more advanced features, like animating different matmul algorithms, partitioning for parallelism, and loading external data to explore the behavior of actual models, all build naturally on this foundation.
 
-mm is fully interactive, runs [in the browser](https://bhosmer.github.io/mm/) or 
-[notebook iframes](https://colab.research.google.com/drive/1wZIoU20eRWKtRNCW7e5Iugm3MhfaE1f7) and 
+mm is fully interactive, runs [in the browser](https://bhosmer.github.io/mm/) and 
 keeps its complete state in the URL, so links are shareable sessions (the screenshots and videos 
 in this note all have links that open the visualizations in the tool). 
 This [reference guide](https://bhosmer.github.io/mm/ref.html) describes all of the available functionality.
