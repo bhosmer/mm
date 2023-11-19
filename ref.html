@@ -166,7 +166,10 @@
   }
 
   window.addEventListener('message', event => {
-    Object.entries(event.data).forEach(([k, v]) => RESPONDERS[k](v))
+    Object.entries(event.data).forEach(([k, v]) => {
+      const r = RESPONDERS[k]
+      r && r(v)
+    })
   })
 
   function withResponse(msg, resp, f) {
@@ -174,8 +177,8 @@
       delete RESPONDERS[resp]
     }
     const timeout = setTimeout(cleanup, 1000)
-    RESPONDERS[resp] = resp => {
-      f(resp)
+    RESPONDERS[resp] = r => {
+      f(r)
       clearTimeout(timeout)
       cleanup()
     }
@@ -1497,16 +1500,17 @@
 
     window.addEventListener('resize', arrange)
 
+    // init block
     {
       const searchParams = new URL(window.location).searchParams
       mmconfig = searchParams.get('mm')
       mmconfig && (mm.src = 'index.html?' + mmconfig)
       const docstr = searchParams.get('doc')
-      console.log(`HEY docstr ${docstr}`)
+      // console.log(`HEY docstr ${docstr}`)
       if (docstr) {
         const doc = JSON.parse(docstr)
         const scroll = doc.scroll
-        console.log(`HEY scroll ${scroll}`)
+        // console.log(`HEY scroll ${scroll}`)
         if (scroll > 0) {
           window.onload = () => {
             getDoc().scrollTop = scroll

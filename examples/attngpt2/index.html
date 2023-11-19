@@ -315,7 +315,10 @@
     const RESPONDERS = {}
 
     window.addEventListener('message', event => {
-      Object.entries(event.data).forEach(([k, v]) => RESPONDERS[k](v))
+      Object.entries(event.data).forEach(([k, v]) => {
+        const r = RESPONDERS[k]
+        r && r(v)
+      })
     })
 
     function withResponse(msg, resp, f) {
@@ -323,8 +326,8 @@
         delete RESPONDERS[resp]
       }
       const timeout = setTimeout(cleanup, 1000)
-      RESPONDERS[resp] = resp => {
-        f(resp)
+      RESPONDERS[resp] = x => {
+        f(x)
         clearTimeout(timeout)
         cleanup()
       }

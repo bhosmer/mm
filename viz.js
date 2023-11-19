@@ -1841,6 +1841,12 @@ export function setLayoutScheme(params, scheme_name) {
 
 export const default_dims = { i: 32, j: 32, k: 32 }
 
+export const defaultCam = () => ({
+  x: -default_dims.i * 1.5,
+  y: default_dims.j * 1.5,
+  z: default_dims.k * 1.5,
+})
+
 export const default_epilog = 'none'
 
 export const defaultLeft = () => ({

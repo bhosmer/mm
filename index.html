@@ -288,12 +288,7 @@
       diag: {
         url: '',
       },
-      cam: {
-        // set from orbit control
-        x: -viz.default_dims.i * 1.5,
-        y: viz.default_dims.j * 1.5,
-        z: viz.default_dims.k * 1.5,
-      }
+      cam: viz.defaultCam()
     }
 
     // we use this when resetting via message passing
@@ -302,6 +297,11 @@
       delete p.cam // interferes with camera placement
       return p
     })()
+
+    function resetParams() {
+      Object.entries(util.copyTree(default_params)).forEach(([k, v]) => params[k] = v)
+      params.cam = viz.defaultCam()
+    }
 
     function updateTitle() {
       document.getElementById('info').innerHTML = viz.genExpr(params)
@@ -356,10 +356,13 @@
       if (oldmag) {
         const newsz = util.bbhwd(obj.getBoundingBox())
         const newmag = newsz.h + newsz.w + newsz.d
-        const ratio = (newmag / oldmag) ** .95
-        camera.position.set(camera.position.x * ratio, camera.position.y * ratio, camera.position.z * ratio)
-        orbit.update()
-        requestCameraPositionSave()
+        const ratio = newmag / oldmag
+        if (ratio != 1) {
+          console.log(`HEY ratio ${ratio}`)
+          camera.position.set(camera.position.x * ratio, camera.position.y * ratio, camera.position.z * ratio)
+          orbit.update()
+          requestCameraPositionSave()
+        }
       }
 
       obj.setLegends()
@@ -496,8 +499,8 @@
     // browser hookups
     //
 
-    function initFromParams() {
-      saveUrlInfo()
+    function initFromParams(save = true) {
+      save && saveUrlInfo()
       camera.position.set(params.cam.x, params.cam.y, params.cam.z)
       params.cam.target && util.updateProps(orbit.target, params.cam.target)
       orbit.update()
@@ -511,13 +514,17 @@
     }
 
     function initFromSearchParams() {
-      util.updateObjectFromSearchParams(params, new URL(window.location).searchParams)
+      const searchParams = new URL(window.location).searchParams
+      if (searchParams.size > 0) {
+        util.updateObjectFromSearchParams(params, searchParams)
+      } else {
+        resetParams()
+      }
       if (params.sync_expr !== undefined) {
-        console.log(`HEY found sync_expr in search params, ignoring`)
         delete params.sync_expr
       }
       params.expr = viz.genExpr(params)
-      initFromParams()
+      initFromParams(false)
     }
 
     window.addEventListener('popstate', initFromSearchParams, false)
@@ -645,7 +652,7 @@
       },
       setParams: ({ props = {}, reset = false }) => {
         console.log(`HEY setParams called props ${JSON.stringify(props)} reset ${reset}`)
-        reset && Object.entries(util.copyTree(default_params)).forEach(([k, v]) => params[k] = v)
+        reset && resetParams()
 
         if (props.sync_expr) {
           params.expr = props.expr
@@ -662,7 +669,10 @@
     }
 
     window.addEventListener('message', event => {
-      Object.entries(event.data).forEach(([k, v]) => RESPONDERS[k](v))
+      Object.entries(event.data).forEach(([k, v]) => {
+        const r = RESPONDERS[k]
+        r && r(v)
+      })
     })
 
     // diag info updated on resize
