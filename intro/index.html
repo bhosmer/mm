@@ -64,7 +64,7 @@ We'll first introduce the visualization approach, build intuition by visualizing
 3. [**Warmup - expressions**](#expressions) - a quick tour of some fundamental expression building blocks
 4. [**Inside an attention head**](#attnhead) - an in-depth look at the structure, values and computation behavior of a couple of attention heads from GPT2 via[ NanoGPT](https://github.com/karpathy/nanoGPT)
 5. [**Parallelizing attention**](#attnpar) - visualizing attention head parallelization with examples from the recent[ Blockwise Parallel Transformer](https://arxiv.org/pdf/2305.19370.pdf) paper
-6. [**Sizes in an attention layer**](#attnsizes) - what do the MHA and FFA halves of an attention layer look like together, when we visualize a whole layer as a single structure? How does the picture change during autoregressive decoding?
+6. [**Sizes in an attention layer**](#attnsizes) - what do the MHA (Multi-Headed Attention) and FFN (Feed Forward Network) halves of an attention layer look like together, when we visualize a whole layer as a single structure? How does the picture change during autoregressive decoding?
 7. [**LoRA**](#lora) - a visual explanation of this elaboration of the attention head architecture
 8. [**Wrapup**](#wrapup) - next steps and call for feedback
 
@@ -235,7 +235,7 @@ idiom and to see what intuitions even simple examples can give us.
 We'll look at two expressions of the form `(A @ B) @ C`, each with its own distinctive shape and character.
 (Note: mm adheres to the convention that matrix multiplication is left-associative and writes this simply as `A @ B @ C`.)
 
-First we'll give `A @ B @ C` the characteristic FFN shape, in which the "hidden dimension" is wider than the "input"
+First we'll give `A @ B @ C` the characteristic FFN (Feed Forward Network) shape, in which the "hidden dimension" is wider than the "input"
 or "output" dimensions - concretely in the context of this example, this means that the width of `B` is greater than
 the widths of `A` or `C`. 
 
@@ -277,7 +277,7 @@ Next we'll visualize a right-associative expression `A @ (B @ C)`.
 In the same way left-associative expressions extend horizontally - sprouting from the left argument of the root
 expression, so to speak - right-associative chains extend vertically, sprouting from the root's right argument.
 
-One sometimes sees an MLP formulated right-associatively, i.e. with columnar input on the right and weight layers
+One sometimes sees an MLP (Multi Layer Perceptron) formulated right-associatively, i.e. with columnar input on the right and weight layers
 running right to left. Using the matrices from the 2-layer FFN example pictured above - suitably transposed - here's
 what that looks like, with `C` now playing the role of the input, `B` the first layer and `A` the second layer
 ([open in mm](https://bhosmer.github.io/mm/index.html?0=A%20%40%20(B%20%40%20C)&1=A%20%40%20(B%20%40%20C)&2=none&12=closed&64=true&3.1=A&3.4=false&3.5=32&3.6=96&3.7=row%20major&3.8=&3.9=-1&3.10=1&3.11=0&3.0=-2%20*%20(Math.trunc(j%20%2F%208)%20%25%202)%20%2B%201&3.12=open&13.1=B%20%40%20C&13.4=true&13.5=32&13.6=32&13.7=col%20major&13.8=&13.9=-1&13.10=1&13.11=0&13.2=none&14.15=inherit&16.17=1&18.19=positive&18.20=right&18.21=top&18.22=back&23.1=B&23.4=false&23.5=96&23.6=32&23.7=col%20major&23.8=&23.0=-2%20*%20(Math.trunc(j%20%2F%208)%20%25%202)%20%2B%201&23.9=-1&23.10=1&23.11=0&23.12=open&24.1=C&24.4=false&24.5=32&24.6=64&24.7=expr&24.8=&24.0=-2%20*%20(Math.trunc(j%20%2F%208)%20%25%202)%20%2B%201&24.9=-1&24.10=1&24.11=0&24.12=open&13.12=open&25.26=none&25.27=12&25.28=false&25.15=none&25.29=0&25.12=closed&30.31=1&30.32=1&30.17=1&33.34=blocks&33.35=5&33.36=0&33.37=1&33.38=0&33.19=negative&33.20=left&33.21=top&33.22=front&33.12=closed&39.40=6&39.41=true&39.42=2&39.43=1&39.44=0.5&39.45=0.5&39.46=10&39.47=false&39.48=false&39.12=closed&49.50=semilocal&49.51=0.2&49.52=0.4&49.53=0.6&49.54=1.25&49.55=0.77&49.56=0.74&49.57=0.04&49.12=closed&58.8=&58.12=open&59.60=-105.78213185291946&59.61=96.67420268229331&59.62=113.6419504179439&63.60=-4.617417891034972&63.61=-3.695553245058398&63.62=-1.8863985145585351&expr=0&name=1&epilog=2&left=3&matmul=4&h=5&w=6&init=7&url=8&min=9&max=10&dropout=11&folder=12&right=13&right.anim=14&alg=15&right.block=16&k%20blocks=17&right.layout=18&polarity=19&left%20placement=20&right%20placement=21&result%20placement=22&right.left=23&right.right=24&anim=25&fuse=26&speed=27&hide%20inputs=28&spin=29&block=30&i%20blocks=31&j%20blocks=32&layout=33&scheme=34&gap=35&scatter=36&molecule=37&blast=38&deco=39&legends=40&shape=41&spotlight=42&row%20guides=43&flow%20guides=44&lens%20size=45&magnification=46&interior%20spotlight=47&axes=48&viz=49&sensitivity=50&min%20size=51&min%20light=52&max%20light=53&elem%20scale=54&zero%20hue=55&hue%20gap=56&hue%20spread=57&diag=58&cam=59&x=60&y=61&z=62&cam.target=63&compress=64)):
