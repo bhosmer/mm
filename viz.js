@@ -171,12 +171,15 @@ const silu = x => x * sigmoid(x)
 
 const relu = x => Math.max(0, x)
 
+const pow2 = x => x ** 2
+
 const POINTWISE = {
   'relu': relu,
   'gelu': gelu,
   'sigmoid': sigmoid,
   'silu': silu,
   'tanh': Math.tanh,
+  'x**2': pow2,
 }
 
 // epilogs
@@ -195,6 +198,7 @@ export const EPILOGS = [
   'softmax(tril(x/sqrt(k)))',
   'x/k',
   'x/sqrt(k)',
+  'x**2',
 ]
 
 function softmax_(h, w, data, tril = false) {
