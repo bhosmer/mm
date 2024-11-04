@@ -1,6 +1,6 @@
 ### Attention head explorer
 
-Trained weights and input samples taken from [Karpathy's NanoGPT (gpt2 default config)](https://github.com/karpathy/nanoGPT).
+Trained weights and input samples taken from [Karpathy's NanoGPT](https://github.com/karpathy/nanoGPT) (('gpt2' config)](https://github.com/karpathy/nanoGPT/blob/master/model.py#L217)).
 
 Sequence length has been reduced to 256 for ease of visualization, but weights retain their original dimensions.
 
@@ -25,4 +25,4 @@ V = input @ wV
 head_out = (attn @ V) @ wO
 ```
 
-[Try it here](https://bhosmer.github.io/mm/examples/attngpt/index.html)
+[Try it here](https://bhosmer.github.io/mm/examples/attngpt2/index.html)

@@ -183,7 +183,7 @@ const POINTWISE = {
 }
 
 // epilogs
-// todo the way epis are done is kind of messy rn
+// TODO the way epis are done is kind of messy rn
 
 export const EPILOGS = [
   'none',
@@ -196,6 +196,7 @@ export const EPILOGS = [
   'softmax',
   'softmax(x/sqrt(k))',
   'softmax(tril(x/sqrt(k)))',
+  'softmax(tril(x/8))',
   'x/k',
   'x/sqrt(k)',
   'x**2',
@@ -256,6 +257,7 @@ const IN_PLACE_EPILOGS = {
   'softmax': softmax_,
   'softmax(x/sqrt(k))': softmax_,
   'softmax(tril(x/sqrt(k)))': softmax_tril_,
+  'softmax(tril(x/8))': softmax_tril_, // TODO remove with epi cleanup
   'layernorm': layernorm_,
 }
 
@@ -286,10 +288,6 @@ function initArrayData_(data, h, w, init, epi = undefined, r = undefined, c = un
   }
   applyInPlaceEpilog_(data, h, w, epi)
 }
-
-// i == j ? Math.sqrt((1 / {3:5, 11: 4, 20: 7, 28: 6}[j])) || 1 : 0
-
-// window.__viz__.right.data.slice().get(j, i)
 
 export class Array2D {
 
@@ -1041,13 +1039,24 @@ export class MatMul {
     this.result = new Mat(data, result_params, this.context, false)
   }
 
-  // todo clean up the way epilogs are done
+  // TODO clean up the way epilogs are done.
+  // currently we run a pointwise epi if we find one,
+  // or we do preprocessing needed by the in-place epi
+  // (which is run later) based on snooping the expression
   applyPointwiseEpilog(x) {
     const epi = this.params.epilog
     const pw = POINTWISE[epi]
-    return epi == 'x/k' ? x / this.D :
-      epi.includes('x/sqrt(k)') ? x / Math.sqrt(this.D) :
-        pw ? pw(x) : x
+    if (pw) {
+      return pw(x)
+    } else if (epi == 'x/k') {
+      return x / this.D
+    } else if (epi.includes('x/sqrt(k)')) {
+      return x / Math.sqrt(this.D)
+    } else if (epi.includes('x/8')) {
+      return x / 8
+    } else {
+      return x
+    }
   }
 
   dotprod(i, k, minj, maxj) {
