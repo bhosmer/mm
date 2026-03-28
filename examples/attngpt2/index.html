@@ -51,6 +51,10 @@
 
 <body>
   <form id="header">
+    <label for="seqLen">Sequence Length (h)</label>
+    <input type="range" id="seqLen" min="32" max="512" step="32" value="256" style="width: 120px;" />
+    <span id="seqLenValue">256</span>
+
     <label for="input">Sample Input</label>
     <select id="input" required></select>
     <label for="layer">Layer</label>
@@ -93,6 +97,8 @@
 
     const anim_elem = document.getElementById('anim');
     const path_elem = document.getElementById('path');
+    const seqLen_elem = document.getElementById('seqLen');
+    const seqLenValue_elem = document.getElementById('seqLenValue');
 
     const params = {
       "folder": "closed",
@@ -454,6 +460,30 @@
     head_elem.addEventListener('change', updateData)
     anim_elem.addEventListener('change', updateAnim)
     path_elem.addEventListener('change', updateData)
+
+    seqLen_elem.addEventListener('change', updateSeqLen)
+    seqLen_elem.addEventListener('input', (e) => {
+      seqLenValue_elem.textContent = e.target.value
+    })
+
+    function updateSeqLen() {
+      const h = parseInt(seqLen_elem.value)
+      set({
+        left: {
+          left: {
+            left: {
+              left: { h },
+            },
+            right: {
+              right: { w: h },
+            }
+          },
+          right: {
+            left: { h },
+          }
+        }
+      })
+    }
 
     init()
   </script>
